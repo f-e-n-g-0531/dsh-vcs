@@ -113,3 +113,8 @@ test('copying a path announces success to assistive technology',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/vcs-sr-only/);assert.match(source,/role="status"/);assert.match(source,/pathCopied/);
 });
+
+test('CI installs the development dependencies required by build and tests',async()=>{
+ const workflow=await readFile(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8');
+ assert.match(workflow,/npm ci --include=dev/);
+});
