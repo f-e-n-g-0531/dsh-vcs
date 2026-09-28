@@ -64,7 +64,8 @@
     "expandAll": "全部展开",
     "collapseAll": "全部折叠",
     "reviewPosition": "第 {index} / {total} 个文件",
-    "clearFilters": "清除筛选"
+    "clearFilters": "清除筛选",
+    "searchShortcut": "Ctrl / ⌘ + F 搜索；Esc 清空搜索"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -131,6 +132,7 @@
     "expandAll": "Expand all",
     "collapseAll": "Collapse all",
     "reviewPosition": "File {index} of {total}",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "searchShortcut": "Ctrl / ⌘ + F to search; Esc clears search"
   }
 }

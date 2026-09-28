@@ -83,3 +83,8 @@ test('review filters can reset search and status together',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/clearFilters/);assert.match(source,/setStatusFilter\('all'\)/);
 });
+
+test('review search supports focus and clear keyboard shortcuts',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/searchNode/);assert.match(source,/key\.toLowerCase\(\)==='f'/);assert.match(source,/key==='Escape'/);
+});
