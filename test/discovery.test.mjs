@@ -120,9 +120,22 @@ test('cancelled and expired requests return bounded partial results with warning
   const expired = await discoverRepositories(root, { timeoutMs: 0 });
   assert.deepEqual(expired.repositories, []); assert.equal(expired.truncated, true); assert.match(expired.warnings.join(), /timed out/);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20);
-  try { const result = await discoverRepositories(root, { signal: controller.signal }); assert.equal(result.truncated, true); assert.match(result.warnings.join(), /cancelled/); }
-  finally { clearTimeout(timer); }
+  // Abort after a real child command subscribes, not after a wall-clock delay:
+  // a fast runner can finish the entire scan within 20ms.
+  let subscribed = false;
+  const signal = {
+    get aborted() { return controller.signal.aborted; },
+    addEventListener(...args) {
+      controller.signal.addEventListener(...args);
+      subscribed = true;
+      queueMicrotask(() => controller.abort());
+    },
+    removeEventListener(...args) { controller.signal.removeEventListener(...args); },
+  };
+  const result = await discoverRepositories(root, { signal });
+  assert.equal(subscribed, true);
+  assert.equal(result.truncated, true);
+  assert.match(result.warnings.join(), /cancelled/);
 });
 
 test('issued canonical roots reject subsequent symlink/junction replacement for both types', async t => {
