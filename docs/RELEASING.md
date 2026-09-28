@@ -1,20 +1,14 @@
 # 发布清单
 
-当前包名 @feng0531/dsh-vcs，配置 npm 公共发布；不自动发布 npm。公开下载不改变非商业许可证。
+当前包名 @feng0531/dsh-vcs；正式发布统一走 GitHub Actions，不在本地 npm publish。公开下载不改变非商业许可证。
 
-## npm 发布
+## GitHub + npm 联合发布
 
-完成检查、标签 CI 全绿和新包名真实 DSH 验收后，维护者手动执行：
+在 GitHub 仓库 Settings → Secrets and variables → Actions 添加 NPM_AUTOMATION_TOKEN。该令牌必须有 @feng0531/dsh-vcs 发布权限，并满足 npm 的 2FA 策略（需要时启用 bypass 2FA）；名字叫 AUTOMATION_TOKEN 不会自动赋予权限。不要在聊天、源码或日志中公开值。
 
-```sh
-npm login --registry=https://registry.npmjs.org/
-npm whoami --registry=https://registry.npmjs.org/
-npm publish --dry-run --access public --registry=https://registry.npmjs.org/
-# 确认账号为 feng0531，并获发布授权后：
-npm publish --access public --registry=https://registry.npmjs.org/
-```
+对应标签 CI 全绿及人工验收后，从 main 手动运行 Publish GitHub and npm 工作流，填写已有版本标签。构建、验证和打包步骤不注入 npm 凭据；仅 npm 发布步骤使用 NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTOMATION_TOKEN }}，且禁用生命周期脚本。同一 tgz 先发布 npm，再作为 GitHub 正式 Release 附件上传并附 SHA-256。
 
-按 npm 提示完成认证，不提交 token 或验证码。同名同版本不可覆盖。
+两平台不支持原子事务：npm 失败则不发布 GitHub；npm 成功而 GitHub 失败时，重跑仅在已发布 npm integrity 与当前包完全一致时继续，否则拒绝覆盖。GitHub 已存在 Release 时也拒绝覆盖，需先检查现场。新版本不移动旧标签。
 
 ## 1. 公开发布前的决定
 
@@ -58,11 +52,11 @@ Git 来源安装依赖 prepare 构建，需要另行验证生命周期和构建�
 
 记录宿主和浏览器版本、步骤及已知限制。自动化测试通过不等于这些项目已完成；未执行时明确写“未验收”，不补写成功结论。
 
-## 4. 草稿 Release 工作流
+## 4. 标签 CI 与发布工作流
 
-普通分支 push、PR 和日常脚本修改不触发 CI；只有维护者主动推送版本标签（`vX.Y.Z`）才触发 Windows/Linux 测试矩阵。完成本地检查后，确认包版本并执行 `git tag vX.Y.Z`、`git push origin vX.Y.Z`（替换成真实版本，标签须指向包含新 CI 规则的提交）。不要移动已经发布的标签。等待该标签的 CI 全部通过并完成真实页面验收后再进行发布。在 Actions 手动运行 Release workflow 并填写已有 tag：工作流验证版本、重新构建与测试、检查包并生成 SHA256SUMS.txt，仅创建草稿 Release。检查附件和说明后再由维护者决定正式发布。未通过的真实页面验收不得勾选完成。
+普通分支 push、PR 和日常脚本修改不触发 CI；只有维护者主动推送版本标签（`vX.Y.Z`）才触发 Windows/Linux 测试矩阵。完成本地检查后，确认包版本并执行 `git tag vX.Y.Z`、`git push origin vX.Y.Z`（替换成真实版本，标签须指向包含新 CI 规则的提交）。不要移动已经发布的标签。等待该标签的 CI 全部通过并完成真实页面验收后再进行发布。在 Actions 手动运行 Release workflow 并填写已有 tag：工作流验证版本、重新构建与测试、检查包并生成 SHA256SUMS.txt，随后先发布 npm 再公开 GitHub Release。手动触发即授权两平台正式发布。未通过的真实页面验收不得勾选完成。
 
-CI 会严格校验标签为 `vX.Y.Z` 且与包版本相同。草稿 Release 会检查同一标签、同一提交的最新 CI 必须成功；未运行、失败或尚在运行时拒绝创建草稿。这不替代真实 DSH 页面人工验收。
+CI 会严格校验标签为 `vX.Y.Z` 且与包版本相同。联合发布会检查同一标签、同一提交的最新 CI 必须成功；未运行、失败或尚在运行时拒绝创建草稿。这不替代真实 DSH 页面人工验收。
 
 ## 5. 分发
 

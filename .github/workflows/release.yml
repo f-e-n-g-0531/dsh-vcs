@@ -1,4 +1,4 @@
-name: Draft release
+name: Publish GitHub and npm
 
 on:
   workflow_dispatch:
@@ -44,6 +44,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          registry-url: https://registry.npmjs.org/
 
       - name: Verify tag matches package version
         run: |
@@ -87,25 +88,54 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync, appendFileSync } from 'node:fs';
           import assert from 'node:assert/strict';
-          const reports = JSON.parse(readFileSync(process.env.RUNNER_TEMP + '/dsh-vcs-pack.json', 'utf8'));
+          const {parsePackReport} = await import('./scripts/pack-report.mjs');
+          const reports = parsePackReport(readFileSync(process.env.RUNNER_TEMP + '/dsh-vcs-pack.json', 'utf8'));
           assert.equal(reports.length, 1);
           const filename = reports[0].filename;
           assert.match(filename, /^[a-zA-Z0-9][a-zA-Z0-9._-]*\.tgz$/);
           appendFileSync(process.env.GITHUB_OUTPUT, 'filename=' + filename + '\n');
           NODE
-          artifact="$(node --input-type=module -e 'import {readFileSync} from "node:fs"; console.log(JSON.parse(readFileSync(process.env.RUNNER_TEMP + "/dsh-vcs-pack.json", "utf8"))[0].filename)')"
+          artifact="$(node --input-type=module -e 'import {readFileSync} from "node:fs"; import {parsePackReport} from "./scripts/pack-report.mjs"; console.log(parsePackReport(readFileSync(process.env.RUNNER_TEMP + "/dsh-vcs-pack.json", "utf8"))[0].filename)')"
           sha256sum -- "$artifact" > SHA256SUMS.txt
           sha256sum --check -- SHA256SUMS.txt
 
-      - name: Create draft GitHub release (never publish)
+      - name: Publish exact tarball to npm
+        env:
+          NODE_AUTH_TOKEN: 4{{ secrets.NPM_AUTOMATION_TOKEN }}
+          ARTIFACT: 4{{ steps.pack.outputs.filename }}
+        run: |
+          set -euo pipefail
+          test -n "$NODE_AUTH_TOKEN" || { echo 'Missing NPM_AUTOMATION_TOKEN secret' >&2; exit 1; }
+          # Only this step gets npm credentials; never execute package scripts with them.
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {spawnSync} from 'node:child_process';
+          import assert from 'node:assert/strict';
+          const pkg=JSON.parse(readFileSync('package.json','utf8'));
+          assert.equal(pkg.name,'@feng0531/dsh-vcs');
+          const integrity='sha512-'+createHash('sha512').update(readFileSync(process.env.ARTIFACT)).digest('base64');
+          const url='https://registry.npmjs.org/'+encodeURIComponent(pkg.name)+'/'+pkg.version;
+          const response=await fetch(url);
+          if(response.ok){
+            assert.equal((await response.json()).dist.integrity,integrity,'Existing npm version differs; refuse overwrite');
+            console.log('Exact artifact already published; continuing GitHub release');
+          }else{
+            assert.equal(response.status,404,'Registry lookup failed; refusing publish');
+            const result=spawnSync('npm',['publish',process.env.ARTIFACT,'--ignore-scripts','--access','public','--registry=https://registry.npmjs.org/'],{stdio:'inherit'});
+            if(result.error)throw result.error;
+            assert.equal(result.status,0,'npm publication failed');
+          }
+          NODE
+
+      - name: Publish GitHub release after npm succeeds
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ARTIFACT: ${{ steps.pack.outputs.filename }}
         run: |
           set -euo pipefail
-          # --verify-tag forbids creating a tag. Existing releases cause failure;
-          # this workflow never overwrites assets or publishes an existing draft.
+          # Existing releases are never overwritten. npm retries require identical integrity.
           gh release create "$RELEASE_TAG" "$ARTIFACT" SHA256SUMS.txt \
-            --verify-tag --draft --title "$RELEASE_TAG" \
-            --notes 'Read-only DSH VCS plugin. Review the tarball and SHA-256 checksum before manually publishing this draft. No npm publication is performed.'
+            --verify-tag --title "DSH VCS $RELEASE_TAG" --generate-notes \
+            --notes 'Read-only Git/SVN plugin for DSH Web 0.1.7-rc.2. npm: @feng0531/dsh-vcs. Install the matching version with dsh plugin --profile web add. Remove legacy @local/dsh-vcs first; restart DSH manually. Noncommercial use only; see LICENSE. Windows ANSI SVN builds may not support Chinese path arguments; CI uses a UTF-8-configured temporary SVN. The npm package and attached tgz are the same artifact. See docs/INSTALL.md and docs/COMPATIBILITY.md in the tagged source.'

@@ -60,7 +60,7 @@ check 构建并运行测试；npm pack 经 prepack 再次执行检查，生成�
 
 ## 发布与安装验收
 
-见 [安装、升级与回滚](<docs/INSTALL.md>) 和 [兼容性与验收矩阵](<docs/COMPATIBILITY.md>)。发布包必须通过 `npm run verify:package` 和 `npm run test:install`；后者验证生产依赖安装，不代表真实 DSH 浏览器验收。GitHub Release 工作流只能手动运行，并且仅创建草稿，不自动正式发布。
+见 [安装、升级与回滚](<docs/INSTALL.md>) 和 [兼容性与验收矩阵](<docs/COMPATIBILITY.md>)。发布包必须通过 `npm run verify:package` 和 `npm run test:install`；后者验证生产依赖安装，不代表真实 DSH 浏览器验收。正式发布统一从 GitHub Actions 手动触发，使用 NPM_AUTOMATION_TOKEN 先发布 npm，再公开 GitHub Release；普通提交和标签 CI 不自动发布。
 
 ## 项目资料
 
