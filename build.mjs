@@ -1,0 +1,10 @@
+import { build } from 'esbuild';
+import { mkdir, copyFile } from 'node:fs/promises';
+await mkdir('dist', { recursive: true });
+await copyFile('node_modules/monaco-editor/LICENSE', 'dist/MONACO-LICENSE.txt');
+await copyFile('node_modules/monaco-editor/ThirdPartyNotices.txt', 'dist/MONACO-ThirdPartyNotices.txt');
+const common = { bundle: true, minify: true, target: 'es2022', logLevel: 'info' };
+await build({ ...common, entryPoints:['src/client.jsx'], outfile:'dist/client.js', format:'cjs', external:['react'], banner:{js:'window.__ModuleLoader__.load({ id: "@local/dsh-vcs", factory(require) { var module = { exports: {} }; var exports = module.exports;'}, footer:{js:'return module.exports; }});'}, loader:{'.css':'text'} });
+await build({ ...common, entryPoints:['src/editor.js'], outfile:'dist/editor.js', format:'esm', loader:{'.ttf':'dataurl'} });
+await build({ ...common, entryPoints:['node_modules/monaco-editor/esm/vs/editor/editor.worker.js'], outfile:'dist/editor.worker.js', format:'iife' });
+console.log('Built DSH VCS client, lazy editor, stylesheet and worker.');

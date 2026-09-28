@@ -1,0 +1,71 @@
+{
+  "name": "@local/dsh-vcs",
+  "version": "0.3.5",
+  "private": true,
+  "type": "module",
+  "description": "Read-only Git and SVN change preview for DSH",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.mjs",
+    "vcs.mjs",
+    "dist",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml",
+    "THIRD_PARTY_NOTICES.md",
+    "docs/RELEASING.md"
+  ],
+  "icon": "./icon.svg",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "npm run build && npm test",
+    "prepare": "npm run build",
+    "prepack": "npm run check"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "monaco-editor": "^0.52.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/f-e-n-g-0531/dsh-vcs.git"
+  },
+  "homepage": "https://github.com/f-e-n-g-0531/dsh-vcs#readme",
+  "bugs": {
+    "url": "https://github.com/f-e-n-g-0531/dsh-vcs/issues"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "git",
+    "svn",
+    "diff"
+  ]
+}
