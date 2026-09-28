@@ -67,6 +67,7 @@
     "reviewPosition": "第 {index} / {total} 个文件",
     "clearFilters": "清除筛选",
     "searchShortcut": "Ctrl / ⌘ + F 搜索；Esc 清空搜索",
+    "fileShortcut": "Alt + ← / → 切换上一个或下一个文件",
     "copyPath": "复制路径",
     "copied": "已复制",
     "copyFailed": "无法复制文件路径。"
@@ -139,6 +140,7 @@
     "reviewPosition": "File {index} of {total}",
     "clearFilters": "Clear filters",
     "searchShortcut": "Ctrl / ⌘ + F to search; Esc clears search",
+    "fileShortcut": "Alt + ← / → switches the previous or next file",
     "copyPath": "Copy path",
     "copied": "Copied",
     "copyFailed": "Unable to copy the file path."

@@ -98,3 +98,8 @@ test('tree controls can reveal and focus the selected nested file',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/revealSelected/);assert.match(source,/directoryAncestors/);assert.match(source,/scrollIntoView/);assert.match(source,/data-vcs-change/);
 });
+
+test('review file navigation supports Alt arrow shortcuts outside text inputs',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/e\.altKey/);assert.match(source,/ArrowLeft/);assert.match(source,/ArrowRight/);assert.match(source,/selectAdjacent\(e\.key==='ArrowLeft'/);
+});
