@@ -4,6 +4,7 @@ import TextComparison from './TextComparison.jsx';
 import {loadEditor} from './editor-loader.mjs';
 import dictionaries from './locales.json';
 import {version} from '../package.json';
+import {readProject,saveProject} from './project-preference.mjs';
 import {changeKey,repositoryLabel,requestMode,groupChanges,createStatusLimiter,mergeDiscovery,selectProject} from './repositories.mjs';
 const statusCodes={modified:'M',added:'A',deleted:'D',missing:'D',renamed:'R',copied:'C',conflicted:'U',untracked:'?',unversioned:'?',replaced:'M',obstructed:'U',normal:'P'};
 const asset = name => new URL('vcs-assets/'+name,document.baseURI).href;
@@ -26,7 +27,7 @@ export function apply(ctx){
   function Panel({session}) {
     useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot(),()=>ctx.locale.getSnapshot());
     const sessionId=session?.id;
-    const [mode,setMode]=useState('all'),[refresh,setRefresh]=useState(0),[discovery,setDiscovery]=useState(null),[statuses,setStatuses]=useState({}),[repositoryId,setRepositoryId]=useState(''),[scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState(''),[selected,setSelected]=useState(null),[comparison,setComparison]=useState(null);
+    const [mode,setMode]=useState('all'),[refresh,setRefresh]=useState(0),[discovery,setDiscovery]=useState(null),[statuses,setStatuses]=useState({}),[repositoryId,setRepositoryId]=useState(()=>readProject(session?.cwd)),[scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState(''),[selected,setSelected]=useState(null),[comparison,setComparison]=useState(null);
     const [scanning,setScanning]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[detailError,setDetailError]=useState(''),[editorError,setEditorError]=useState('');
     const [query,setQuery]=useState(''),[tree,setTree]=useState(true),[sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false),[tab,setTab]=useState('content');
     const [editorRetry,setEditorRetry]=useState(0);
@@ -35,6 +36,7 @@ export function apply(ctx){
     const statusController=useRef(null),compareController=useRef(null),scanController=useRef(null),previousDiscovery=useRef(null);
     const repositories=discovery?.repositories||[];
     const visibleRepositories=repositories.filter(repo=>repo.id===repositoryId);
+    useEffect(()=>{if(repositories.some(repo=>repo.id===repositoryId))saveProject(session?.cwd,repositoryId);},[session?.cwd,repositoryId,discovery]);
     const invalidate=()=>{statusController.current?.abort();compareController.current?.abort();setComparison(null);setSelected(null);setDetailError('');setTab('content');setStats({added:0,deleted:0,count:0});};
     const rescan=()=>{invalidate();scanController.current?.abort();previousDiscovery.current=discovery;setDiscovery(null);setStatuses({});setScanPath(subdirectory.trim());setScan(x=>x+1);};
     const refreshStatuses=()=>{invalidate();setStatuses({});setRefresh(x=>x+1);};
