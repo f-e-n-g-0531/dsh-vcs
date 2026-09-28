@@ -78,3 +78,8 @@ test('review toolbar shows current visible file position',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/changePosition/);assert.match(source,/reviewPosition/);
 });
+
+test('review filters can reset search and status together',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/clearFilters/);assert.match(source,/setStatusFilter\('all'\)/);
+});

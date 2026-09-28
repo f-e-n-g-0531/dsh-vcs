@@ -63,7 +63,8 @@
     "nextFile": "下一个文件",
     "expandAll": "全部展开",
     "collapseAll": "全部折叠",
-    "reviewPosition": "第 {index} / {total} 个文件"
+    "reviewPosition": "第 {index} / {total} 个文件",
+    "clearFilters": "清除筛选"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -129,6 +130,7 @@
     "nextFile": "Next file",
     "expandAll": "Expand all",
     "collapseAll": "Collapse all",
-    "reviewPosition": "File {index} of {total}"
+    "reviewPosition": "File {index} of {total}",
+    "clearFilters": "Clear filters"
   }
 }
