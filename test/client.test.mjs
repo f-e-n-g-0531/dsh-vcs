@@ -108,3 +108,8 @@ test('binary comparison notice identifies the compared sides',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/binarySummary/);assert.match(source,/binaryComparison/);assert.match(source,/comparison.left.label/);
 });
+
+test('copying a path announces success to assistive technology',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/vcs-sr-only/);assert.match(source,/role="status"/);assert.match(source,/pathCopied/);
+});

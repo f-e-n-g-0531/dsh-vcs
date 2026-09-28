@@ -70,6 +70,7 @@
     "fileShortcut": "Alt + ← / → 切换上一个或下一个文件",
     "copyPath": "复制路径",
     "copied": "已复制",
+    "pathCopied": "文件路径已复制到剪贴板。",
     "copyFailed": "无法复制文件路径。",
     "binaryComparison": "（{files}）"
   },
@@ -144,6 +145,7 @@
     "fileShortcut": "Alt + ← / → switches the previous or next file",
     "copyPath": "Copy path",
     "copied": "Copied",
+    "pathCopied": "File path copied to the clipboard.",
     "copyFailed": "Unable to copy the file path.",
     "binaryComparison": "({files})"
   }
