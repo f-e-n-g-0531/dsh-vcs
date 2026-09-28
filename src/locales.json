@@ -58,7 +58,9 @@
     "before": "前版本",
     "after": "后版本",
     "filterStatus": "按状态筛选",
-    "allFiles": "全部文件"
+    "allFiles": "全部文件",
+    "previousFile": "上一个文件",
+    "nextFile": "下一个文件"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -119,6 +121,8 @@
     "before": "Before",
     "after": "After",
     "filterStatus": "Filter by status",
-    "allFiles": "All files"
+    "allFiles": "All files",
+    "previousFile": "Previous file",
+    "nextFile": "Next file"
   }
 }

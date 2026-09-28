@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,adjacentChange,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -40,4 +40,11 @@ test('status filtering combines review category and case-insensitive path search
  assert.deepEqual(filterChanges(changes,'','added').map(c=>c.path),['src/new.js']);
  assert.deepEqual(filterChanges(changes,'new','added').map(c=>c.path),['src/new.js']);
  assert.deepEqual(filterChanges(changes,'new','deleted'),[]);
+});
+
+test('adjacent review navigation wraps only within visible changes',()=>{
+ const changes=[{id:'a'},{id:'b'},{id:'c'}];
+ assert.equal(adjacentChange(changes,'b','next').id,'c');assert.equal(adjacentChange(changes,'b','previous').id,'a');
+ assert.equal(adjacentChange(changes,'c','next').id,'a');assert.equal(adjacentChange(changes,'a','previous').id,'c');
+ assert.equal(adjacentChange([], 'a','next'),null);assert.equal(adjacentChange(changes,'missing','next').id,'a');
 });

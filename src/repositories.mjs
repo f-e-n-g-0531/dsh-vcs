@@ -23,6 +23,13 @@ export function buildChangeTree(changes = []) {
   const sort = node => ({...node, directories: [...node.directories.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(sort), files: [...node.files].sort((a,b)=>a.path.localeCompare(b.path))});
   return sort(root);
 }
+export function adjacentChange(changes = [], selectedId, direction) {
+  if (!changes.length || !['previous', 'next'].includes(direction)) return null;
+  const index = changes.findIndex(change => change.id === selectedId);
+  const step = direction === 'next' ? 1 : -1;
+  const current = index < 0 ? (direction === 'next' ? -1 : 0) : index;
+  return changes[(current + step + changes.length) % changes.length] || null;
+}
 export function filterChanges(changes = [], query = '', status = 'all') {
   const needle = query.toLowerCase();
   return changes.filter(change => (status === 'all' || change.status === status) && change.path.toLowerCase().includes(needle)).sort((a, b) => a.path.localeCompare(b.path));
