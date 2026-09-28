@@ -17,6 +17,7 @@
     "locale",
     "icon.svg",
     "cordis.patch.yml",
+    "LICENSE",
     "THIRD_PARTY_NOTICES.md",
     "docs/RELEASING.md"
   ],
@@ -60,7 +61,7 @@
   "bugs": {
     "url": "https://github.com/f-e-n-g-0531/dsh-vcs/issues"
   },
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",

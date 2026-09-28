@@ -1,6 +1,6 @@
 # Third-party notices
 
-This notice does not grant a license to the plugin itself. The owner must select its license before a public release.
+The plugin is governed by the DSH VCS Non-Commercial Source Available License 1.0 in LICENSE. Third-party materials remain under their respective licenses; the plugin license does not restrict the rights those licenses independently grant.
 
 ## Monaco Editor 0.52.x
 
