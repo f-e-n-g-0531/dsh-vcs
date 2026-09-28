@@ -101,8 +101,8 @@ jobs:
 
       - name: Publish exact tarball to npm
         env:
-          NODE_AUTH_TOKEN: 4{{ secrets.NPM_AUTOMATION_TOKEN }}
-          ARTIFACT: 4{{ steps.pack.outputs.filename }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTOMATION_TOKEN }}
+          ARTIFACT: ${{ steps.pack.outputs.filename }}
         run: |
           set -euo pipefail
           test -n "$NODE_AUTH_TOKEN" || { echo 'Missing NPM_AUTOMATION_TOKEN secret' >&2; exit 1; }
