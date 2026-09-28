@@ -91,5 +91,5 @@ test('review search supports focus and clear keyboard shortcuts',async()=>{
 
 test('review header exposes a safe copy-path control',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
- assert.match(source,/navigator.clipboard/);assert.match(source,/copyPath/);assert.match(source,/copyFailed/);
+ assert.match(source,/navigator\.clipboard/);assert.match(source,/document\.execCommand\('copy'\)/);assert.match(source,/copyPath/);assert.match(source,/copyFailed/);
 });
