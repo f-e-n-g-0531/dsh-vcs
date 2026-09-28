@@ -7,7 +7,7 @@
 ```sh
 # 旧包用户先备份配置，再移除旧包
 dsh plugin --profile web remove @local/dsh-vcs
-dsh plugin --profile web add @feng0531/dsh-vcs@0.3.17
+dsh plugin --profile web add @feng0531/dsh-vcs@0.3.18
 ```
 
 不要同时保留新旧包；安装后由用户重启。回滚时先移除 @feng0531/dsh-vcs，再安装旧版 tgz。
