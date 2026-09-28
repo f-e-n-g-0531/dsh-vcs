@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {parsePackReport} from './pack-report.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -55,7 +56,7 @@ function verify() {
     });
   if (packed.error) throw packed.error;
   assert.equal(packed.status, 0, 'npm pack dry-run failed: ' + (packed.stderr || packed.signal || packed.status));
-  const reports = JSON.parse(packed.stdout);
+  const reports = parsePackReport(packed.stdout);
   assert.ok(Array.isArray(reports) && reports.length === 1, 'Expected exactly one package');
   const report = reports[0];
   assert.equal(report.name, manifest.name);

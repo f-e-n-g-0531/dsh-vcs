@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
+import {parsePackReport} from './pack-report.mjs';
 import {pathToFileURL} from 'node:url';
 const npm=process.env.npm_execpath;
 if(!npm) throw new Error('Run via npm run test:install');
@@ -11,7 +12,7 @@ const root=process.cwd();
 const temp=await mkdtemp(path.join(tmpdir(),'dsh-vcs-install-'));
 function run(args,cwd){const r=spawnSync(process.execPath,[npm,...args],{cwd,encoding:'utf8',windowsHide:true});if(r.error)throw r.error;if(r.status!==0)throw new Error(r.stderr||r.stdout);return r.stdout;}
 try {
- const packed=JSON.parse(run(['pack','--ignore-scripts','--json','--pack-destination',temp],root));
+ const packed=parsePackReport(run(['pack','--ignore-scripts','--json','--pack-destination',temp],root));
  const archive=path.join(temp,packed[0].filename);
  await writeFile(path.join(temp,'package.json'),JSON.stringify({private:true}));
  run(['install','--omit=dev','--no-audit','--no-fund',archive],temp);
