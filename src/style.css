@@ -36,6 +36,7 @@
 .vcs-root .vcs-filelist{overflow:auto;flex:1;padding:0 6px 10px}
 .vcs-root .vcs-file{display:flex;gap:8px;align-items:flex-start;width:100%;border:0;background:transparent;text-align:left;border-radius:6px;padding:7px 8px}
 .vcs-root .vcs-file[aria-current=true]{background:var(--dsw-alias-interactive-bg-active)}
+.vcs-root .vcs-file:focus-visible,.vcs-root .vcs-dir-toggle:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:-2px}
 .vcs-root .vcs-filename{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vcs-root .vcs-filepath{display:block;color:var(--dsw-alias-label-tertiary);font-size:11px;overflow:hidden;text-overflow:ellipsis}
 .vcs-root .vcs-status{font-weight:600;min-width:14px;color:var(--dsw-alias-state-warn-primary)}

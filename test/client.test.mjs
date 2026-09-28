@@ -51,3 +51,10 @@ test('VCS page renders no-session state without repository reads during render',
   const html=renderToString(React.createElement(Page,{useSessions:select=>select({byId:{}})}));
   assert.match(html,/先打开一个项目会话/);
 });
+
+test('review file tree exposes keyboard navigation and directory expansion semantics',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/onFileListKeyDown/);
+ assert.match(source,/ArrowDown/);assert.match(source,/ArrowUp/);assert.match(source,/data-vcs-directory/);
+ assert.match(source,/aria-expanded/);assert.match(source,/data-vcs-item/);
+});
