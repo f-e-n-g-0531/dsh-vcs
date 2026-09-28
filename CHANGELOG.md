@@ -1,5 +1,10 @@
 # 变更记录
 
+## 0.3.12 — 联合发布流程验证
+
+- 正式发布统一由 GitHub Actions 手动触发，以 NPM_AUTOMATION_TOKEN 发布 npm 后公开 GitHub Release，使用同一 tgz。
+- 标签推送只触发测试 CI，不自动正式发布；本版本用于验证当前流程。
+
 ## 0.3.11 — npm 发布准备
 
 - 迁移为 @feng0531/dsh-vcs，开启公共 npm 发布配置，尚未执行 npm publish。
