@@ -33,6 +33,7 @@
 .vcs-root .vcs-status-filter{display:flex;gap:4px;overflow:auto;padding:0 10px 8px}
 .vcs-root .vcs-status-filter button{font-size:11px;white-space:nowrap;padding:3px 6px}
 .vcs-root .vcs-status-filter button[aria-pressed=true]{background:var(--dsw-alias-interactive-bg-active);color:var(--dsw-alias-label-primary)}
+.vcs-root .vcs-status-filter small{font-size:10px;color:var(--dsw-alias-label-tertiary)}
 .vcs-root .vcs-count{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--dsw-alias-label-secondary)}
 .vcs-root .vcs-count>span:first-child{margin-right:auto}
 .vcs-root .vcs-auto{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}

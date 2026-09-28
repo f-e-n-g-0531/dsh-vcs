@@ -68,3 +68,8 @@ test('tree mode exposes bulk expand and collapse review controls',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/setTreeExpanded/);assert.match(source,/expandAll/);assert.match(source,/collapseAll/);
 });
+
+test('review status filters expose current category counts',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/countChangeStatuses/);assert.match(source,/statusCounts\[value\]/);
+});
