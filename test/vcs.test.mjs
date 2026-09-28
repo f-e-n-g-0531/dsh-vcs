@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { detectRepository, listChanges, getComparison } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
-  const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } });
+  const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
   if (!fail) assert.equal(result.status, 0, name + ' ' + args.join(' ') + ': ' + result.stderr);
   return result;
 }

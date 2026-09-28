@@ -14,7 +14,7 @@ function run(command, args, cwd, max = MAX_OUTPUT, { signal, timeoutMs = TIMEOUT
     if (signal?.aborted) { reject(Object.assign(new Error('Discovery cancelled'), { code: 'ABORT_ERR' })); return; }
     // Inherited Git overrides must not redirect reads to a different repository.
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_')));
-    Object.assign(env, { GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'win32' ? 'C' : process.platform === 'darwin' ? 'en_US.UTF-8' : 'C.UTF-8' });
+    Object.assign(env, { GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' });
     const child = spawn(command, args, { cwd, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env });
     const out = [], err = []; let size = 0, error, done = false;
     const stop = e => { error ??= e; child.kill(); };
