@@ -73,3 +73,8 @@ test('review status filters expose current category counts',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/countChangeStatuses/);assert.match(source,/statusCounts\[value\]/);
 });
+
+test('review toolbar shows current visible file position',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/changePosition/);assert.match(source,/reviewPosition/);
+});

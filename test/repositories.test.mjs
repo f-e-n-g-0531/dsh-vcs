@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,adjacentChange,treeDirectoryIds,countChangeStatuses,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,changePosition,adjacentChange,treeDirectoryIds,countChangeStatuses,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -57,4 +57,11 @@ test('tree directory ids support bulk collapse while preserving nested stable pa
 test('status counts retain all categories for review filter badges',()=>{
  assert.deepEqual(countChangeStatuses([{status:'modified'},{status:'added'},{status:'modified'}]),{all:3,modified:2,added:1});
  assert.deepEqual(countChangeStatuses(),{all:0});
+});
+
+test('review position reports selection within the visible result set',()=>{
+ const changes=[{id:'a'},{id:'b'},{id:'c'}];
+ assert.deepEqual(changePosition(changes,'b'),{index:2,total:3});
+ assert.deepEqual(changePosition(changes,'missing'),{index:0,total:3});
+ assert.deepEqual(changePosition([], 'a'),{index:0,total:0});
 });

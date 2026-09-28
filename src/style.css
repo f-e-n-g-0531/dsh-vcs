@@ -75,6 +75,7 @@
 .vcs-root .vcs-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:8px 12px;border-top:1px solid var(--dsw-alias-border-l2);font-size:12px}
 .vcs-root .vcs-toolbar label{display:flex;gap:5px;align-items:center;cursor:pointer}
 .vcs-root .vcs-toolbar-separator{height:18px;border-left:1px solid var(--dsw-alias-border-l2)}
+.vcs-root .vcs-review-position{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
 .vcs-root .vcs-toolbar input{accent-color:var(--dsw-alias-state-business-primary)}
 .vcs-root .vcs-tabs{display:flex;gap:6px;padding:6px 12px}
 .vcs-root .vcs-properties{overflow:auto;padding:14px;flex:1}
