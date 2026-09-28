@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+      - name: Verify version tag
+        run: node scripts/verify-tag.mjs
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y subversion
       - if: runner.os == 'Windows'

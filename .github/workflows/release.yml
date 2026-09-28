@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+      actions: read
     env:
       RELEASE_TAG: ${{ inputs.tag }}
     defaults:
@@ -48,6 +49,23 @@ jobs:
         run: |
           set -euo pipefail
           node --input-type=module -e 'import { readFileSync } from "node:fs"; import assert from "node:assert/strict"; const pkg = JSON.parse(readFileSync("package.json", "utf8")); assert.equal(process.env.RELEASE_TAG, "v" + pkg.version, "Tag and package.version differ");'
+
+      - name: Require successful tag CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          export RELEASE_SHA="$(git rev-parse HEAD)"
+          gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$RELEASE_SHA&event=push&per_page=100" > "$RUNNER_TEMP/tag-ci.json"
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const runs=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/tag-ci.json','utf8')).workflow_runs;
+          const matching=runs.filter(r=>r.head_sha===process.env.RELEASE_SHA && r.head_branch===process.env.RELEASE_TAG).sort((a,b)=>b.id-a.id);
+          assert.ok(matching.length, 'Push the version tag and run CI before preparing a release');
+          assert.equal(matching[0].conclusion,'success','Latest CI for this exact tag must succeed');
+          NODE
 
       - name: Install Subversion test tools
         run: sudo apt-get update && sudo apt-get install -y subversion
