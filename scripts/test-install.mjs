@@ -16,7 +16,7 @@ try {
  const archive=path.join(temp,packed[0].filename);
  await writeFile(path.join(temp,'package.json'),JSON.stringify({private:true}));
  run(['install','--omit=dev','--no-audit','--no-fund',archive],temp);
- const installed=path.join(temp,'node_modules','@local','dsh-vcs');
+ const installed=path.join(temp,'node_modules','@feng0531','dsh-vcs');
  const manifest=JSON.parse(await readFile(path.join(installed,'package.json'),'utf8'));
  for(const file of ['index.mjs','vcs.mjs','dist/client.js','dist/editor.js','dist/editor.css','dist/editor.worker.js','LICENSE','dist/MONACO-LICENSE.txt','dist/MONACO-ThirdPartyNotices.txt','cordis.patch.yml'])await access(path.join(installed,file));
  const plugin=await import(pathToFileURL(path.join(installed,'index.mjs')).href);

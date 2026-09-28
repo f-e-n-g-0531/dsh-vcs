@@ -1,6 +1,20 @@
 # 发布清单
 
-本清单针对 0.3.6 发布准备。包名保持 @local/dsh-vcs，private: true；**不执行 npm publish**。
+当前包名 @feng0531/dsh-vcs，配置 npm 公共发布；不自动发布 npm。公开下载不改变非商业许可证。
+
+## npm 发布
+
+完成检查、标签 CI 全绿和新包名真实 DSH 验收后，维护者手动执行：
+
+```sh
+npm login --registry=https://registry.npmjs.org/
+npm whoami --registry=https://registry.npmjs.org/
+npm publish --dry-run --access public --registry=https://registry.npmjs.org/
+# 确认账号为 feng0531，并获发布授权后：
+npm publish --access public --registry=https://registry.npmjs.org/
+```
+
+按 npm 提示完成认证，不提交 token 或验证码。同名同版本不可覆盖。
 
 ## 1. 公开发布前的决定
 

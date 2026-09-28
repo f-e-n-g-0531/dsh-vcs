@@ -1,7 +1,8 @@
 {
-  "name": "@local/dsh-vcs",
-  "version": "0.3.10",
-  "private": true,
+  "name": "@feng0531/dsh-vcs",
+  "version": "0.3.11",
+  "private": false,
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
   "description": "Read-only Git and SVN change preview for DSH",
   "exports": {

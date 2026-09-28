@@ -7,7 +7,7 @@
 - 平台：仅 DSH Web；不支持作为独立 Vite 网站启动。React 由宿主提供，Monaco 和 Worker 随包分发。
 - Windows SVN 工具链：CI 固定使用 VisualSVN 分发的 Apache Subversion 1.14.5-5 ZIP 并核对 SHA-256，不再依赖未固定版本的 SlikSVN。旧 runner 将中文 argv 转成 `??`，设置 LC_ALL 未解决；仅替换发行版也未解决英文 runner 上的失败。SVN 1.14 的 Windows 参数转换使用系统 ANSI 代码页（CP_ACP），LC_ALL 不改变它。CI 在校验下载包后，仅为临时工具副本的 svn.exe/svnadmin.exe 合并 activeCodePage=UTF-8 manifest（需 Windows SDK mt.exe、Windows 10 1903+）；保留原有 manifest 设置，不更改系统区域。修改资源会使厂商签名失效，因此只限临时 CI 副本，不随插件分发。仍须以实际 runner 的中文回归结果验收。用户环境也须使用能正确接收中文参数的 SVN；本次 CI 配置不修复用户已安装的 ANSI SVN。LC_ALL 不能保证修复任意 Windows SVN 构建的 ANSI 参数处理。不修改系统代码页、不跳过中文路径断言。
 - Git/SVN：运行环境须按项目类型提供 git 或 svn；完整测试另需 svnadmin。
-- 发布渠道：GitHub Release 的预构建 tgz，非 npm registry。包名 @local/dsh-vcs 是宿主模块身份，保留以避免升级出现重复插件；private:true 不妨碍 tgz 安装。
+- 发布渠道：预构建 tgz，以及维护者手动发布后的 npm 包 @feng0531/dsh-vcs。旧包 @local/dsh-vcs 必须先卸载，不可与新包共存；保留 local-dsh-vcs 实例 ID。新包名的真实宿主加载仍需重新验收。
 
 ## 自动检查
 

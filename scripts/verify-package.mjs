@@ -16,10 +16,12 @@ const required = [
 function verify() {
   assert.equal(process.argv.length, 2, 'Usage: node scripts/verify-package.mjs (no arguments)');
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(manifest.name, '@local/dsh-vcs', 'Unexpected package name');
+  assert.equal(manifest.name, '@feng0531/dsh-vcs', 'Unexpected package name');
   assert.match(manifest.version, /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/, 'Version must be X.Y.Z');
   assert.equal(manifest.type, 'module');
-  assert.equal(manifest.private, true, 'Package must remain private; releases are tarball-only');
+  assert.equal(manifest.private, false, 'npm publication must be enabled');
+  assert.deepEqual(manifest.publishConfig, {access:'public',registry:'https://registry.npmjs.org/'});
+  assert.ok(readFileSync(new URL('../dist/client.js',import.meta.url),'utf8').includes('id: '+JSON.stringify(manifest.name)), 'Client loader identity must match package');
   assert.ok(typeof manifest.license === 'string' && manifest.license.length > 0, 'Missing license metadata');
   assert.deepEqual(manifest.exports, {
     '.': './index.mjs',
@@ -39,7 +41,7 @@ function verify() {
   // Deliberately accept only this small declarative YAML shape, not executable or
   // additional Cordis entries. No YAML dependency is needed for the fixed patch.
   const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-  assert.match(patch, /^- insert:\n {4}- id: local-dsh-vcs\n {6}name: ['"]@local\/dsh-vcs['"]\n {6}disabled: false\n {6}config: \{\}\n?$/, 'Unexpected Cordis installation patch');
+  assert.match(patch, /^- insert:\n {4}- id: local-dsh-vcs\n {6}name: ['"]@feng0531\/dsh-vcs['"]\n {6}disabled: false\n {6}config: \{\}\n?$/, 'Unexpected Cordis installation patch');
 
   // Windows npm is a .cmd shim. Only literal command/arguments reach the shell;
   // neither package metadata nor user input is ever interpolated into it.

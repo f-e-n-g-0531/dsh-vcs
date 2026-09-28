@@ -2,6 +2,16 @@
 
 本项目以 GitHub 发布附件中的预构建 tgz 分发。不要把开发目录链接到日常工作的 DSH profile。
 
+## npm 安装（确认版本已上架后）
+
+```sh
+# 旧包用户先备份配置，再移除旧包
+dsh plugin --profile web remove @local/dsh-vcs
+dsh plugin --profile web add @feng0531/dsh-vcs@0.3.11
+```
+
+不要同时保留新旧包；安装后由用户重启。回滚时先移除 @feng0531/dsh-vcs，再安装旧版 tgz。
+
 ## 安装前
 
 - 确认 Node.js >=22、DSH Web 接口兼容、Git/SVN 可执行文件可用。
