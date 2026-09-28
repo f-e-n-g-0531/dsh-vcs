@@ -5,7 +5,7 @@ import {loadEditor} from './editor-loader.mjs';
 import dictionaries from './locales.json';
 import {version} from '../package.json';
 import {readProject,saveProject} from './project-preference.mjs';
-import {changeKey,repositoryLabel,requestMode,groupChanges,createStatusLimiter,mergeDiscovery,selectProject} from './repositories.mjs';
+import {changeKey,repositoryLabel,requestMode,groupChanges,buildChangeTree,createStatusLimiter,mergeDiscovery,selectProject} from './repositories.mjs';
 const statusCodes={modified:'M',added:'A',deleted:'D',missing:'D',renamed:'R',copied:'C',conflicted:'U',untracked:'?',unversioned:'?',replaced:'M',obstructed:'U',normal:'P'};
 const asset = name => new URL('vcs-assets/'+name,document.baseURI).href;
 function Icon(){return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M12 4v16M6 10h3M7.5 8.5v3M15 14h3"/></svg>}
@@ -14,7 +14,7 @@ export function apply(ctx){
   ctx.effect(()=>ctx.locale.register('local.vcs',dictionaries));
   const t=ctx.locale.bind('local.vcs');
   const scheduleStatus=createStatusLimiter(2);
-  async function rpc(endpoint,payload,signal){const result=await ctx.connection.rpc.call('/vcs-rpc',endpoint,payload,signal);if(!result.ok)throw new Error(result.error?.message||String(result.error||t('error')));return result.value;}
+  async function rpc(endpoint,payload,signal){const result=await ctx.connection.rpc.call('/vcs-rpc',endpoint,payload,signal);if(!result.ok){const error=new Error(result.error?.message||String(result.error||t('error')));error.code=result.error?.code;throw error;}return result.value;}
   function Page(props){
     const session=props.useSessions(s=>Object.values(s.byId).find(row=>(row.retainedBy.mainView??0)>0));
     return <PanelBoundary key={JSON.stringify([session?.id,session?.cwd])}><Panel session={session}/></PanelBoundary>;
@@ -29,41 +29,42 @@ export function apply(ctx){
     const sessionId=session?.id;
     const [mode,setMode]=useState('all'),[refresh,setRefresh]=useState(0),[discovery,setDiscovery]=useState(null),[statuses,setStatuses]=useState({}),[repositoryId,setRepositoryId]=useState(()=>readProject(session?.cwd)),[scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState(''),[selected,setSelected]=useState(null),[comparison,setComparison]=useState(null);
     const [scanning,setScanning]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[detailError,setDetailError]=useState(''),[editorError,setEditorError]=useState('');
-    const [query,setQuery]=useState(''),[tree,setTree]=useState(true),[sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false),[tab,setTab]=useState('content');
+    const [query,setQuery]=useState(''),[tree,setTree]=useState(true),[collapsedDirectories,setCollapsedDirectories]=useState({}),[sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false),[tab,setTab]=useState('content');
     const [editorRetry,setEditorRetry]=useState(0);
     const [stats,setStats]=useState({added:0,deleted:0,count:0}),[editorReady,setEditorReady]=useState(false);
     const editorNode=useRef(null),viewer=useRef(null);
-    const statusController=useRef(null),compareController=useRef(null),scanController=useRef(null),previousDiscovery=useRef(null);
+    const statusController=useRef(null),compareController=useRef(null),scanController=useRef(null),previousDiscovery=useRef(null),preserveStatusRefresh=useRef(false),rediscovering=useRef(false);
     const repositories=discovery?.repositories||[];
     const visibleRepositories=repositories.filter(repo=>repo.id===repositoryId);
     useEffect(()=>{if(repositories.some(repo=>repo.id===repositoryId))saveProject(session?.cwd,repositoryId);},[session?.cwd,repositoryId,discovery]);
     const invalidate=()=>{statusController.current?.abort();compareController.current?.abort();setComparison(null);setSelected(null);setDetailError('');setTab('content');setStats({added:0,deleted:0,count:0});};
-    const rescan=()=>{invalidate();scanController.current?.abort();previousDiscovery.current=discovery;setDiscovery(null);setStatuses({});setScanPath(subdirectory.trim());setScan(x=>x+1);};
-    const refreshStatuses=()=>{invalidate();setStatuses({});setRefresh(x=>x+1);};
+    const rescan=()=>{rediscovering.current=false;invalidate();scanController.current?.abort();previousDiscovery.current=discovery;setDiscovery(null);setStatuses({});setScanPath(subdirectory.trim());setScan(x=>x+1);};
+    const rediscover=()=>{if(rediscovering.current)return;rediscovering.current=true;invalidate();scanController.current?.abort();previousDiscovery.current=null;setDiscovery(null);setStatuses({});setScanPath('');setScan(x=>x+1);};
+    const refreshStatuses=(preserve=false)=>{preserveStatusRefresh.current=preserve;if(!preserve)invalidate();if(!preserve)setStatuses({});setRefresh(x=>x+1);};
     useEffect(()=>{
       const controller=new AbortController();scanController.current=controller;setError('');setScanning(!!sessionId);
       if(sessionId)rpc('vcs/repositories',{sessionId,...(scanPath?{subdirectory:scanPath}:{})},controller.signal).then(value=>{
-        if(!controller.signal.aborted){const next=mergeDiscovery(previousDiscovery.current,value,scanPath);setRepositoryId(previous=>selectProject(next.repositories,previous));setDiscovery(next);}
+        if(!controller.signal.aborted){const next=mergeDiscovery(previousDiscovery.current,value,scanPath);rediscovering.current=false;setRepositoryId(previous=>selectProject(next.repositories,previous));setDiscovery(next);}
       }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setScanning(false);});
       return()=>controller.abort();
     },[sessionId,scan,scanPath]);
     useEffect(()=>{
-      const controller=new AbortController();statusController.current=controller;
-      setStatuses({});setComparison(null);setSelected(null);setDetailError('');
+      const controller=new AbortController(),preserve=preserveStatusRefresh.current;statusController.current=controller;preserveStatusRefresh.current=false;
+      if(!preserve){setStatuses({});setDetailError('');}
       for(const repository of visibleRepositories){
         const modeForRepo=requestMode(repository,mode);
         scheduleStatus(()=>rpc('vcs/status',{sessionId,repositoryId:repository.id,mode:modeForRepo},controller.signal),controller.signal).then(value=>{
           if(!controller.signal.aborted)setStatuses(old=>({...old,[repository.id]:{...value,mode:modeForRepo}}));
-        }).catch(e=>{if(!controller.signal.aborted)setStatuses(old=>({...old,[repository.id]:{error:e.message,changes:[],mode:modeForRepo}}));});
+        }).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'){rediscover();return;}setStatuses(old=>({...old,[repository.id]:{error:e.message,changes:[],mode:modeForRepo}}));});
       }
       return()=>controller.abort();
     },[sessionId,discovery,repositoryId,mode,refresh]);
-    useEffect(()=>{const focus=()=>{if(document.visibilityState==='visible')refreshStatuses();};window.addEventListener('focus',focus);return()=>window.removeEventListener('focus',focus);},[]);
+    useEffect(()=>{const focus=()=>{if(document.visibilityState==='visible')refreshStatuses(true);};window.addEventListener('focus',focus);const poll=window.setInterval(focus,30000);return()=>{window.removeEventListener('focus',focus);window.clearInterval(poll);};},[sessionId,repositoryId,mode]);
     const selectedRepository=repositories.find(repo=>repo.id===selected?.repositoryId);
     const selectedStatus=selected?statuses[selected.repositoryId]:null;
     useEffect(()=>{
       const controller=new AbortController();compareController.current=controller;setComparison(null);setDetailError('');setStats({added:0,deleted:0,count:0});setTab('content');setLoading(!!selected&&!!selectedStatus);
-      if(selected&&selectedStatus&&selectedRepository)rpc('vcs/compare',{sessionId,repositoryId:selected.repositoryId,mode:requestMode(selectedRepository,mode),id:selected.id},controller.signal).then(value=>{if(!controller.signal.aborted)setComparison(value);}).catch(e=>{if(!controller.signal.aborted)setDetailError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+      if(selected&&selectedStatus&&selectedRepository)rpc('vcs/compare',{sessionId,repositoryId:selected.repositoryId,mode:requestMode(selectedRepository,mode),id:selected.id},controller.signal).then(value=>{if(!controller.signal.aborted)setComparison(value);}).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'){rediscover();return;}setDetailError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
       return()=>controller.abort();
     },[selected,selectedStatus,sessionId,mode]);
     useEffect(()=>{
@@ -82,6 +83,8 @@ export function apply(ctx){
     const propertyNames=properties?[...new Set([...Object.keys(properties.left||{}),...Object.keys(properties.right||{})])].filter(k=>properties.left?.[k]!==properties.right?.[k]):[];
     const code=entry=>statusCodes[entry?.status]||entry?.status?.slice(0,1).toUpperCase()||'M';
     const overlay=detailError||(loading?t('loading'):!sessionId?t('noSession'):busy&&!chosen?t('loading'):error?error:!repositories.length?t('noRepo'):!chosen?t('pick'):comparison?.binary?t('binary'):!comparison?t('pick'):!editorReady&&!editorError?t('loading'):'');
+    const FileRow=({entry,compact=false,depth=0})=>{const slash=entry.path.lastIndexOf('/');return <button className="vcs-file" aria-current={selected?.repositoryId===repositoryId&&selected?.id===entry.id?'true':undefined} style={{paddingInlineStart:8+depth*14}} title={(entry.oldPath?entry.oldPath+' → ':'')+entry.path+' · '+t(code(entry))} onClick={()=>{compareController.current?.abort();setComparison(null);setTab('content');setSelected({repositoryId,id:entry.id});}}><span className="vcs-status" data-status={code(entry)}>{code(entry)}</span><span className="vcs-filename">{compact?entry.path.slice(slash+1):entry.path}{entry.oldPath&&<small className="vcs-filepath">← {entry.oldPath}</small>}</span></button>;};
+    const TreeRows=({node,repository,depth=0})=><>{node.directories.map(directory=>{const key=repository.id+'\0'+directory.id,closed=!!collapsedDirectories[key];return <React.Fragment key={key}><button className="vcs-dir vcs-dir-toggle" aria-expanded={!closed} style={{paddingInlineStart:8+depth*14}} onClick={()=>setCollapsedDirectories(old=>({...old,[key]:!closed}))}><span aria-hidden="true">{closed?'›':'⌄'}</span>{directory.name}<small>{directory.count}</small></button>{!closed&&<TreeRows node={directory} repository={repository} depth={depth+1}/>}</React.Fragment>;})}{node.files.map(entry=><FileRow key={changeKey(repository.id,entry.id)} entry={entry} compact={node.id!==''} depth={depth}/>)}</>;
     return <section className="vcs-root" aria-label={t('title')}><style>{css}</style>
       <header className="vcs-top"><Icon/><h1 className="vcs-title">{t('title')}</h1><span className="vcs-badge">{t('readonly')}</span><span className="vcs-spacer"/>
         <select aria-label={t('repositories')} value={repositoryId} disabled={scanning||!repositories.length} onChange={e=>{invalidate();setStatuses({});setRepositoryId(e.target.value);}}>{!repositories.length&&<option value="">{t('repositories')}</option>}{repositories.map(repo=><option key={repo.id} value={repo.id}>{repositoryLabel(repo,t('workspaceRoot'))}</option>)}</select>
@@ -91,12 +94,12 @@ export function apply(ctx){
         <form className="vcs-discovery" onSubmit={e=>{e.preventDefault();rescan();}}><input aria-label={t('subdirectory')} placeholder={t('subdirectory')} value={subdirectory} onChange={e=>setSubdirectory(e.target.value)}/><button disabled={!sessionId||scanning}>{t('rescan')}</button><span>{t('scanHint')}</span></form>
         {discovery?.truncated&&<div className="vcs-notice">{t('truncated')}</div>}{(discovery?.warnings||[]).map((warning,index)=><div className="vcs-notice" key={index}>{typeof warning==='string'?warning:warning.message||JSON.stringify(warning)}</div>)}
       </header>
-      <div className="vcs-body"><aside className="vcs-files"><div className="vcs-filter"><input aria-label={t('search')} placeholder={t('search')} value={query} onChange={e=>setQuery(e.target.value)}/></div><div className="vcs-count"><span>{changes.length} {t('files')}</span><button aria-pressed={tree} onClick={()=>setTree(!tree)}>{t(tree?'tree':'list')}</button></div><div className="vcs-filelist" role="listbox" aria-label={t('title')}>
-        {groups.map(group=>{let previousDir;const repo=group.repository;return <section className="vcs-repository" key={repo.id} aria-label={repositoryLabel(repo,t('workspaceRoot'))}><div className="vcs-repository-heading" title={repo.root}><strong>{repositoryLabel(repo,t('workspaceRoot'))}</strong><small>{repo.type==='svn'?t('svnBase'):t(requestMode(repo,mode))}</small></div>
-          {group.error?<div className="vcs-message vcs-error" role="status">{group.error}<button onClick={rescan}>{t('rescan')}</button></div>:!statuses[repo.id]?<div className="vcs-message">{t('loading')}</div>:group.changes.map(entry=>{const slash=entry.path.lastIndexOf('/');const dir=slash<0?'.':entry.path.slice(0,slash);const heading=tree&&dir!==previousDir;previousDir=dir;const key=changeKey(repo.id,entry.id);return <React.Fragment key={key}>{heading&&<div className="vcs-dir" title={dir}>{dir}</div>}<button className="vcs-file" role="option" aria-selected={selected?.repositoryId===repo.id&&selected?.id===entry.id} title={repositoryLabel(repo,t('workspaceRoot'))+' · '+(entry.oldPath?entry.oldPath+' → ':'')+entry.path+' · '+t(code(entry))} onClick={()=>{compareController.current?.abort();setComparison(null);setTab('content');setSelected({repositoryId:repo.id,id:entry.id});}}><span className="vcs-status" data-status={code(entry)}>{code(entry)}</span><span className="vcs-filename">{tree?entry.path.slice(slash+1):entry.path}{entry.oldPath&&<small className="vcs-filepath">← {entry.oldPath}</small>}</span></button></React.Fragment>;})}
+      <div className="vcs-body"><aside className="vcs-files"><div className="vcs-filter"><input aria-label={t('search')} placeholder={t('search')} value={query} onChange={e=>setQuery(e.target.value)}/></div><div className="vcs-count"><span>{changes.length} {t('files')}</span><span className="vcs-auto">{t('autoRefresh')}</span><button aria-pressed={tree} onClick={()=>setTree(!tree)}>{t(tree?'tree':'list')}</button></div><nav className="vcs-filelist" aria-label={t('title')}>
+        {groups.map(group=>{const repo=group.repository;return <section className="vcs-repository" key={repo.id} aria-label={repositoryLabel(repo,t('workspaceRoot'))}><div className="vcs-repository-heading" title={repo.root}><strong>{repositoryLabel(repo,t('workspaceRoot'))}</strong><small>{repo.type==='svn'?t('svnBase'):t(requestMode(repo,mode))}</small></div>
+          {group.error?<div className="vcs-message vcs-error" role="status">{group.error}<button onClick={rescan}>{t('rescan')}</button></div>:!statuses[repo.id]?<div className="vcs-message">{t('loading')}</div>:tree?<TreeRows node={buildChangeTree(group.changes)} repository={repo}/>:group.changes.map(entry=><FileRow key={changeKey(repo.id,entry.id)} entry={entry}/>)}
           {!group.error&&statuses[repo.id]&&!group.changes.length&&<div className="vcs-message">{query?t('emptySearch'):t('clean')}</div>}
         </section>;})}{!groups.length&&<div className="vcs-message">{scanning?t('loading'):error||(!sessionId?t('noSession'):t('noRepo'))}{error&&<button onClick={rescan}>{t('rescan')}</button>}</div>}
-      </div></aside>
+      </nav></aside>
       <main className="vcs-detail"><div className="vcs-filehead"><strong title={comparison?.path||chosen?.path}>{selectedRepository?repositoryLabel(selectedRepository,t('workspaceRoot'))+' / ':''}{comparison?.path||chosen?.path||t('pick')}</strong><span className="vcs-spacer"/>{comparison&&!comparison.binary&&editorReady&&<><span className="vcs-add">+{stats.added}</span><span className="vcs-del">−{stats.deleted}</span></>}</div>
         {editorError&&<div className="vcs-notice" role="status">{t('fallback')} <button onClick={()=>setEditorRetry(x=>x+1)}>{t('retry')}</button><details><summary>{t('diagnostics')}</summary>{editorError}</details></div>}
         {comparison?.notice&&<div className="vcs-notice">{comparison.notice}</div>}

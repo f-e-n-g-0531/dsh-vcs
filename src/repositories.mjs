@@ -7,6 +7,22 @@ export function selectProject(repositories, previousId = '') {
 export const changeKey = (repositoryId, changeId) => JSON.stringify([repositoryId, changeId]);
 export const repositoryLabel = (repository, workspaceLabel = '.') => [repository.type.toUpperCase(), repository.relativePath === '.' ? workspaceLabel : repository.relativePath || '.', repository.branch].filter(Boolean).join(' · ');
 export const requestMode = (repository, mode = 'all') => repository.type === 'git' && ['staged', 'unstaged'].includes(mode) ? mode : 'all';
+export function buildChangeTree(changes = []) {
+  const root = { id: '', name: '', directories: new Map(), files: [], count: 0 };
+  for (const change of changes) {
+    const parts = String(change.path || '').split('/').filter(Boolean);
+    if (!parts.length) continue;
+    let node = root;
+    for (const part of parts.slice(0, -1)) {
+      const id = node.id ? node.id + '/' + part : part;
+      if (!node.directories.has(part)) node.directories.set(part, { id, name: part, directories: new Map(), files: [], count: 0 });
+      node = node.directories.get(part); node.count++;
+    }
+    node.files.push(change);
+  }
+  const sort = node => ({...node, directories: [...node.directories.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(sort), files: [...node.files].sort((a,b)=>a.path.localeCompare(b.path))});
+  return sort(root);
+}
 export function groupChanges(repositories, statuses, query = '') {
   const needle = query.toLowerCase();
   return repositories.map(repository => ({

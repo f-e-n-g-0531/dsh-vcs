@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -23,4 +23,13 @@ test('status limiter never runs more than two and a repository error frees capac
 test('queued cancelled status is never executed',async()=>{
  const schedule=createStatusLimiter(1);let release,called=false;const first=schedule(()=>new Promise(resolve=>{release=resolve;}));
  const controller=new AbortController();const next=schedule(()=>{called=true;},controller.signal);const rejected=assert.rejects(next,/Aborted/);controller.abort();await rejected;await new Promise(setImmediate);release();await first;assert.equal(called,false);
+});
+
+test('change tree gives directories stable paths, counts, and sorted Unicode files',()=>{
+ const tree=buildChangeTree([{id:'1',path:'src/z.txt'},{id:'2',path:'src/a/中文.txt'},{id:'3',path:'README.md'},{id:'4',path:'src/a/space name.txt'}]);
+ assert.equal(tree.count,0);assert.deepEqual(tree.directories.map(d=>d.id),['src']);
+ const src=tree.directories[0];assert.equal(src.count,3);assert.deepEqual(src.directories.map(d=>d.id),['src/a']);
+ assert.deepEqual(src.files.map(f=>f.path),['src/z.txt']);
+ assert.equal(src.directories[0].count,2);assert.deepEqual(src.directories[0].files.map(f=>f.path),['src/a/中文.txt','src/a/space name.txt']);
+ assert.deepEqual(tree.files.map(f=>f.path),['README.md']);
 });
