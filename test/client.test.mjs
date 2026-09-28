@@ -93,3 +93,8 @@ test('review header exposes a safe copy-path control',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/navigator\.clipboard/);assert.match(source,/document\.execCommand\('copy'\)/);assert.match(source,/finally\{input\.remove\(\);\}/);assert.match(source,/copyPath/);assert.match(source,/copyFailed/);
 });
+
+test('tree controls can reveal and focus the selected nested file',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/revealSelected/);assert.match(source,/directoryAncestors/);assert.match(source,/scrollIntoView/);assert.match(source,/data-vcs-change/);
+});

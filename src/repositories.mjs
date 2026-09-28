@@ -34,6 +34,10 @@ export function adjacentChange(changes = [], selectedId, direction) {
   const current = index < 0 ? (direction === 'next' ? -1 : 0) : index;
   return changes[(current + step + changes.length) % changes.length] || null;
 }
+export function directoryAncestors(path = '') {
+  const parts = String(path).split('/').filter(Boolean);
+  return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'));
+}
 export function treeDirectoryIds(node, result = []) {
   for (const directory of node?.directories || []) { result.push(directory.id); treeDirectoryIds(directory, result); }
   return result;

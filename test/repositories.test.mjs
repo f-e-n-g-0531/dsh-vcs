@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,changePosition,adjacentChange,treeDirectoryIds,reviewStatus,countChangeStatuses,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,changePosition,adjacentChange,directoryAncestors,treeDirectoryIds,reviewStatus,countChangeStatuses,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -72,4 +72,10 @@ test('review status categories normalize SVN and Git variants for shared filters
  assert.deepEqual(filterChanges(changes,'','deleted').map(c=>c.path),['gone']);
  assert.deepEqual(filterChanges(changes,'','untracked').map(c=>c.path),['new']);
  assert.deepEqual(countChangeStatuses(changes),{all:3,deleted:1,untracked:1,renamed:1});
+});
+
+test('directory ancestors reveal a selected nested path without its filename',()=>{
+ assert.deepEqual(directoryAncestors('src/ui/client.jsx'),['src','src/ui']);
+ assert.deepEqual(directoryAncestors('README.md'),[]);
+ assert.deepEqual(directoryAncestors('中文/目录/file.txt'),['中文','中文/目录']);
 });
