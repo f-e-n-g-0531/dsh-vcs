@@ -103,3 +103,8 @@ test('review file navigation supports Alt arrow shortcuts outside text inputs',a
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/e\.altKey/);assert.match(source,/ArrowLeft/);assert.match(source,/ArrowRight/);assert.match(source,/selectAdjacent\(e\.key==='ArrowLeft'/);
 });
+
+test('binary comparison notice identifies the compared sides',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/binarySummary/);assert.match(source,/binaryComparison/);assert.match(source,/comparison.left.label/);
+});
