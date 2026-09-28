@@ -3,6 +3,7 @@ import css from './style.css';
 import TextComparison from './TextComparison.jsx';
 import {loadEditor} from './editor-loader.mjs';
 import dictionaries from './locales.json';
+import {version} from '../package.json';
 import {changeKey,repositoryLabel,requestMode,groupChanges,createStatusLimiter,mergeDiscovery,selectProject} from './repositories.mjs';
 const statusCodes={modified:'M',added:'A',deleted:'D',missing:'D',renamed:'R',copied:'C',conflicted:'U',untracked:'?',unversioned:'?',replaced:'M',obstructed:'U',normal:'P'};
 const asset = name => new URL('vcs-assets/'+name,document.baseURI).href;
@@ -66,7 +67,7 @@ export function apply(ctx){
     useEffect(()=>{
       let disposed=false;let instance;const controller=new AbortController();setEditorReady(false);setEditorError('');
       const link=document.createElement('link');link.rel='stylesheet';link.href=asset('editor.css');editorNode.current.parentNode.appendChild(link);
-      loadEditor(asset('editor.js')+'?v=0.3.3&retry='+editorRetry,{signal:controller.signal}).then(module=>{if(disposed)return;instance=module.createDiff(editorNode.current,{onStats:setStats});viewer.current=instance;setEditorReady(true);}).catch(e=>{if(!disposed)setEditorError(e.message);});
+      loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry='+editorRetry,{signal:controller.signal}).then(module=>{if(disposed)return;instance=module.createDiff(editorNode.current,{onStats:setStats});viewer.current=instance;setEditorReady(true);}).catch(e=>{if(!disposed)setEditorError(e.message);});
       return()=>{disposed=true;controller.abort();instance?.dispose();viewer.current=null;link.remove();};
     },[editorRetry]);
     useEffect(()=>{if(editorReady&&comparison&&!comparison.binary)viewer.current?.setContent(comparison,JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id,comparison.path]));},[editorReady,comparison,sessionId,discovery,selected,mode]);

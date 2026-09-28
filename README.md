@@ -1,6 +1,6 @@
 # DSH VCS
 
-DeepSeek Harness（DSH）Web 的只读 Git / SVN 变更预览插件。当前版本 **0.3.5**，包名保持 @local/dsh-vcs，private: true；不发布到 npm registry。
+DeepSeek Harness（DSH）Web 的只读 Git / SVN 变更预览插件。当前版本 **0.3.6**，包名保持 @local/dsh-vcs，private: true；不发布到 npm registry。
 
 > 项目仓库：https://github.com/f-e-n-g-0531/dsh-vcs 。采用 [DSH VCS 非商业源码公开许可证 1.0](<LICENSE>)：允许非商业使用、修改与分发，禁止商业使用（包括公司内部用于商业项目的开发、测试与维护），商业用途须另行书面授权。分发须保留许可证和版权，修改版须注明修改。第三方组件保持原许可。这是源码公开项目，不是 OSI 认可的开源软件。
 
@@ -57,6 +57,10 @@ check 构建并运行测试；npm pack 经 prepack 再次执行检查，生成�
 - 取消界面请求不保证立即停止正在执行的状态 / 比较子进程；命令仍受各自超时与输出上限约束。
 - 编辑器资源不可用时检查构建与安装包。简化文本比较不等价于 Monaco 的完整功能。
 - 自动化测试不替代真实 DSH 浏览器验收；本说明不宣称已通过特定宿主、浏览器或操作系统的端到端验收。
+
+## 发布与安装验收
+
+见 [安装、升级与回滚](<docs/INSTALL.md>) 和 [兼容性与验收矩阵](<docs/COMPATIBILITY.md>)。发布包必须通过 `npm run verify:package` 和 `npm run test:install`；后者验证生产依赖安装，不代表真实 DSH 浏览器验收。GitHub Release 工作流只能手动运行，并且仅创建草稿，不自动正式发布。
 
 ## 项目资料
 

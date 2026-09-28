@@ -1,6 +1,6 @@
 # 发布清单
 
-本清单针对 0.3.5 分发整理，不代表新增功能版本。包名保持 @local/dsh-vcs，private: true；**不执行 npm publish**。
+本清单针对 0.3.6 发布准备。包名保持 @local/dsh-vcs，private: true；**不执行 npm publish**。
 
 ## 1. 公开发布前的决定
 
@@ -15,6 +15,8 @@
 使用 Node.js 22 或更新版本，在干净检出目录中执行：
 
     npm ci && npm run check
+    npm run verify:package
+    npm run test:install
     npm pack --dry-run
     npm pack
 
@@ -42,7 +44,11 @@ Git 来源安装依赖 prepare 构建，需要另行验证生命周期和构建�
 
 记录宿主和浏览器版本、步骤及已知限制。自动化测试通过不等于这些项目已完成；未执行时明确写“未验收”，不补写成功结论。
 
-## 4. 分发
+## 4. 草稿 Release 工作流
+
+在所有自动检查和人工验收满足后，由维护者创建与包版本一致的 `vX.Y.Z` tag。在 Actions 手动运行 Release workflow 并填写已有 tag：工作流验证版本、重新构建与测试、检查包并生成 SHA256SUMS.txt，仅创建草稿 Release。检查附件和说明后再由维护者决定正式发布。未通过的真实页面验收不得勾选完成。
+
+## 5. 分发
 
 确认完整附带许可证及第三方声明，不把本项目标记为标准开源软件。在已确认的仓库中按实际验证结果编写发布说明，附审核过的 tgz 和校验值，注明兼容环境与未验证事项。是否打 tag / 创建 GitHub Release 由维护者决定；不为本次整理虚构日期、历史版本或功能变更。
 
