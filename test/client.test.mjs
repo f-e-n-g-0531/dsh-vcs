@@ -63,3 +63,8 @@ test('review panel exposes localized status filter controls',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/vcs-status-filter/);assert.match(source,/statusFilter/);assert.match(source,/filterStatus/);
 });
+
+test('tree mode exposes bulk expand and collapse review controls',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/setTreeExpanded/);assert.match(source,/expandAll/);assert.match(source,/collapseAll/);
+});

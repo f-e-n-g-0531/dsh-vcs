@@ -60,7 +60,9 @@
     "filterStatus": "按状态筛选",
     "allFiles": "全部文件",
     "previousFile": "上一个文件",
-    "nextFile": "下一个文件"
+    "nextFile": "下一个文件",
+    "expandAll": "全部展开",
+    "collapseAll": "全部折叠"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -123,6 +125,8 @@
     "filterStatus": "Filter by status",
     "allFiles": "All files",
     "previousFile": "Previous file",
-    "nextFile": "Next file"
+    "nextFile": "Next file",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all"
   }
 }

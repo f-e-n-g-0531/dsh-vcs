@@ -36,6 +36,8 @@
 .vcs-root .vcs-count{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--dsw-alias-label-secondary)}
 .vcs-root .vcs-count>span:first-child{margin-right:auto}
 .vcs-root .vcs-auto{font-size:11px;color:var(--dsw-alias-label-tertiary);white-space:nowrap}
+.vcs-root .vcs-tree-actions{display:flex;gap:5px;padding:0 10px 8px}
+.vcs-root .vcs-tree-actions button{font-size:11px;padding:3px 6px}
 .vcs-root .vcs-filelist{overflow:auto;flex:1;padding:0 6px 10px}
 .vcs-root .vcs-file{display:flex;gap:8px;align-items:flex-start;width:100%;border:0;background:transparent;text-align:left;border-radius:6px;padding:7px 8px}
 .vcs-root .vcs-file[aria-current=true]{background:var(--dsw-alias-interactive-bg-active)}

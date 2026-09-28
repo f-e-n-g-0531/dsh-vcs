@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,adjacentChange,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,adjacentChange,treeDirectoryIds,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -47,4 +47,9 @@ test('adjacent review navigation wraps only within visible changes',()=>{
  assert.equal(adjacentChange(changes,'b','next').id,'c');assert.equal(adjacentChange(changes,'b','previous').id,'a');
  assert.equal(adjacentChange(changes,'c','next').id,'a');assert.equal(adjacentChange(changes,'a','previous').id,'c');
  assert.equal(adjacentChange([], 'a','next'),null);assert.equal(adjacentChange(changes,'missing','next').id,'a');
+});
+
+test('tree directory ids support bulk collapse while preserving nested stable paths',()=>{
+ const tree=buildChangeTree([{path:'src/a/file.js'},{path:'src/b/file.js'},{path:'docs/readme.md'}]);
+ assert.deepEqual(treeDirectoryIds(tree),['docs','src','src/a','src/b']);
 });
