@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {selectProject} from '../src/repositories.mjs';
+import {selectProject,repositoryLabel} from '../src/repositories.mjs';
+test('workspace Git and SVN entries remain distinct and remembered child wins',()=>{const repos=[{id:'child',type:'git',relativePath:'child'},{id:'git-root',type:'git',relativePath:'.'},{id:'svn-root',type:'svn',relativePath:'.'}];assert.equal(selectProject(repos),'git-root');assert.equal(selectProject(repos,'child'),'child');assert.equal(selectProject(repos,'svn-root'),'svn-root');assert.equal(selectProject(repos,'removed'),'git-root');assert.equal(repositoryLabel(repos[2],'工作区本身'),'SVN · 工作区本身');});
 test('single project defaults to cwd then first; preserves selection on refresh',()=>{
  const repos=[{id:'child',relativePath:'child'},{id:'root',relativePath:'.'}];
  assert.equal(selectProject(repos),'root');assert.equal(selectProject(repos,'child'),'child');assert.equal(selectProject(repos,'removed'),'root');assert.equal(selectProject([repos[0]]),'child');assert.equal(selectProject([]),'');

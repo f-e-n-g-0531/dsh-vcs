@@ -1,5 +1,6 @@
 {
   "zh": {
+    "workspaceRoot": "工作区本身",
     "title": "VCS 变更",
     "readonly": "只读预览",
     "refresh": "刷新",
@@ -53,6 +54,7 @@
     "textTruncated": "仅显示前 2000 行。"
   },
   "en": {
+    "workspaceRoot": "Workspace root",
     "title": "VCS changes",
     "readonly": "Read-only preview",
     "refresh": "Refresh",

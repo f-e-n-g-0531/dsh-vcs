@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-vcs",
-  "version": "0.3.9",
+  "version": "0.3.10",
   "private": true,
   "type": "module",
   "description": "Read-only Git and SVN change preview for DSH",

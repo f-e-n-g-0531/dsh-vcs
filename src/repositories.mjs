@@ -5,7 +5,7 @@ export function selectProject(repositories, previousId = '') {
    || repositories[0]?.id || '';
 }
 export const changeKey = (repositoryId, changeId) => JSON.stringify([repositoryId, changeId]);
-export const repositoryLabel = repository => [repository.type.toUpperCase(), repository.relativePath || '.', repository.branch].filter(Boolean).join(' · ');
+export const repositoryLabel = (repository, workspaceLabel = '.') => [repository.type.toUpperCase(), repository.relativePath === '.' ? workspaceLabel : repository.relativePath || '.', repository.branch].filter(Boolean).join(' · ');
 export const requestMode = (repository, mode = 'all') => repository.type === 'git' && ['staged', 'unstaged'].includes(mode) ? mode : 'all';
 export function groupChanges(repositories, statuses, query = '') {
   const needle = query.toLowerCase();
