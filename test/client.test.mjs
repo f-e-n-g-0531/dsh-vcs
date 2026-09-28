@@ -88,3 +88,8 @@ test('review search supports focus and clear keyboard shortcuts',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/searchNode/);assert.match(source,/key\.toLowerCase\(\)==='f'/);assert.match(source,/key==='Escape'/);
 });
+
+test('review header exposes a safe copy-path control',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/navigator.clipboard/);assert.match(source,/copyPath/);assert.match(source,/copyFailed/);
+});
