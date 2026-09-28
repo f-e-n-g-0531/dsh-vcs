@@ -38,12 +38,15 @@ export function treeDirectoryIds(node, result = []) {
   for (const directory of node?.directories || []) { result.push(directory.id); treeDirectoryIds(directory, result); }
   return result;
 }
+export function reviewStatus(status = '') {
+  return ({missing: 'deleted', unversioned: 'untracked', replaced: 'modified', obstructed: 'conflicted', copied: 'renamed'})[status] || status;
+}
 export function countChangeStatuses(changes = []) {
-  return changes.reduce((counts, change) => { counts.all++; counts[change.status] = (counts[change.status] || 0) + 1; return counts; }, {all: 0});
+  return changes.reduce((counts, change) => { const status = reviewStatus(change.status); counts.all++; counts[status] = (counts[status] || 0) + 1; return counts; }, {all: 0});
 }
 export function filterChanges(changes = [], query = '', status = 'all') {
   const needle = query.toLowerCase();
-  return changes.filter(change => (status === 'all' || change.status === status) && change.path.toLowerCase().includes(needle)).sort((a, b) => a.path.localeCompare(b.path));
+  return changes.filter(change => (status === 'all' || reviewStatus(change.status) === status) && change.path.toLowerCase().includes(needle)).sort((a, b) => a.path.localeCompare(b.path));
 }
 export function groupChanges(repositories, statuses, query = '', status = 'all') {
   return repositories.map(repository => ({

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,changePosition,adjacentChange,treeDirectoryIds,countChangeStatuses,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,changePosition,adjacentChange,treeDirectoryIds,reviewStatus,countChangeStatuses,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -64,4 +64,12 @@ test('review position reports selection within the visible result set',()=>{
  assert.deepEqual(changePosition(changes,'b'),{index:2,total:3});
  assert.deepEqual(changePosition(changes,'missing'),{index:0,total:3});
  assert.deepEqual(changePosition([], 'a'),{index:0,total:0});
+});
+
+test('review status categories normalize SVN and Git variants for shared filters',()=>{
+ assert.equal(reviewStatus('missing'),'deleted');assert.equal(reviewStatus('unversioned'),'untracked');assert.equal(reviewStatus('replaced'),'modified');
+ const changes=[{path:'gone',status:'missing'},{path:'new',status:'unversioned'},{path:'copy',status:'copied'}];
+ assert.deepEqual(filterChanges(changes,'','deleted').map(c=>c.path),['gone']);
+ assert.deepEqual(filterChanges(changes,'','untracked').map(c=>c.path),['new']);
+ assert.deepEqual(countChangeStatuses(changes),{all:3,deleted:1,untracked:1,renamed:1});
 });
