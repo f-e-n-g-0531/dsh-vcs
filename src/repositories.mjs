@@ -23,12 +23,15 @@ export function buildChangeTree(changes = []) {
   const sort = node => ({...node, directories: [...node.directories.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(sort), files: [...node.files].sort((a,b)=>a.path.localeCompare(b.path))});
   return sort(root);
 }
-export function groupChanges(repositories, statuses, query = '') {
+export function filterChanges(changes = [], query = '', status = 'all') {
   const needle = query.toLowerCase();
+  return changes.filter(change => (status === 'all' || change.status === status) && change.path.toLowerCase().includes(needle)).sort((a, b) => a.path.localeCompare(b.path));
+}
+export function groupChanges(repositories, statuses, query = '', status = 'all') {
   return repositories.map(repository => ({
     ...statuses[repository.id],
     repository,
-    changes: (statuses[repository.id]?.changes || []).filter(change => change.path.toLowerCase().includes(needle)).sort((a, b) => a.path.localeCompare(b.path)),
+    changes: filterChanges(statuses[repository.id]?.changes, query, status),
   }));
 }
 // A targeted scan supplements discovery; a full scan replaces it.

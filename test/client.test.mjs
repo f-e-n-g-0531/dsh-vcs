@@ -58,3 +58,8 @@ test('review file tree exposes keyboard navigation and directory expansion seman
  assert.match(source,/ArrowDown/);assert.match(source,/ArrowUp/);assert.match(source,/data-vcs-directory/);
  assert.match(source,/aria-expanded/);assert.match(source,/data-vcs-item/);
 });
+
+test('review panel exposes localized status filter controls',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.match(source,/vcs-status-filter/);assert.match(source,/statusFilter/);assert.match(source,/filterStatus/);
+});

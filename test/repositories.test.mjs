@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -32,4 +32,12 @@ test('change tree gives directories stable paths, counts, and sorted Unicode fil
  assert.deepEqual(src.files.map(f=>f.path),['src/z.txt']);
  assert.equal(src.directories[0].count,2);assert.deepEqual(src.directories[0].files.map(f=>f.path),['src/a/中文.txt','src/a/space name.txt']);
  assert.deepEqual(tree.files.map(f=>f.path),['README.md']);
+});
+
+test('status filtering combines review category and case-insensitive path search',()=>{
+ const changes=[{path:'src/Alpha.js',status:'modified'},{path:'src/new.js',status:'added'},{path:'old.txt',status:'deleted'}];
+ assert.deepEqual(filterChanges(changes,'SRC','all').map(c=>c.path),['src/Alpha.js','src/new.js']);
+ assert.deepEqual(filterChanges(changes,'','added').map(c=>c.path),['src/new.js']);
+ assert.deepEqual(filterChanges(changes,'new','added').map(c=>c.path),['src/new.js']);
+ assert.deepEqual(filterChanges(changes,'new','deleted'),[]);
 });

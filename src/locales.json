@@ -56,7 +56,9 @@
     "comparisonContext": "比较上下文",
     "encoding": "编码",
     "before": "前版本",
-    "after": "后版本"
+    "after": "后版本",
+    "filterStatus": "按状态筛选",
+    "allFiles": "全部文件"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -115,6 +117,8 @@
     "comparisonContext": "Comparison context",
     "encoding": "Encoding",
     "before": "Before",
-    "after": "After"
+    "after": "After",
+    "filterStatus": "Filter by status",
+    "allFiles": "All files"
   }
 }
