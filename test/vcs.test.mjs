@@ -18,6 +18,15 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('local reference enumeration accepts 1000 refs and rejects 1001 without truncating silently',async t=>{
+ const root=await gitRepo(t);await write(root,'seed','x');commit(root);const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ const input=Array.from({length:999},(_,i)=>'create refs/heads/b'+String(i).padStart(4,'0')+' '+head).join('\n')+'\n';
+ const batch=spawnSync('git',['update-ref','--stdin'],{cwd:root,input,encoding:'utf8',windowsHide:true,timeout:20000});assert.equal(batch.status,0,batch.stderr);
+ assert.equal((await listReferences(repo)).references.length,1000);
+ cmd(root,'git',['update-ref','refs/tags/overflow',head]);await assert.rejects(listReferences(repo),/Reference count exceeds limit/);
+ cmd(root,'git',['update-ref','-d','refs/tags/overflow']);assert.equal((await listReferences(repo)).references.length,1000);
+ assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),head);assert.equal(cmd(root,'git',['status','--porcelain']).stdout,'');
+});
 test('local references enumerate branches and commit tags without changing repository state',async t=>{
  const root=await gitRepo(t),repo=await detectRepository(root);assert.deepEqual(await listReferences(repo),{references:[]});
  await write(root,'file.txt','one');commit(root);const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
