@@ -90,7 +90,13 @@
     "copied": "已复制",
     "pathCopied": "文件路径已复制到剪贴板。",
     "copyFailed": "无法复制文件路径。",
-    "binaryComparison": "（{files}）"
+    "binaryComparison": "（{files}）",
+    "revisionTitle": "本地版本 A/B 比较",
+    "revisionScope": "仅选择已加载的提交；直接比较 A → B，不使用合并基点。",
+    "revisionBase": "A（左侧）",
+    "revisionTarget": "B（右侧）",
+    "revisionSwap": "交换 A/B",
+    "revisionEmpty": "两个版本没有文件变更。"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -183,6 +189,12 @@
     "copied": "Copied",
     "pathCopied": "File path copied to the clipboard.",
     "copyFailed": "Unable to copy the file path.",
-    "binaryComparison": "({files})"
+    "binaryComparison": "({files})",
+    "revisionTitle": "Local A/B revision comparison",
+    "revisionScope": "Select loaded commits only. Compare A → B directly, not via merge-base.",
+    "revisionBase": "A (left)",
+    "revisionTarget": "B (right)",
+    "revisionSwap": "Swap A/B",
+    "revisionEmpty": "No file changes between these revisions."
   }
 }
