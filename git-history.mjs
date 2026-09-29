@@ -13,7 +13,7 @@ export function parseHistory(text, maxRecords = 101) {
     const [id,parentText,author,date,subject]=fields.slice(i,i+5);
     const parents=parentText?parentText.split(' '):[];
     if(!oid(id)||parents.some(p=>!oid(p)||p.length!==id.length)) throw new Error('Invalid history object id');
-    if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[+-][0-9]{2}:[0-9]{2}$/.test(date)||!Number.isFinite(Date.parse(date))) throw new Error('Invalid history timestamp');
+    if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:Z|[+-][0-9]{2}:[0-9]{2})$/.test(date)||!Number.isFinite(Date.parse(date))) throw new Error('Invalid history timestamp');
     result.push({id,parents,author,date,subject});
   }
   return result;

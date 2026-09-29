@@ -11,6 +11,7 @@ test('history parses root, merge parents and untrusted display text',()=>{
  const rows=parseHistory(row()+row(id+' '+id));
  assert.equal(rows.length,2);assert.deepEqual(rows[0].parents,[]);assert.equal(rows[1].parents.length,2);assert.equal(rows[0].subject,'中文 <script>');
  assert.deepEqual(parseHistory(''),[]);
+ assert.equal(parseHistory(row().replace(date,'2026-09-29T04:00:00Z'))[0].date,'2026-09-29T04:00:00Z');
 });
 test('history rejects truncation, malformed IDs, dates and excessive output',()=>{
  assert.throws(()=>parseHistory(row().slice(0,-1)),/Truncated/);
