@@ -18,6 +18,24 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('historical comparisons preserve nested Unicode and punctuation paths',async t=>{
+ const root=await gitRepo(t);
+ const names=['nested/中文 空格.txt','nested/[literal].txt','-leading.txt','same.txt','nested/same.txt'];
+ await fs.mkdir(path.join(root,'nested'));
+ for(const name of names)await write(root,name,'base: '+name);
+ commit(root);
+ for(const name of names)await write(root,name,'next: '+name);
+ commit(root);
+ const repo=await detectRepository(root),oid=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ const details=await getCommitDetails(repo,{commit:oid});
+ assert.equal(details.changes.length,names.length);
+ for(const name of names){
+  await write(root,name,'not the historical content');
+  const entry=details.changes.find(row=>row.path===name);assert.ok(entry,name);
+  const result=await getCommitComparison(repo,{commit:oid,id:entry.id});
+  assert.equal(result.left.text,'base: '+name);assert.equal(result.right.text,'next: '+name);
+ }
+});
 test('cancelled historical requests stop before probing even nonexistent roots',async()=>{
  const controller=new AbortController();controller.abort();
  const repo={type:'git',root:path.join(os.tmpdir(),'absent-history-root')};
