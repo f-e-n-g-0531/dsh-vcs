@@ -23,6 +23,13 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  button('First commit').click();await wait(()=>button('added · example.txt'));
  button('added · example.txt').click();await wait(()=>document.querySelector('.vcs-text-comparison'));
  if(!document.querySelector('.vcs-text-comparison').textContent.includes('historical content'))throw Error('Missing historical content');
+ const countBeforeFilter=calls.length;
+ const input=document.querySelector('input[aria-label="commitFileSearch"]');
+ const enter=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));};
+ enter('no-matching-file');await wait(()=>!button('added · example.txt'));
+ if(document.querySelector('.vcs-text-comparison'))throw Error('Filtered file retained old diff');
+ enter('');await wait(()=>button('added · example.txt'));
+ if(calls.length!==countBeforeFilter)throw Error('Filtering unexpectedly called RPC');
  const select=document.querySelector('select');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));
  await wait(()=>button('added · parent-two.txt'));
  if(document.querySelector('.vcs-text-comparison'))throw Error('Old parent diff retained');
@@ -36,5 +43,5 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  delayNext=true;button('added · example.txt').click();await wait(()=>delayedResolve);
  root.unmount();if(!delayedSignal.aborted)throw Error('Unmount failed to cancel');
  delayedResolve({path:'STALE',left:{text:''},right:{text:'STALE'}});
- document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['pagination','commit','file','diff','parent','stale','unmount'],calls:calls.length});
+ document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['pagination','commit','file','diff','filter','parent','stale','unmount'],calls:calls.length});
  }catch(e){document.querySelector('#report').textContent=JSON.stringify({pass:false,error:String(e)});}})();
