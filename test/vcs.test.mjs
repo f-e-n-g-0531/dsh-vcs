@@ -31,6 +31,8 @@ test('oversized commit body does not prevent details or file comparison',async t
  const head=cmd(root,'git',['commit-tree',tree,'-F','message.txt']).stdout.trim(),repo=await detectRepository(root);
  const details=await getCommitDetails(repo,{commit:head});assert.equal(details.subject,'Subject');assert.equal(details.message,'');assert.equal(details.messageTruncated,true);assert.equal(details.changes.length,1);
  const comparison=await getCommitComparison(repo,{commit:head,id:details.changes[0].id});assert.equal(comparison.right.text,'content');
+ const blame=await getFileBlame(repo,{commit:head,id:details.changes[0].id});assert.equal(blame.lines[0].text,'content');
+ const history=await listFileHistory(repo,{commit:head,id:details.changes[0].id});assert.equal(history.commits[0].id,head);
 });
 test('historical tree reads committed nested entries not working directory contents',async t=>{
  const root=await gitRepo(t);await fs.mkdir(path.join(root,'nested'));await write(root,'nested/中文 [file].txt','committed');commit(root);

@@ -242,7 +242,10 @@ export async function listHistory(repo, {snapshot,offset=0,limit=50,signal} = {}
   const rows=parseHistory(text.toString('utf8'),limit+1);
   return historyPage(rows,snapshot,offset,limit);
 }
-export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
+export async function getCommitDetails(repo,options={}) {
+  return commitDetails(repo,options,true);
+}
+async function commitDetails(repo,{commit,parentIndex=0,signal}={},includeMessage=false) {
   if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');
   if(!Number.isInteger(parentIndex)||parentIndex<0)throw new Error('Invalid parent index');
   signal?.throwIfAborted();
@@ -255,6 +258,7 @@ export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
   const parent=metadata.parents[parentIndex]??null;
   const args=['diff-tree','--no-commit-id','--name-status','-z','-r','--no-ext-diff','--no-textconv','--find-renames',...(parent?[parent,commit]:['--root',commit]),'--'];
   const changes=parseCommitChanges((await git(repo.root,args,MAX_TEXT,{signal})).toString('utf8'),commit+':'+(parent||'root'));
+  if(!includeMessage)return {...metadata,parent,parentIndex,changes};
   let message='',messageTruncated=false;
   try{message=(await git(repo.root,['log','--no-show-signature','--encoding=UTF-8','--max-count=1','--format=%B',commit,'--'],MAX_TEXT,{signal})).toString('utf8');}
   catch(error){if(error.code!=='TOO_LARGE')throw error;messageTruncated=true;}
@@ -296,7 +300,7 @@ export async function getHistoricalTree(repo,{commit,signal}={}){
 export async function getCommitImage(repo,{commit,parentIndex=0,id,side='right',signal}={}){
  if(!['left','right'].includes(side))throw new Error('Invalid image side');
  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
- const details=await getCommitDetails(repo,{commit,parentIndex,signal}),entry=details.changes.find(e=>e.id===id);
+ const details=await commitDetails(repo,{commit,parentIndex,signal}),entry=details.changes.find(e=>e.id===id);
  if(!entry)throw new Error('Change is not part of selected commit');
  const revision=side==='left'?details.parent:commit,file=side==='left'?(entry.oldPath||entry.path):entry.path;
  if(!revision||(side==='left'&&entry.status==='added')||(side==='right'&&entry.status==='deleted'))return {commit:revision,path:file,absent:true};
@@ -311,7 +315,7 @@ export async function getCommitImage(repo,{commit,parentIndex=0,id,side='right',
 }
 export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
- const details=await getCommitDetails(repo,{commit,parentIndex,signal});
+ const details=await commitDetails(repo,{commit,parentIndex,signal});
  const entry=details.changes.find(row=>row.id===id);if(!entry)throw new Error('Change is not part of selected commit');
  const result={commit,path:entry.path,lines:[],truncated:false};
  if(entry.status==='deleted')return {...result,notice:'File is deleted at this commit; blame unavailable.'};
@@ -328,7 +332,7 @@ export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
 export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,signal}={}){
   if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid history pagination');
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
-  const details=await getCommitDetails(repo,{commit,parentIndex,signal});
+  const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected commit');
   const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
@@ -425,7 +429,7 @@ async function historicalBlob(root,revision,file,signal){
 }
 export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal}={}){
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
-  const details=await getCommitDetails(repo,{commit,parentIndex,signal});
+  const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Historical change is not part of selected commit and parent');
   const left=details.parent&&entry.status!=='added'?await historicalBlob(repo.root,details.parent,entry.oldPath||entry.path,signal):{text:''};
