@@ -19,9 +19,12 @@ try {
  const archive=supplied||path.join(temp,parsePackReport(run(['pack','--ignore-scripts','--json','--pack-destination',temp],root))[0].filename);
  console.log('Testing tarball SHA-256:',createHash('sha256').update(await readFile(archive)).digest('hex'));
  await writeFile(path.join(temp,'package.json'),JSON.stringify({private:true}));
- run(['install','--omit=dev','--no-audit','--no-fund',archive],temp);
+ run(['install','--ignore-scripts','--omit=dev','--no-audit','--no-fund',archive],temp);
  const installed=path.join(temp,'node_modules','@feng0531','dsh-vcs');
  const manifest=JSON.parse(await readFile(path.join(installed,'package.json'),'utf8'));
+ const expected=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
+ assert.equal(manifest.name,'@feng0531/dsh-vcs','Unexpected installed package');
+ assert.equal(manifest.version,expected.version,'Candidate version differs from checkout');
  for(const file of ['index.mjs','vcs.mjs','dist/client.js','dist/editor.js','dist/editor.css','dist/editor.worker.js','LICENSE','dist/MONACO-LICENSE.txt','dist/MONACO-ThirdPartyNotices.txt','cordis.patch.yml'])await access(path.join(installed,file));
  const plugin=await import(pathToFileURL(path.join(installed,'index.mjs')).href);
  assert.equal(typeof plugin.apply,'function');assert.ok(plugin.inject.includes('webServer'));
