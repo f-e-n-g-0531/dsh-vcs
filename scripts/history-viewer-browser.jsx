@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkImageUI} from './image-ui-browser.jsx';
 export {checkImage} from './image-browser.mjs';
 export {checkGraph} from './graph-browser.jsx';
 export {checkTree} from './tree-browser.jsx';
