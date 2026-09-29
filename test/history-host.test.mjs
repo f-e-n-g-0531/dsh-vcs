@@ -27,6 +27,16 @@ for(const [endpoint,method] of [['vcs/revision-changes','getRevisionChanges'],['
   const controller=new AbortController(),cancel=setup({[method]:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call(endpoint,p,controller.signal)).error.code,'vcs/cancelled');
  });
 }
+test('blame enforces grants opaque selection fixed limits and stale cancellation',async()=>{
+ const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)},controller=new AbortController();let calls=0;
+ const h=setup({getFileBlame:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,parentIndex:0,id:p.id,signal:controller.signal});return {lines:[]};}});
+ assert.equal((await h.call('vcs/blame',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{path:'secret'},{root:'/evil'},{limit:9999},{offset:1},{commit:'HEAD'},{id:'bad'},{parentIndex:-1}])assert.equal((await h.call('vcs/blame',{...p,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(calls,0);assert.equal((await h.call('vcs/blame',p,controller.signal)).ok,true);assert.equal(calls,1);
+ h.expire();assert.equal((await h.call('vcs/blame',p)).error.code,'vcs/rediscover-required');
+ const moved=setup({getFileBlame:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/blame',p)).error.code,'vcs/rediscover-required');
+ const cancelled=setup({getFileBlame:async()=>{controller.abort();return {};}});await cancelled.discover();assert.equal((await cancelled.call('vcs/blame',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('file history validates opaque selection pagination and session grants',async()=>{
  const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)};const controller=new AbortController();let calls=0;
  const h=setup({listFileHistory:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,id:p.id,parentIndex:0,offset:0,limit:50,signal:controller.signal});return {commits:[]};}});
