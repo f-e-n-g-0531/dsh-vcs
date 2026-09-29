@@ -55,7 +55,7 @@ function validatePayload(endpoint, payload) {
 
 /** Limit active adapter operations and retain only bounded, short-lived discovery grants. */
 export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512 } = {}) {
-  let active = 0;
+  let active = 0, activeImages = 0;
   const sessions = new Map();
   function current(sessionId, cwd) {
     for (const [id, entry] of sessions) if (entry.expiresAt <= now()) sessions.delete(id);
@@ -72,6 +72,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
     if (!['vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/commit-image'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
+    let imageSlot=false;
     try {
       signal?.throwIfAborted();
       validatePayload(endpoint, payload);
@@ -115,6 +116,10 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
       if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/commit-image'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
+      if(endpoint==='vcs/commit-image'){
+        if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');
+        activeImages++;imageSlot=true;
+      }
       const value = endpoint === 'vcs/commit-image'
         ? await api.getCommitImage({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,side:payload.side??'right',signal})
         : endpoint === 'vcs/tree'
@@ -142,7 +147,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') return failure('vcs/cancelled', 'The request was cancelled.');
       return failure(typeof error?.code === 'string' && error.code.startsWith('vcs/') ? error.code : 'vcs/operation-failed', error instanceof Error ? error.message : String(error));
-    } finally { active--; }
+    } finally { active--; if(imageSlot)activeImages--; }
   };
 }
 

@@ -37,6 +37,16 @@ test('historical tree enforces commit-only grants and rejects stale results',asy
  const moved=setup({getHistoricalTree:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree',p)).error.code,'vcs/rediscover-required');
  const cancel=setup({getHistoricalTree:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree',p,controller.signal)).error.code,'vcs/cancelled');
 });
+test('image RPC budget leaves room for history and recovers after errors and cancellation',async()=>{
+ const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)};let started=0,ready;const both=new Promise(resolve=>ready=resolve),finish=[];
+ const h=setup({getCommitImage:async()=>{started++;if(started===2)ready();return new Promise((resolve,reject)=>finish.push({resolve,reject}));}});await h.discover();
+ const controller=new AbortController(),one=h.call('vcs/commit-image',p),two=h.call('vcs/commit-image',p,controller.signal);await both;
+ assert.equal((await h.call('vcs/commit-image',p)).error.code,'vcs/busy');assert.equal(started,2);
+ assert.equal((await h.call('vcs/history',payload)).ok,true);
+ finish[0].reject(Error('image failed'));controller.abort();finish[1].resolve({});
+ assert.equal((await one).error.code,'vcs/operation-failed');assert.equal((await two).error.code,'vcs/cancelled');
+ const three=h.call('vcs/commit-image',p);while(started<3)await new Promise(resolve=>setImmediate(resolve));finish[2].resolve({});assert.equal((await three).ok,true);
+});
 test('image RPC enforces grants strict fields side defaults and cancellation',async()=>{
  const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)},controller=new AbortController();const seen=[];
  const h=setup({getCommitImage:async(r,o)=>{assert.deepEqual(r,repo);assert.equal(o.signal,controller.signal);seen.push(o);return {mime:'image/png'};}});
