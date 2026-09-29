@@ -1,4 +1,5 @@
 import React from 'react';
+import {checkHistoryNavigation} from './history-navigation-browser.jsx';
 import {createRoot} from 'react-dom/client';
 import FileHistory from '../src/FileHistory.jsx';
 export async function checkFileHistory(){
@@ -27,4 +28,5 @@ export async function checkFileHistory(){
  delayed({path:'file.txt',commits:[row(commit,'STALE')],nextOffset:null});await new Promise(r=>setTimeout(r,50));
  if(host.textContent.includes('STALE')||calls!==3)throw Error('Closed history accepted stale response');
  }finally{root.unmount();host.remove();}
+ await checkHistoryNavigation();
 }
