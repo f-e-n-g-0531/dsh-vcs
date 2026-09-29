@@ -9,7 +9,7 @@ test('real authorized RPC traverses history details and committed diff',async t=
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'vcs-history-rpc-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
  const git=args=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',windowsHide:true,timeout:20000});assert.equal(r.status,0,r.stderr);return r.stdout;};
  git(['init','-b','main']);git(['config','user.name','History']);git(['config','user.email','history@example.invalid']);git(['config','core.autocrlf','false']);
- for(const text of ['before','after']){await fs.writeFile(path.join(root,'file.txt'),text);git(['add','file.txt']);git(['commit','--no-gpg-sign','-m',text]);}
+ for(const text of ['before','after']){await fs.writeFile(path.join(root,'file.txt'),text);git(['add','file.txt']);git(['commit','--no-gpg-sign','-m',text+'\n\n中文正文\n<em>literal</em>']);}
  await fs.writeFile(path.join(root,'file.txt'),'uncommitted');
  const before=git(['status','--porcelain']),head=git(['rev-parse','HEAD']);
  const handler=createHandler({sessions:{get:()=>({header:{cwd:root}})},sessionPersistence:{stat:async()=>null}});
@@ -19,6 +19,8 @@ test('real authorized RPC traverses history details and committed diff',async t=
  const read=async(endpoint,extra={})=>{const r=await handler(endpoint,{...p,...extra});assert.equal(r.ok,true,JSON.stringify(r));return r.value;};
  const history=await read('vcs/history',{limit:1});assert.equal(history.commits.length,1);assert.equal(history.nextOffset,1);
  const detail=await read('vcs/commit',{commit:history.commits[0].id});assert.equal(detail.changes.length,1);
+ assert.equal(detail.message.trimEnd(),'after\n\n中文正文\n<em>literal</em>');assert.equal(detail.messageTruncated,false);assert.equal(Object.hasOwn(history.commits[0],'message'),false);
+ assert.equal((await handler('vcs/commit',{...p,commit:detail.id,includeMessage:false})).error.code,'vcs/invalid-request');
  const result=await read('vcs/commit-compare',{commit:detail.id,id:detail.changes[0].id});assert.equal(result.left.text,'before');assert.equal(result.right.text,'after');
  const next=await read('vcs/history',{snapshot:history.snapshot,offset:1,limit:1});assert.equal(next.commits.length,1);assert.equal(next.nextOffset,null);
  const tree=await read('vcs/tree',{commit:detail.id});assert.equal(tree.commit,detail.id);
@@ -58,6 +60,8 @@ test('real authorized RPC traverses history details and committed diff',async t=
   assert.equal((await handler(endpoint,{...p,...args,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
   assert.equal((await handler(endpoint,{...p,...args,path:'file.txt'})).error.code,'vcs/invalid-request');
  }
+ const messagePath=path.join(os.tmpdir(),'vcs-message-'+path.basename(root));t.after(()=>fs.rm(messagePath,{force:true}));await fs.writeFile(messagePath,'Large\n\n'+'x'.repeat(2*1024*1024));
+ const huge=git(['commit-tree',git(['rev-parse','HEAD^{tree}']).trim(),'-F',messagePath]).trim();const omitted=await read('vcs/commit',{commit:huge});assert.equal(omitted.message,'');assert.equal(omitted.messageTruncated,true);assert.equal(omitted.changes.length,1);
  const foreign=await handler('vcs/commit-compare',{...p,sessionId:'foreign',commit:detail.id,id:detail.changes[0].id});assert.equal(foreign.error.code,'vcs/rediscover-required');
  assert.equal(git(['status','--porcelain']),before);assert.equal(git(['rev-parse','HEAD']),head);assert.equal(await fs.readFile(path.join(root,'file.txt'),'utf8'),'uncommitted');
 });
