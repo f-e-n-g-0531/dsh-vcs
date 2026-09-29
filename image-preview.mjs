@@ -29,6 +29,7 @@ export function inspectPng(buffer){
   }else{
    if(seenData)endedData=true;
    if(type==='IEND'){if(length||!seenData||end!==buffer.length)throw new Error('Invalid PNG end');ended=true;}
+   else if(['iCCP','zTXt','iTXt'].includes(type))throw new Error('Compressed or international PNG metadata is unsupported');
    else if(['acTL','fcTL','fdAT'].includes(type))throw new Error('Animated PNG is unsupported');
    else if(type[0]===type[0].toUpperCase()&&type!=='PLTE')throw new Error('Unknown critical PNG chunk');
   }
