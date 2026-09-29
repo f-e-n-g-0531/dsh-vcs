@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -18,6 +18,18 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('blame reads committed UTF8 lines with original attribution and bounded output',async t=>{
+ const root=await gitRepo(t);await write(root,'file.txt','first\nsecond\n');commit(root);
+ const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await write(root,'file.txt','first\nchanged\n');commit(root);const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ const detail=await getCommitDetails(repo,{commit:head}),id=detail.changes[0].id;
+ await write(root,'file.txt','working only');const blame=await getFileBlame(repo,{commit:head,id});
+ assert.deepEqual(blame.lines.map(r=>[r.line,r.commit,r.text]),[[1,first,'first'],[2,head,'changed']]);assert.equal(blame.truncated,false);
+ await write(root,'file.txt',Array.from({length:501},(_,i)=>'row '+i).join('\n'));commit(root);
+ const latest=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),large=await getCommitDetails(repo,{commit:latest});
+ const bounded=await getFileBlame(repo,{commit:latest,id:large.changes[0].id});assert.equal(bounded.lines.length,500);assert.equal(bounded.truncated,true);
+ await assert.rejects(getFileBlame(repo,{commit:head,id:'f'.repeat(64)}),/selected commit/);
+});
 test('file history pins exact literal path and paginates without working tree reads',async t=>{
  const root=await gitRepo(t),name='[file].txt';
  await write(root,name,'first');await write(root,'f.txt','other');commit(root);

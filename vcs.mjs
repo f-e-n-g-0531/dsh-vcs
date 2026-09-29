@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import {parseHistory,HISTORY_FORMAT,historyPage} from './git-history.mjs';
+import {parseHistory,HISTORY_FORMAT,historyPage,parseBlame} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -270,6 +270,19 @@ function parseCommitChanges(text,scope){
     if(changes.length>10000)throw new Error('Commit exceeds file count limit');
   }
   return changes;
+}
+export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
+ if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+ const details=await getCommitDetails(repo,{commit,parentIndex,signal});
+ const entry=details.changes.find(row=>row.id===id);if(!entry)throw new Error('Change is not part of selected commit');
+ const result={commit,path:entry.path,lines:[],truncated:false};
+ if(entry.status==='deleted')return {...result,notice:'File is deleted at this commit; blame unavailable.'};
+ const blob=await historicalBlob(repo.root,commit,entry.path,signal);
+ if(blob.notice||blob.binary||blob.encoding!=='UTF-8')return {...result,notice:blob.notice||'Blame supports UTF-8 regular text only.'};
+ if(!blob.text)return result;
+ const count=blob.text.split('\n').length-(blob.text.endsWith('\n')?1:0),limit=Math.min(count,500);
+ const output=await git(repo.root,['--literal-pathspecs','blame','--line-porcelain','--no-textconv','--encoding=UTF-8','-L','1,'+limit,commit,'--',entry.path],MAX_TEXT,{signal});
+ return {...result,lines:parseBlame(output.toString('utf8'),limit),truncated:count>limit};
 }
 export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,signal}={}){
   if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid history pagination');
