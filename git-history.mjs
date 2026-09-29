@@ -24,6 +24,30 @@ export function parseBlame(text,maxLines=500){
  }
  return rows;
 }
+// for-each-ref adds LF after each NUL-delimited record; ref names cannot contain LF.
+export const REFS_FORMAT='%(refname)%00%(objecttype)%00%(objectname)%00%(*objecttype)%00%(*objectname)%00';
+export function parseReferences(text){
+ if(typeof text!=='string'||Buffer.byteLength(text,'utf8')>2*1024*1024)throw Error('Invalid reference output size');
+ if(!text)return [];
+ if(!text.endsWith('\n'))throw Error('Truncated reference output');
+ const lines=text.slice(0,-1).split('\n');if(lines.length>1000)throw Error('Reference count exceeds limit');
+ const seen=new Set(),result=[];
+ for(const line of lines){
+  const fields=line.split('\0');if(fields.length!==6||fields[5]!=='')throw Error('Invalid reference framing');
+  const [name,type,id,peeledType,peeled]=fields;
+  const prefix=name.startsWith('refs/heads/')?'refs/heads/':name.startsWith('refs/tags/')?'refs/tags/':null;
+  if(!prefix||seen.has(name)||name.length>1024)throw Error('Invalid reference name');
+  const short=name.slice(prefix.length);
+  if(!short||short.endsWith('.')||short.includes('..')||short.includes('@{')||[...short].some(c=>c.charCodeAt(0)<=32||c.charCodeAt(0)===127||'~^:?*['.includes(c)||c===String.fromCharCode(92))||short.split('/').some(p=>!p||p.startsWith('.')||p.endsWith('.lock')))throw Error('Invalid reference name');
+  seen.add(name);
+  if(!oid(id)||!['commit','tag','tree','blob'].includes(type)||Boolean(peeledType)!==Boolean(peeled)||(peeled&&(!oid(peeled)||peeled.length!==id.length||!['commit','tag','tree','blob'].includes(peeledType))))throw Error('Invalid reference object');
+  if(type!=='tag'&&peeled)throw Error('Unexpected peeled object');
+  const commit=type==='commit'?id:type==='tag'&&peeledType==='commit'?peeled:null;
+  if(commit)result.push({name,shortName:short,kind:prefix==='refs/heads/'?'branch':'tag',commit});
+ }
+ return result;
+}
+
 // Format for: git log -z --format=<HISTORY_FORMAT>. NUL separates fields/records.
 export const HISTORY_FORMAT = '%H%x00%P%x00%an%x00%aI%x00%s';
 const oid = value => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
