@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import HistoryViewer from './HistoryViewer.jsx';
 import FileHistory from './FileHistory.jsx';
+import BlamePanel from './BlamePanel.jsx';
 export default function HistoryComparison({sessionId,repositoryId,commit,parentIndex,base,target,id,rpc,t,onRediscover}){
  const [comparison,setComparison]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{
@@ -14,5 +15,6 @@ export default function HistoryComparison({sessionId,repositoryId,commit,parentI
  {comparison.notice&&<p role="status">{comparison.notice}</p>}
  {comparison.binary?<p>{t('binary')}</p>:<HistoryViewer comparison={comparison} identity={base?JSON.stringify([sessionId,repositoryId,base,target,id]):JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} t={t}/>}
  {commit&&!base&&<FileHistory key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
+ {commit&&!base&&<BlamePanel key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
  </section>;
 }
