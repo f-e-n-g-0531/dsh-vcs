@@ -18,6 +18,30 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('historical special files remain bounded and never follow link or submodule targets',async t=>{
+ const root=await gitRepo(t);
+ await write(root,'seed.txt','seed');commit(root);
+ const seed=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await write(root,'binary.dat',Buffer.from([0,1,2,3]));
+ await write(root,'large.txt','x'.repeat(2*1024*1024+1));
+ await write(root,'target.txt','/outside/private-file');
+ const blob=cmd(root,'git',['hash-object','-w','target.txt']).stdout.trim();
+ cmd(root,'git',['add','binary.dat','large.txt']);
+ // Index-only objects work on Windows without symlink privileges or a submodule checkout.
+ cmd(root,'git',['update-index','--add','--cacheinfo','120000',blob,'link.txt']);
+ cmd(root,'git',['update-index','--add','--cacheinfo','160000',seed,'submodule']);
+ cmd(root,'git',['commit','--no-gpg-sign','-m','special objects']);
+ const repo=await detectRepository(root),commitId=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ const before={head:commitId,index:cmd(root,'git',['ls-files','--stage']).stdout,status:cmd(root,'git',['status','--porcelain']).stdout,target:await fs.readFile(path.join(root,'target.txt'),'utf8')};
+ const details=await getCommitDetails(repo,{commit:commitId});
+ const compare=name=>getCommitComparison(repo,{commit:commitId,id:details.changes.find(row=>row.path===name).id});
+ const binary=await compare('binary.dat');assert.equal(binary.binary,true);
+ const large=await compare('large.txt');assert.equal(large.right.text,'');assert.match(large.notice,/2 MiB/);
+ const link=await compare('link.txt');assert.equal(link.right.text,'/outside/private-file');assert.match(link.notice,/not followed/);
+ const submodule=await compare('submodule');assert.equal(submodule.right.text,seed);assert.match(submodule.notice,/not loaded/);
+ assert.deepEqual({head:cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),index:cmd(root,'git',['ls-files','--stage']).stdout,status:cmd(root,'git',['status','--porcelain']).stdout,target:await fs.readFile(path.join(root,'target.txt'),'utf8')},before);
+});
+
 test('historical comparison reads committed blobs not working files',async t=>{
  const root=await gitRepo(t);await write(root,'a.txt','before');commit(root);const repo=await detectRepository(root);
  const head=()=>cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
