@@ -33,6 +33,20 @@ test('file history pins exact literal path and paginates without working tree re
  await assert.rejects(listFileHistory(repo,{commit:snapshot,id,limit:101}),/pagination/);
  const controller=new AbortController();controller.abort();await assert.rejects(listFileHistory(repo,{commit:snapshot,id,signal:controller.signal}),{name:'AbortError'});
 });
+test('file path history explicitly excludes pre-rename names and includes deletion and recreation',async t=>{
+ const root=await gitRepo(t);await write(root,'old.txt','original content');commit(root);
+ const original=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await fs.rename(path.join(root,'old.txt'),path.join(root,'新 名.txt'));commit(root);
+ const renamed=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ const repo=await detectRepository(root);
+ const query=async oid=>{const detail=await getCommitDetails(repo,{commit:oid});const entry=detail.changes.find(c=>c.path==='新 名.txt');assert.ok(entry);return listFileHistory(repo,{commit:oid,id:entry.id});};
+ const afterRename=await query(renamed);assert.equal(afterRename.followsRenames,false);assert.deepEqual(afterRename.commits.map(c=>c.id),[renamed]);
+ await fs.unlink(path.join(root,'新 名.txt'));commit(root);const removed=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ assert.deepEqual((await query(removed)).commits.map(c=>c.id),[removed,renamed]);
+ await write(root,'新 名.txt','unrelated recreated file');commit(root);const recreated=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ const page=await query(recreated);assert.deepEqual(page.commits.map(c=>c.id),[recreated,removed,renamed]);assert.ok(!page.commits.some(c=>c.id===original));
+ assert.equal(page.path,'新 名.txt');assert.equal(page.nextOffset,null);
+});
 test('divergent revision pairs use direct trees and bind IDs to repository roots',async t=>{
  const root=await gitRepo(t);await write(root,'common.txt','ancestor');commit(root);
  const ancestor=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
