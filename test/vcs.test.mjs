@@ -56,6 +56,23 @@ test('committed PNG preview uses immutable blob and rejects forged selection',as
  await write(root,'image.png',png);assert.deepEqual(await getCommitImage(repo,{commit:deleted,id:changes.changes[0].id}),{commit:deleted,path:'image.png',absent:true});
  const prior=await getCommitImage(repo,{commit:deleted,id:changes.changes[0].id,side:'left'});assert.equal(prior.commit,head);assert.deepEqual(Buffer.from(prior.base64,'base64'),png);
 });
+test('committed PNG rename and merge parents resolve exact baseline paths',async t=>{
+ const root=await gitRepo(t),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+ await write(root,'old.png',png);commit(root);const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await fs.rename(path.join(root,'old.png'),path.join(root,'new.png'));commit(root);const renamed=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),tree=cmd(root,'git',['rev-parse','HEAD^{tree}']).stdout.trim();
+ await fs.unlink(path.join(root,'new.png'));commit(root);const empty=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ const merged=cmd(root,'git',['commit-tree',tree,'-p',first,'-p',empty,'-m','synthetic merge']).stdout.trim(),repo=await detectRepository(root);
+ for(const commitId of [renamed,merged]){
+  const details=await getCommitDetails(repo,{commit:commitId,parentIndex:0}),entry=details.changes.find(e=>e.path==='new.png');assert.equal(entry.oldPath,'old.png');
+  const left=await getCommitImage(repo,{commit:commitId,id:entry.id,side:'left'}),right=await getCommitImage(repo,{commit:commitId,id:entry.id});
+  assert.equal(left.commit,first);assert.equal(left.path,'old.png');assert.equal(right.path,'new.png');assert.deepEqual(Buffer.from(left.base64,'base64'),png);assert.deepEqual(Buffer.from(right.base64,'base64'),png);
+ }
+ const one=await getCommitDetails(repo,{commit:merged,parentIndex:0}),two=await getCommitDetails(repo,{commit:merged,parentIndex:1}),entry=two.changes.find(e=>e.path==='new.png');
+ assert.equal((await getCommitImage(repo,{commit:merged,parentIndex:1,id:entry.id,side:'left'})).absent,true);
+ assert.equal((await getCommitImage(repo,{commit:merged,parentIndex:1,id:entry.id})).commit,merged);
+ await assert.rejects(getCommitImage(repo,{commit:merged,parentIndex:1,id:one.changes[0].id}),/selected commit/);
+ assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),empty);assert.equal(cmd(root,'git',['status','--porcelain']).stdout,'');
+});
 test('blame reads committed UTF8 lines with original attribution and bounded output',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','first\nsecond\n');commit(root);
  const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
