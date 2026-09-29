@@ -21,6 +21,21 @@ test('real authorized RPC traverses history details and committed diff',async t=
  const detail=await read('vcs/commit',{commit:history.commits[0].id});assert.equal(detail.changes.length,1);
  const result=await read('vcs/commit-compare',{commit:detail.id,id:detail.changes[0].id});assert.equal(result.left.text,'before');assert.equal(result.right.text,'after');
  const next=await read('vcs/history',{snapshot:history.snapshot,offset:1,limit:1});assert.equal(next.commits.length,1);assert.equal(next.nextOffset,null);
+ const pair={base:next.commits[0].id,target:detail.id};
+ const revisions=await read('vcs/revision-changes',pair);assert.equal(revisions.changes.length,1);
+ const selected={...pair,id:revisions.changes[0].id};
+ const revisionDiff=await read('vcs/revision-compare',selected);
+ assert.equal(revisionDiff.left.text,'before');assert.equal(revisionDiff.right.text,'after');
+ const reversed=await handler('vcs/revision-compare',{...p,...selected,base:pair.target,target:pair.base});assert.equal(reversed.ok,false);
+ const reverseList=await read('vcs/revision-changes',{base:pair.target,target:pair.base});
+ const reverseDiff=await read('vcs/revision-compare',{base:pair.target,target:pair.base,id:reverseList.changes[0].id});
+ assert.equal(reverseDiff.left.text,'after');assert.equal(reverseDiff.right.text,'before');
+ assert.deepEqual((await read('vcs/revision-changes',{base:pair.base,target:pair.base})).changes,[]);
+ for(const endpoint of ['vcs/revision-changes','vcs/revision-compare']){
+  const args=endpoint.endsWith('compare')?selected:pair;
+  assert.equal((await handler(endpoint,{...p,...args,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
+  assert.equal((await handler(endpoint,{...p,...args,path:'file.txt'})).error.code,'vcs/invalid-request');
+ }
  const foreign=await handler('vcs/commit-compare',{...p,sessionId:'foreign',commit:detail.id,id:detail.changes[0].id});assert.equal(foreign.error.code,'vcs/rediscover-required');
  assert.equal(git(['status','--porcelain']),before);assert.equal(git(['rev-parse','HEAD']),head);assert.equal(await fs.readFile(path.join(root,'file.txt'),'utf8'),'uncommitted');
 });
