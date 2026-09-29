@@ -1,7 +1,8 @@
 import React,{useState,useEffect} from 'react';
 import CommitDetails from './CommitDetails.jsx';
+import {filterLoadedCommits} from './history-filter.mjs';
 export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
- const [selected,setSelected]=useState(null);
+ const [selected,setSelected]=useState(null),[query,setQuery]=useState('');
  const [page,setPage]=useState({commits:[],snapshot:null,nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  // Parent remounts on repository/refresh changes; pagination stays anchored to first snapshot.
  useEffect(()=>{
@@ -11,9 +12,12 @@ export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}
   }).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,offset,retry]);
+ const commits=filterLoadedCommits(page.commits,query);
  return <section className="vcs-history" aria-label={t('history')} aria-busy={busy}>
  <p>{t('historyListOnly')}</p>
- <ol>{page.commits.map(commit=><li key={commit.id}><button aria-pressed={selected===commit.id} onClick={()=>setSelected(commit.id)}>{commit.subject}</button><div><code title={commit.id}>{commit.id.slice(0,10)}</code> · {commit.author} · <time dateTime={commit.date}>{commit.date}</time></div></li>)}</ol>
+ <label>{t('historySearch')} <input aria-label={t('historySearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}}/></label><span> {commits.length} / {page.commits.length}</span>
+ {!!page.commits.length&&!commits.length&&<p role="status">{t('historyNoMatch')}</p>}
+ <ol>{commits.map(commit=><li key={commit.id}><button aria-pressed={selected===commit.id} onClick={()=>setSelected(commit.id)}>{commit.subject}</button><div><code title={commit.id}>{commit.id.slice(0,10)}</code> · {commit.author} · <time dateTime={commit.date}>{commit.date}</time></div></li>)}</ol>
  {busy&&<p role="status">{t('loading')}</p>}
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
