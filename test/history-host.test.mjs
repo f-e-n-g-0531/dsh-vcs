@@ -27,6 +27,15 @@ for(const [endpoint,method] of [['vcs/revision-changes','getRevisionChanges'],['
   const controller=new AbortController(),cancel=setup({[method]:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call(endpoint,p,controller.signal)).error.code,'vcs/cancelled');
  });
 }
+test('file history validates opaque selection pagination and session grants',async()=>{
+ const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)};const controller=new AbortController();let calls=0;
+ const h=setup({listFileHistory:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,id:p.id,parentIndex:0,offset:0,limit:50,signal:controller.signal});return {commits:[]};}});
+ assert.equal((await h.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{path:'secret'},{root:'/evil'},{snapshot:p.commit},{commit:'HEAD'},{id:'bad'},{parentIndex:null},{offset:null},{offset:10001},{limit:101}])assert.equal((await h.call('vcs/file-history',{...p,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(calls,0);assert.equal((await h.call('vcs/file-history',p,controller.signal)).ok,true);assert.equal(calls,1);
+ h.expire();assert.equal((await h.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');
+ const cancel=setup({listFileHistory:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/file-history',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('history requires per-session grants and rejects roots and invalid arguments',async()=>{
  const h=setup();assert.equal((await h.call('vcs/history',payload)).error.code,'vcs/rediscover-required');await h.discover();
  for(const extra of [{root:'/evil'},{mode:'all'},{snapshot:'--all'},{offset:-1},{limit:101},{offset:0.5},{offset:null},{limit:null}])assert.equal((await h.call('vcs/history',{...payload,...extra})).error.code,'vcs/invalid-request');
