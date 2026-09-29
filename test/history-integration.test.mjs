@@ -61,3 +61,24 @@ test('real authorized RPC traverses history details and committed diff',async t=
  const foreign=await handler('vcs/commit-compare',{...p,sessionId:'foreign',commit:detail.id,id:detail.changes[0].id});assert.equal(foreign.error.code,'vcs/rediscover-required');
  assert.equal(git(['status','--porcelain']),before);assert.equal(git(['rev-parse','HEAD']),head);assert.equal(await fs.readFile(path.join(root,'file.txt'),'utf8'),'uncommitted');
 });
+
+test('real authorized image RPC reads both renamed PNG sides without working tree fallback',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'vcs-image-rpc-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
+ const git=args=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',windowsHide:true,timeout:20000});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ git(['init','-b','main']);git(['config','user.name','Image']);git(['config','user.email','image@example.invalid']);git(['config','core.autocrlf','false']);
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+ await fs.writeFile(path.join(root,'old.png'),png);git(['add','.']);git(['commit','--no-gpg-sign','-m','image']);const parent=git(['rev-parse','HEAD']);
+ await fs.rename(path.join(root,'old.png'),path.join(root,'new.png'));git(['add','.']);git(['commit','--no-gpg-sign','-m','rename']);const commit=git(['rev-parse','HEAD']);
+ await fs.writeFile(path.join(root,'new.png'),'uncommitted');const before=git(['status','--porcelain']),index=git(['ls-files','--stage']);
+ const handler=createHandler({sessions:{get:()=>({header:{cwd:root}})},sessionPersistence:{stat:async()=>null}});
+ const scan=await handler('vcs/repositories',{sessionId:'s'});assert.equal(scan.ok,true);const repo=scan.value.repositories.find(r=>r.type==='git');
+ const p={sessionId:'s',repositoryId:repo.id,commit};const details=await handler('vcs/commit',p);assert.equal(details.ok,true);const args={...p,id:details.value.changes[0].id};
+ for(const side of ['left','right']){
+  const response=await handler('vcs/commit-image',{...args,side});assert.equal(response.ok,true,JSON.stringify(response));const value=response.value;
+  assert.equal(value.commit,side==='left'?parent:commit);assert.equal(value.path,side==='left'?'old.png':'new.png');assert.equal(value.mime,'image/png');assert.equal(value.width,1);assert.equal(value.height,1);assert.deepEqual(Buffer.from(value.base64,'base64'),png);assert.equal(value.bytes,png.length);
+ }
+ assert.equal((await handler('vcs/commit-image',{...args,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
+ assert.equal((await handler('vcs/commit-image',{...args,path:'old.png'})).error.code,'vcs/invalid-request');
+ assert.equal((await handler('vcs/commit-image',{...args,id:'f'.repeat(64)})).ok,false);
+ assert.equal(git(['status','--porcelain']),before);assert.equal(git(['ls-files','--stage']),index);assert.equal(git(['rev-parse','HEAD']),commit);assert.equal(await fs.readFile(path.join(root,'new.png'),'utf8'),'uncommitted');
+});
