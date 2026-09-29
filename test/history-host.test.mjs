@@ -27,6 +27,16 @@ for(const [endpoint,method] of [['vcs/revision-changes','getRevisionChanges'],['
   const controller=new AbortController(),cancel=setup({[method]:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call(endpoint,p,controller.signal)).error.code,'vcs/cancelled');
  });
 }
+test('historical tree enforces commit-only grants and rejects stale results',async()=>{
+ const p={...payload,commit:'a'.repeat(40)},controller=new AbortController();let count=0;
+ const h=setup({getHistoricalTree:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,signal:controller.signal});return {entries:[]};}});
+ assert.equal((await h.call('vcs/tree',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{root:'/evil'},{path:'secret'},{depth:10},{id:'b'.repeat(64)},{commit:'HEAD'},{parentIndex:0}])assert.equal((await h.call('vcs/tree',{...p,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(count,0);assert.equal((await h.call('vcs/tree',p,controller.signal)).ok,true);assert.equal(count,1);
+ h.expire();assert.equal((await h.call('vcs/tree',p)).error.code,'vcs/rediscover-required');
+ const moved=setup({getHistoricalTree:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree',p)).error.code,'vcs/rediscover-required');
+ const cancel=setup({getHistoricalTree:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('blame enforces grants opaque selection fixed limits and stale cancellation',async()=>{
  const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)},controller=new AbortController();let calls=0;
  const h=setup({getFileBlame:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,parentIndex:0,id:p.id,signal:controller.signal});return {lines:[]};}});
