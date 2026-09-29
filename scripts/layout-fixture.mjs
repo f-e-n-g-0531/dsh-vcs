@@ -30,7 +30,7 @@ const check=()=>{
  document.body.dataset.result=results.every(r=>r.pass)?'pass':'fail';
  window.scrollTo(0,0);
 };
-const html='<!doctype html><meta charset="utf-8"><title>DSH VCS isolated layout checks</title><style>:root{--dsw-font-family:Arial,sans-serif;--dsw-alias-bg-base:white;--dsw-alias-label-primary:#222;--dsw-alias-border-l2:#888}section{margin-bottom:30px}'+css+'</style><h1>Isolated layout fixture — NOT live DSH acceptance</h1><p>CSS zoom is not browser zoom. Use a desktop browser and run again after resizing.</p><button id="run">Run geometry checks</button><pre>Not run</pre>'+cases.join('')+'<script>const check='+check.toString()+';document.querySelector("#run").onclick=check;</script>';
+const html='<!doctype html><meta charset="utf-8"><title>DSH VCS isolated layout checks</title><style>:root{--dsw-font-family:Arial,sans-serif;--dsw-alias-bg-base:white;--dsw-alias-label-primary:#222;--dsw-alias-border-l2:#888}section{margin-bottom:30px}'+css+'</style><h1>Isolated layout fixture — NOT live DSH acceptance</h1><p>CSS zoom is not browser zoom. Use a desktop browser and run again after resizing.</p><button id="run">Run geometry checks</button><pre>Not run</pre>'+cases.join('')+'<script>const check='+check.toString()+';document.querySelector("#run").onclick=check;if(location.hash==="#autorun")window.addEventListener("load",()=>document.fonts.ready.then(check));</script>';
 assert.equal(cases.length,12);
 new Script(html.split('<script>')[1].split('</script>')[0]);
 const output=new URL('../test-results/layout-fixture.html',import.meta.url);

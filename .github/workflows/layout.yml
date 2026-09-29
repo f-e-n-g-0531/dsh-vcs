@@ -1,0 +1,30 @@
+name: Browser layout checks
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/layout-fixture.mjs
+      - name: Run runner Chrome against isolated fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          google-chrome --version
+          google-chrome --headless --no-sandbox --disable-gpu --window-size=1920,1080 --virtual-time-budget=10000 --dump-dom "file://$PWD/test-results/layout-fixture.html#autorun" > test-results/layout-dom.html
+          node scripts/verify-layout-result.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-layout-evidence
+          path: test-results/
+          retention-days: 14
