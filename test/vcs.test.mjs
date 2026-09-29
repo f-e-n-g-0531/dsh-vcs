@@ -25,6 +25,13 @@ test('commit details preserve multiline message while history remains summary-on
  const details=await getCommitDetails(repo,{commit:head});assert.equal(details.subject,'Review subject');assert.equal(details.message.trimEnd(),message);
  const history=await listHistory(repo);assert.equal(history.commits[0].subject,'Review subject');assert.equal(Object.hasOwn(history.commits[0],'message'),false);
 });
+test('oversized commit body does not prevent details or file comparison',async t=>{
+ const root=await gitRepo(t);await write(root,'file.txt','content');cmd(root,'git',['add','.']);
+ const tree=cmd(root,'git',['write-tree']).stdout.trim();await write(root,'message.txt','Subject\n\n'+'x'.repeat(2*1024*1024));
+ const head=cmd(root,'git',['commit-tree',tree,'-F','message.txt']).stdout.trim(),repo=await detectRepository(root);
+ const details=await getCommitDetails(repo,{commit:head});assert.equal(details.subject,'Subject');assert.equal(details.message,'');assert.equal(details.messageTruncated,true);assert.equal(details.changes.length,1);
+ const comparison=await getCommitComparison(repo,{commit:head,id:details.changes[0].id});assert.equal(comparison.right.text,'content');
+});
 test('historical tree reads committed nested entries not working directory contents',async t=>{
  const root=await gitRepo(t);await fs.mkdir(path.join(root,'nested'));await write(root,'nested/中文 [file].txt','committed');commit(root);
  const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);

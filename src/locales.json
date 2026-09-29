@@ -126,7 +126,8 @@
     "imageAbsent": "此侧没有文件。",
     "imageInvalid": "图片响应无效。",
     "imageMetadata": "预览已移除附加元数据。",
-    "imageScope": "仅支持非交错静态 PNG 普通文件；每侧最多 2 MiB、1600 万像素。元数据被移除，不适用于色彩精确性审阅。工作区修改不包含在内。"
+    "imageScope": "仅支持非交错静态 PNG 普通文件；每侧最多 2 MiB、1600 万像素。元数据被移除，不适用于色彩精确性审阅。工作区修改不包含在内。",
+    "commitMessageLimit": "完整提交说明超过 2 MiB 预览上限，已省略。"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -255,6 +256,7 @@
     "imageAbsent": "No file on this side.",
     "imageInvalid": "Invalid image response.",
     "imageMetadata": "Ancillary metadata was removed from this preview.",
-    "imageScope": "Non-interlaced static PNG regular files only; at most 2 MiB and 16 million pixels per side. Metadata is removed; not suitable for color-critical review. Working changes are excluded."
+    "imageScope": "Non-interlaced static PNG regular files only; at most 2 MiB and 16 million pixels per side. Metadata is removed; not suitable for color-critical review. Working changes are excluded.",
+    "commitMessageLimit": "Full commit message exceeds the 2 MiB preview limit and was omitted."
   }
 }

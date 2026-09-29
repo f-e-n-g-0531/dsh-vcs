@@ -255,8 +255,11 @@ export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
   const parent=metadata.parents[parentIndex]??null;
   const args=['diff-tree','--no-commit-id','--name-status','-z','-r','--no-ext-diff','--no-textconv','--find-renames',...(parent?[parent,commit]:['--root',commit]),'--'];
   const changes=parseCommitChanges((await git(repo.root,args,MAX_TEXT,{signal})).toString('utf8'),commit+':'+(parent||'root'));
-  const message=(await git(repo.root,['log','--no-show-signature','--encoding=UTF-8','--max-count=1','--format=%B',commit,'--'],MAX_TEXT,{signal})).toString('utf8');
-  return {...metadata,message,parent,parentIndex,changes};
+  let message='',messageTruncated=false;
+  try{message=(await git(repo.root,['log','--no-show-signature','--encoding=UTF-8','--max-count=1','--format=%B',commit,'--'],MAX_TEXT,{signal})).toString('utf8');}
+  catch(error){if(error.code!=='TOO_LARGE')throw error;messageTruncated=true;}
+  signal?.throwIfAborted();
+  return {...metadata,message,messageTruncated,parent,parentIndex,changes};
 }
 function parseCommitChanges(text,scope){
   const fields=text.split(String.fromCharCode(0));
