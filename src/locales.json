@@ -107,7 +107,13 @@
     "blameCommit": "归属提交",
     "blameAuthor": "作者",
     "blameSummary": "提交摘要",
-    "blameSource": "源码"
+    "blameSource": "源码",
+    "historicalTree": "历史目录",
+    "historicalTreeScope": "所选提交的目录条目；每页 100 项。不打开文件、不跟随符号链接或子模块。",
+    "treeUp": "上级目录",
+    "treeEntries": "个条目",
+    "treePrevious": "上一页",
+    "treeNext": "下一页"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -217,6 +223,12 @@
     "blameCommit": "Commit",
     "blameAuthor": "Author",
     "blameSummary": "Summary",
-    "blameSource": "Source"
+    "blameSource": "Source",
+    "historicalTree": "Historical tree",
+    "historicalTreeScope": "Entries at the selected commit; 100 per page. Files are not opened; symlinks and submodules are not followed.",
+    "treeUp": "Parent directory",
+    "treeEntries": "entries",
+    "treePrevious": "Previous page",
+    "treeNext": "Next page"
   }
 }

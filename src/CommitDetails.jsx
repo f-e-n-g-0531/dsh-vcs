@@ -1,4 +1,5 @@
 import React,{useState,useEffect} from 'react';
+import HistoricalTree from './HistoricalTree.jsx';
 import HistoryComparison from './HistoryComparison.jsx';
 import {filterCommitFiles} from './history-filter.mjs';
 export default function CommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover}){
@@ -21,5 +22,6 @@ export default function CommitDetails({sessionId,repositoryId,commit,rpc,t,onRed
  {!!details.changes.length&&!files.length&&<p role="status">{t('emptySearch')}</p>}
  {!details.changes.length&&<p>{t('commitNoChanges')}</p>}
  {selected&&<HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={commit} parentIndex={parentIndex} id={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+ <HistoricalTree key={JSON.stringify([sessionId,repositoryId,commit])} {...{sessionId,repositoryId,commit,rpc,t,onRediscover}}/>
  </section>;
 }
