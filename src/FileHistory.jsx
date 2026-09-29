@@ -1,5 +1,5 @@
 import React,{useEffect,useState} from 'react';
-function FileHistoryPages({sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}){
+function FileHistoryPages({sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover,onSelectCommit}){
  const [page,setPage]=useState({commits:[],nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
@@ -7,7 +7,7 @@ function FileHistoryPages({sessionId,repositoryId,commit,parentIndex,id,rpc,t,on
   return()=>controller.abort();
  },[sessionId,repositoryId,commit,parentIndex,id,offset,retry]);
  return <section aria-label={t('fileHistory')} aria-busy={busy}><p>{t('fileHistoryScope')}</p><p style={{overflowWrap:'anywhere'}}>{page.path} · <code>{commit}</code></p>
- <ol>{page.commits.map(row=><li key={row.id}><code title={row.id}>{row.id.slice(0,10)}</code> · {row.subject}<div>{row.author} · <time dateTime={row.date}>{row.date}</time></div></li>)}</ol>
+ <ol>{page.commits.map(row=><li key={row.id}><code title={row.id}>{row.id.slice(0,10)}</code> · {onSelectCommit?<button onClick={()=>onSelectCommit(row.id)}>{row.subject}</button>:row.subject}<div>{row.author} · <time dateTime={row.date}>{row.date}</time></div></li>)}</ol>
  {busy&&<p role="status">{t('loading')}</p>}
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}

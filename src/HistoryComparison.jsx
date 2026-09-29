@@ -3,7 +3,7 @@ import HistoryViewer from './HistoryViewer.jsx';
 import FileHistory from './FileHistory.jsx';
 import ImageComparison from './ImageComparison.jsx';
 import BlamePanel from './BlamePanel.jsx';
-export default function HistoryComparison({sessionId,repositoryId,commit,parentIndex,base,target,id,rpc,t,onRediscover}){
+export default function HistoryComparison({sessionId,repositoryId,commit,parentIndex,base,target,id,rpc,t,onRediscover,onSelectCommit}){
  const [comparison,setComparison]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{
   const controller=new AbortController();setComparison(null);setError('');
@@ -15,7 +15,7 @@ export default function HistoryComparison({sessionId,repositoryId,commit,parentI
  return <section><h4>{comparison.path}</h4><p>{comparison.left.label} ↔ {comparison.right.label}</p>
  {comparison.notice&&<p role="status">{comparison.notice}</p>}
  {comparison.binary?<p>{t('binary')}</p>:<HistoryViewer comparison={comparison} identity={base?JSON.stringify([sessionId,repositoryId,base,target,id]):JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} t={t}/>}
- {commit&&!base&&<FileHistory key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
+ {commit&&!base&&<FileHistory onSelectCommit={onSelectCommit} key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
  {commit&&!base&&<BlamePanel key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
  {commit&&!base&&<ImageComparison key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
  </section>;
