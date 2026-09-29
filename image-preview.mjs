@@ -1,3 +1,4 @@
+import {inflateSync} from 'node:zlib';
 // Structural gate only. Pixel decoding must still succeed before display.
 export function inspectPng(buffer){
  if(!Buffer.isBuffer(buffer)||buffer.length>2*1024*1024)throw new Error('Image byte limit exceeded or invalid input');
@@ -37,4 +38,20 @@ export function inspectPng(buffer){
  }
  if(!ended)throw new Error('Missing PNG end');
  return {mime:'image/png',width,height,bytes:buffer.length};
+}
+
+export function validatePng(buffer){
+ const metadata=inspectPng(buffer);
+ const depth=buffer[24],color=buffer[25];
+ if(buffer[28]!==0)throw new Error('Interlaced PNG is unsupported');
+ const channels={0:1,2:3,3:1,4:2,6:4}[color],stride=Math.ceil(metadata.width*channels*depth/8)+1;
+ const expected=stride*metadata.height;
+ if(expected>64*1024*1024)throw new Error('PNG decoded byte limit exceeded');
+ const parts=[];
+ for(let offset=8;offset<buffer.length;){const length=buffer.readUInt32BE(offset);if(buffer.toString('ascii',offset+4,offset+8)==='IDAT')parts.push(buffer.subarray(offset+8,offset+8+length));offset+=length+12;}
+ const compressed=Buffer.concat(parts);
+ const result=inflateSync(compressed,{maxOutputLength:expected,info:true});
+ if(result.engine.bytesWritten!==compressed.length||result.buffer.length!==expected)throw new Error('Invalid PNG decoded length');
+ for(let row=0;row<metadata.height;row++)if(result.buffer[row*stride]>4)throw new Error('Invalid PNG row filter');
+ return metadata;
 }

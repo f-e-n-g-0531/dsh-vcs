@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectPng} from '../image-preview.mjs';
+import {deflateSync} from 'node:zlib';
+import {inspectPng,validatePng} from '../image-preview.mjs';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aP1sAAAAASUVORK5CYII=','base64');
 function chunk(type,data){const b=Buffer.alloc(data.length+12);b.writeUInt32BE(data.length);b.write(type,4);data.copy(b,8);let crc=0xffffffff;for(const byte of b.subarray(4,-4)){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}b.writeUInt32BE((crc^0xffffffff)>>>0,b.length-4);return b;}
 // Generate a valid IDAT CRC independently of the canned fixture's provenance.
@@ -20,6 +21,13 @@ test('PNG metadata chunk count data continuity and pixel budget are bounded',()=
  const header=Buffer.from(valid.subarray(16,29));header.writeUInt32BE(4000);header.writeUInt32BE(4000,4);
  assert.equal(inspectPng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),tail])).height,4000);
  header.writeUInt32BE(4001,4);assert.throws(()=>inspectPng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),tail])),/dimensions/);
+});
+test('PNG decoding bounds enforce exact scanlines filters and stream consumption',()=>{
+ const make=raw=>Buffer.concat([valid.subarray(0,33),chunk('IDAT',deflateSync(raw)),chunk('IEND',Buffer.alloc(0))]);
+ assert.equal(validatePng(make(Buffer.from([0,255,255]))).width,1);
+ for(const raw of [Buffer.from([0]),Buffer.from([5,0,0]),Buffer.alloc(10000)])assert.throws(()=>validatePng(make(raw)));
+ const extra=Buffer.concat([valid.subarray(0,33),chunk('IDAT',Buffer.concat([deflateSync(Buffer.from([0,0,0])),Buffer.from('trailing')])),chunk('IEND',Buffer.alloc(0))]);assert.throws(()=>validatePng(extra),/length/);
+ const header=Buffer.from(valid.subarray(16,29));header[12]=1;assert.throws(()=>validatePng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),valid.subarray(33)])),/Interlaced/);
 });
 test('PNG structural inspection returns bounded metadata',()=>{assert.deepEqual(inspectPng(valid),{mime:'image/png',width:1,height:1,bytes:valid.length});});
 test('PNG gate rejects non-raster signatures corruption truncation animation and size overflow',()=>{
