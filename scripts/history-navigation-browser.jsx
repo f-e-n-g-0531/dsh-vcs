@@ -1,6 +1,8 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import HistoryPanel from '../src/HistoryPanel.jsx';
+import CommitDetails from '../src/CommitDetails.jsx';
+import locales from '../src/locales.json';
 export async function checkHistoryNavigation(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host),a='a'.repeat(40),b='b'.repeat(40),c='c'.repeat(40),calls=[];
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('History navigation timeout');};
@@ -28,5 +30,12 @@ export async function checkHistoryNavigation(){
   if(calls.filter(x=>['vcs/commit-compare','vcs/file-history'].includes(x.endpoint)).some(x=>!x.signal.aborted))throw Error('Old comparison requests survived navigation');
   if(host.querySelector('select[aria-label="commitParent"]')||host.querySelector('.vcs-text-comparison'))throw Error('Old comparison state survived navigation');
   if(calls.filter(x=>x.endpoint==='vcs/history').length!==1)throw Error('Navigation reloaded pinned history');
+  for(const language of ['zh','en']){
+   root.render(<CommitDetails key={language} sessionId="s" repositoryId="r" commit={b} t={k=>locales[language][k]} onRediscover={()=>{}} rpc={async(endpoint,p,signal)=>endpoint==='vcs/commit'?{...row(b,'Large body'),parents:[],parent:null,message:'',messageTruncated:true,changes:[{id:'d'.repeat(64),path:'file.txt',status:'modified'}]}:rpc(endpoint,p,signal)}/>);
+   await wait(()=>host.textContent.includes(locales[language].commitMessageLimit));
+   if(host.querySelector('pre')||!button('modified · file.txt'))throw Error('Omitted message hid files or rendered body');
+   button('modified · file.txt').click();await wait(()=>host.querySelector('.vcs-text-comparison'));
+   if(!host.textContent.includes(locales[language].commitMessageLimit))throw Error('Omission notice lost after selecting file');
+  }
  }finally{root.unmount();host.remove();}
 }
