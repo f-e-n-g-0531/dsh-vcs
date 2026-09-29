@@ -39,6 +39,18 @@ jobs:
           node scripts/history-fixture.mjs
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=10000 --dump-dom "file://$PWD/test-results/history-fixture.html" > test-results/history-dom.html
           node scripts/verify-history-result.mjs
+      - name: Exercise actual Monaco modules and concurrent editors
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/monaco-fixture.mjs
+          python3 -m http.server 8765 --bind 127.0.0.1 > test-results/monaco-server.log 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          for i in {1..20}; do curl -fsS http://127.0.0.1:8765/test-results/monaco-fixture.html -o /dev/null && break || sleep 0.2; done
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=20000 --dump-dom "http://127.0.0.1:8765/test-results/monaco-fixture.html" > test-results/monaco-dom.html
+          node scripts/verify-monaco-result.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
