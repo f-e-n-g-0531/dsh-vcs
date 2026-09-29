@@ -18,6 +18,26 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('divergent revision pairs use direct trees and bind IDs to repository roots',async t=>{
+ const root=await gitRepo(t);await write(root,'common.txt','ancestor');commit(root);
+ const ancestor=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await write(root,'common.txt','left branch');await write(root,'left.txt','left only');commit(root);
+ const base=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ cmd(root,'git',['checkout','-b','other',ancestor]);await write(root,'common.txt','right branch');await write(root,'right.txt','right only');commit(root);
+ const target=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ assert.equal(cmd(root,'git',['merge-base','--is-ancestor',base,target],true).status,1);
+ assert.equal(cmd(root,'git',['merge-base','--is-ancestor',target,base],true).status,1);
+ const before=cmd(root,'git',['status','--porcelain']).stdout;
+ const list=await getRevisionChanges(repo,{base,target});
+ assert.deepEqual(list.changes.map(c=>[c.path,c.status]),[['common.txt','modified'],['left.txt','deleted'],['right.txt','added']]);
+ const entry=list.changes.find(c=>c.path==='common.txt');
+ const diff=await getRevisionComparison(repo,{base,target,id:entry.id});assert.equal(diff.left.text,'left branch');assert.equal(diff.right.text,'right branch');
+ const clone=await temp(t);cmd(clone,'git',['clone','--no-hardlinks',root,'.']);const cloneRepo=await detectRepository(clone);
+ const cloneList=await getRevisionChanges(cloneRepo,{base,target});
+ assert.notEqual(cloneList.changes.find(c=>c.path==='common.txt').id,entry.id);
+ await assert.rejects(getRevisionComparison(cloneRepo,{base,target,id:entry.id}),/revision pair/);
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,before);assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),target);
+});
 test('revision file diffs handle rename add delete and reject unrelated IDs',async t=>{
  const root=await gitRepo(t);await write(root,'old.txt','rename content');await write(root,'deleted.txt','removed');commit(root);
  const base=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
