@@ -1,11 +1,10 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import {validateLayoutReport} from './layout-report.mjs';
 const html=await readFile(new URL('../test-results/layout-dom.html',import.meta.url),'utf8');
 const text=html.split('<pre>')[1]?.split('</pre>')[0];
 assert.ok(text,'Browser must emit a result');
 const report=JSON.parse(text.replaceAll('&quot;','"').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
 await writeFile(new URL('../test-results/layout-result.json',import.meta.url),JSON.stringify(report,null,2));
-assert.equal(report.results.length,12);
-assert.equal(new Set(report.results.map(r=>r.case)).size,12);
-for(const row of report.results)assert.equal(row.pass,true,JSON.stringify(row));
+validateLayoutReport(report);
 console.log('PASS: 12 isolated browser layout cases; '+report.browser);
