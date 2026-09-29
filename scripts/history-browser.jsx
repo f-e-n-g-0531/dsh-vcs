@@ -3,10 +3,12 @@ import {createRoot} from 'react-dom/client';
 import HistoryPanel from '../src/HistoryPanel.jsx';
 const calls=[],a='a'.repeat(40),b='b'.repeat(40),id='c'.repeat(64);
 const row=(id,subject)=>({id,subject,author:'Tester',date:'2026-09-29T00:00:00+00:00',parents:[]});
-const rpc=async(endpoint,payload)=>{
+let delayedResolve,delayedSignal,delayNext=false;
+const rpc=async(endpoint,payload,signal)=>{
  calls.push({endpoint,payload});
+ if(delayNext){delayNext=false;delayedSignal=signal;return new Promise(resolve=>{delayedResolve=resolve;});}
  if(endpoint==='vcs/history')return {snapshot:a,commits:payload.offset?[row(b,'Second commit')]:[row(a,'First commit')],nextOffset:payload.offset?null:1};
- if(endpoint==='vcs/commit')return {...row(payload.commit,'Details'),parent:null,parentIndex:0,changes:[{id,path:'example.txt',status:'added'}]};
+ if(endpoint==='vcs/commit')return {...row(payload.commit,'Details'),parents:[a,b],parent:payload.parentIndex?b:a,parentIndex:payload.parentIndex,changes:[{id,path:payload.parentIndex?'parent-two.txt':'example.txt',status:'added'}]};
  if(endpoint==='vcs/commit-compare')return {path:'example.txt',left:{label:'Empty',text:''},right:{label:a,text:'historical content'},binary:false};
  throw Error('Unexpected RPC');
 };
@@ -21,5 +23,18 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  button('First commit').click();await wait(()=>button('added · example.txt'));
  button('added · example.txt').click();await wait(()=>document.querySelector('.vcs-text-comparison'));
  if(!document.querySelector('.vcs-text-comparison').textContent.includes('historical content'))throw Error('Missing historical content');
- document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['pagination','commit','file','diff'],calls:calls.length});
+ const select=document.querySelector('select');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));
+ await wait(()=>button('added · parent-two.txt'));
+ if(document.querySelector('.vcs-text-comparison'))throw Error('Old parent diff retained');
+ if(calls.at(-1).payload.parentIndex!==1)throw Error('Parent selection not forwarded');
+ delayNext=true;button('added · parent-two.txt').click();await wait(()=>delayedResolve);
+ const staleResolve=delayedResolve,staleSignal=delayedSignal;delayedResolve=null;
+ button('Second commit').click();await wait(()=>button('added · example.txt'));
+ if(!staleSignal.aborted)throw Error('Switch failed to abort old diff');
+ staleResolve({path:'STALE',left:{text:''},right:{text:'STALE'},binary:false});
+ await new Promise(r=>setTimeout(r,40));if(document.querySelector('#root').textContent.includes('STALE'))throw Error('Stale response displayed');
+ delayNext=true;button('added · example.txt').click();await wait(()=>delayedResolve);
+ root.unmount();if(!delayedSignal.aborted)throw Error('Unmount failed to cancel');
+ delayedResolve({path:'STALE',left:{text:''},right:{text:'STALE'}});
+ document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['pagination','commit','file','diff','parent','stale','unmount'],calls:calls.length});
  }catch(e){document.querySelector('#report').textContent=JSON.stringify({pass:false,error:String(e)});}})();
