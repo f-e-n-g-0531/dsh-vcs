@@ -31,6 +31,14 @@ jobs:
           node scripts/keyboard-fixture.mjs
           google-chrome --headless --no-sandbox --disable-gpu --dump-dom "file://$PWD/test-results/keyboard-fixture.html" > test-results/keyboard-dom.html
           node scripts/verify-keyboard-result.mjs
+      - name: Exercise real React history components
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --ignore-scripts
+          node scripts/history-fixture.mjs
+          google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=10000 --dump-dom "file://$PWD/test-results/history-fixture.html" > test-results/history-dom.html
+          node scripts/verify-history-result.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
