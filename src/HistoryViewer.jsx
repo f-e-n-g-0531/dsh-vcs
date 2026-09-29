@@ -11,7 +11,7 @@ export default function HistoryViewer({comparison,identity,t}){
   setReady(false);setError('');if(!enabled)return;
   const asset=name=>new URL('vcs-assets/'+name,document.baseURI).href;
   const link=document.createElement('link');link.rel='stylesheet';link.href=asset('editor.css');node.current.parentNode.appendChild(link);
-  const task=startHistoryEditor({node:node.current,comparison,key:identity,load:signal=>loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version),{signal}),onReady:()=>setReady(true),onError:e=>setError(e.message)});
+  const task=startHistoryEditor({node:node.current,comparison,key:identity,load:signal=>loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry=0',{signal}),onReady:()=>setReady(true),onError:e=>setError(e.message)});
   return()=>{try{task.dispose();}finally{link.remove();}};
  },[enabled,comparison,identity]);
  return <div>

@@ -1,3 +1,5 @@
+import {createEnvironmentOwner} from './editor-environment.mjs';
+const acquireEnvironment=createEnvironmentOwner(globalThis,(url,label)=>new Worker(url??new URL('./editor.worker.js',import.meta.url),{name:label}));
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
 import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js';
@@ -39,22 +41,7 @@ function updateTheme() {
   monaco.editor.setTheme('dsh-vcs');
 }
 export function createDiff(node, { onStats } = {}) {
-  const workers = new Set();
-  const previousEnvironment = globalThis.MonacoEnvironment;
-  const hadEnvironment = Object.prototype.hasOwnProperty.call(globalThis, 'MonacoEnvironment');
-  const environment = { ...previousEnvironment, getWorker(moduleId, label) {
-    // Only Monaco's ordinary editor worker belongs to this bundle. Preserve
-    // existing language-service workers and their owner's disposal lifetime.
-    if (label !== 'editorWorkerService') {
-      if (typeof previousEnvironment?.getWorker === 'function') return previousEnvironment.getWorker(moduleId, label);
-      if (typeof previousEnvironment?.getWorkerUrl === 'function') return new Worker(previousEnvironment.getWorkerUrl(moduleId, label), { name: label });
-      throw new Error('Unsupported Monaco worker: ' + label);
-    }
-    if (disposed) throw new Error('VCS editor has been disposed.');
-    const worker = new Worker(new URL('./editor.worker.js', import.meta.url), { name: label });
-    workers.add(worker);
-    return worker;
-  } };
+  const releaseEnvironment = acquireEnvironment();
   let editor, observer, subscription;
   let models = [], key = '', disposed = false;
   const states = new Map();
@@ -63,19 +50,14 @@ export function createDiff(node, { onStats } = {}) {
     disposed = true;
     // One failing cleanup must not leave the global worker hook installed.
     const cleanups = [() => observer?.disconnect(), () => subscription?.dispose(),
-      () => editor?.dispose(), ...models.map(model => () => model.dispose()),
-      ...Array.from(workers, worker => () => worker.terminate())];
+      () => editor?.dispose(), ...models.map(model => () => model.dispose())];
     try {
       for (const cleanup of cleanups) { try { cleanup(); } catch (error) { console.warn('VCS editor cleanup failed', error); } }
     } finally {
-      if (globalThis.MonacoEnvironment === environment) {
-        if (hadEnvironment) globalThis.MonacoEnvironment = previousEnvironment;
-        else delete globalThis.MonacoEnvironment;
-      }
-      states.clear(); workers.clear(); models = [];
+      releaseEnvironment();
+      states.clear(); models = [];
     }
   }
-  globalThis.MonacoEnvironment = environment;
   try {
   updateTheme();
   editor = monaco.editor.createDiffEditor(node, {readOnly:true,originalEditable:false,domReadOnly:true,automaticLayout:true,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,ignoreTrimWhitespace:false,minimap:{enabled:false},fontSize:13,scrollBeyondLastLine:false,renderOverviewRuler:false,hideUnchangedRegions:{enabled:true,contextLineCount:4,minimumLineCount:8},maxComputationTime:3000,accessibilityVerbose:true});
