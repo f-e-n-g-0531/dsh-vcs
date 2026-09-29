@@ -11,7 +11,7 @@ export async function checkRevisions(){
   if(endpoint==='vcs/revision-changes'){
    if(p.base===p.target)return {changes:[]};
    if(p.base===b){oldSignal=signal;return new Promise(resolve=>delayed=resolve);}
-   return {changes:[{id:'c'.repeat(64),path:'pair.txt',status:'modified'}]};
+   return {changes:[{id:'c'.repeat(64),path:'pair.txt',oldPath:'original.txt',status:'renamed'}]};
   }
   if(endpoint!=='vcs/revision-compare'||p.base!==a||p.target!==b)throw Error('Unexpected comparison pair');
   return {path:'pair.txt',left:{text:'left revision',label:a},right:{text:'right revision',label:b}};
@@ -21,6 +21,12 @@ export async function checkRevisions(){
  root.render(<RevisionPanel commits={[{id:a,subject:'first'},{id:b,subject:'second'}]} sessionId="s" repositoryId="r" rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
  await wait(()=>host.querySelectorAll('select').length===2);choose(0,a);choose(1,b);
  await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
+ const input=host.querySelector('input'),countBefore=calls.length;
+ const enter=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));};
+ enter('no-match');await wait(()=>host.textContent.includes('emptySearch'));
+ if(host.textContent.includes('right revision'))throw Error('Filtered Diff retained');
+ enter('original');await wait(()=>button('pair.txt'));if(calls.length!==countBefore)throw Error('Filter issued RPC');
+ button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
  button('revisionSwap').click();await wait(()=>delayed);
  if(host.textContent.includes('right revision'))throw Error('Old Diff remained after swap');
  const selects=host.querySelectorAll('select');if(selects[0].value!==b||selects[1].value!==a)throw Error('Swap failed');
@@ -28,6 +34,6 @@ export async function checkRevisions(){
  if(!oldSignal.aborted)throw Error('Superseded request not aborted');
  delayed({changes:[{id:'d'.repeat(64),path:'STALE.txt',status:'modified'}]});
  await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE'))throw Error('Stale response rendered');
- if(calls.length!==4)throw Error('Unexpected revision RPC count: '+calls.length);
+ if(calls.length!==5)throw Error('Unexpected revision RPC count: '+calls.length);
  }finally{root.unmount();host.remove();}
 }
