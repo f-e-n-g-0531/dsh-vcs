@@ -22,6 +22,16 @@ for(const order of [[0,1],[1,0]])test('cache-busted module owners share workers 
  assert.equal(Object.getOwnPropertySymbols(host).length,0);
  const again=b();assert.notEqual(host.MonacoEnvironment,env);again();
 });
+test('released environment rejects late allocations and does not terminate foreign workers',()=>{
+ let created=0,foreignTerminated=0;
+ const foreign={terminate(){foreignTerminated++;}},previous={getWorker(){return foreign;}},host={MonacoEnvironment:previous};
+ const release=createEnvironmentOwner(host,()=>{created++;return {terminate(){throw Error('cleanup failure');}};})();
+ const env=host.MonacoEnvironment;
+ assert.equal(env.getWorker('','typescript'),foreign);env.getWorker('','editorWorkerService');release();
+ assert.throws(()=>env.getWorker('','editorWorkerService'),/released/);
+ assert.equal(created,1);assert.equal(foreignTerminated,0);assert.equal(host.MonacoEnvironment,previous);
+ assert.equal(Object.getOwnPropertySymbols(host).length,0);
+});
 test('environment cleanup preserves external replacements and original absence',()=>{
  const host={},acquire=createEnvironmentOwner(host,()=>({terminate(){}}));
  acquire()();assert.equal(Object.hasOwn(host,'MonacoEnvironment'),false);

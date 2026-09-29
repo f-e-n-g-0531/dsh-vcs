@@ -5,7 +5,9 @@ export function createEnvironmentOwner(host,createWorker){
   let shared=host[ownerKey];
   if(!shared){
    const previous=host.MonacoEnvironment,had=Object.hasOwn(host,'MonacoEnvironment'),workers=new Set();
+   let closed=false;
    const environment={...previous,getWorker(moduleId,label){
+    if(closed)throw Error('VCS editor environment has been released.');
     if(label!=='editorWorkerService'){
      if(typeof previous?.getWorker==='function')return previous.getWorker(moduleId,label);
      if(typeof previous?.getWorkerUrl==='function')return createWorker(previous.getWorkerUrl(moduleId,label),label);
@@ -13,11 +15,12 @@ export function createEnvironmentOwner(host,createWorker){
     }
     const worker=createWorker(undefined,label);workers.add(worker);return worker;
    }};
-   shared={previous,had,workers,environment,count:0};host[ownerKey]=shared;host.MonacoEnvironment=environment;
+   shared={previous,had,workers,environment,count:0,close(){closed=true;}};host[ownerKey]=shared;host.MonacoEnvironment=environment;
   }
   const state=shared;state.count++;let released=false;
   return ()=>{
    if(released)return;released=true;if(--state.count)return;
+   state.close();
    for(const worker of state.workers){try{worker.terminate();}catch{}}
    state.workers.clear();
    if(host.MonacoEnvironment===state.environment){if(state.had)host.MonacoEnvironment=state.previous;else delete host.MonacoEnvironment;}
