@@ -17,6 +17,7 @@ export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}
  {busy&&<p role="status">{t('loading')}</p>}
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
+ {page.truncated&&<p role="status">{t('historyLimit')}</p>}
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  {selected&&<CommitDetails key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </section>;

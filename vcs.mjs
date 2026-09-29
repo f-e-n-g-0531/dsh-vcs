@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import {parseHistory,HISTORY_FORMAT} from './git-history.mjs';
+import {parseHistory,HISTORY_FORMAT,historyPage} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -237,7 +237,7 @@ export async function listHistory(repo, {snapshot,offset=0,limit=50,signal} = {}
   }
   const text=await git(repo.root,['log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,snapshot,'--'],MAX_TEXT,{signal});
   const rows=parseHistory(text.toString('utf8'),limit+1);
-  return {snapshot,commits:rows.slice(0,limit),nextOffset:rows.length>limit&&offset+limit<=10000?offset+limit:null};
+  return historyPage(rows,snapshot,offset,limit);
 }
 export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
   if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');

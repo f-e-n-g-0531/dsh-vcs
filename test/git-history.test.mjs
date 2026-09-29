@@ -4,9 +4,17 @@ import {execFileSync} from 'node:child_process';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {parseHistory,HISTORY_FORMAT} from '../git-history.mjs';
+import {parseHistory,HISTORY_FORMAT,historyPage} from '../git-history.mjs';
 const id='a'.repeat(40), date='2026-09-29T12:00:00+08:00', nul=String.fromCharCode(0);
 const row=(parents='',subject='中文 <script>')=>[id,parents,'作者',date,subject].join(nul)+nul;
+test('history page distinguishes truncation from actual end',()=>{
+ const rows=[{id:'one'},{id:'two'}];
+ assert.deepEqual(historyPage(rows,'snapshot',10000,1),{snapshot:'snapshot',commits:[rows[0]],nextOffset:null,truncated:true});
+ assert.equal(historyPage(rows,'snapshot',9999,1).nextOffset,10000);
+ assert.equal(historyPage(rows,'snapshot',9999,1).truncated,false);
+ assert.equal(historyPage([rows[0]],'snapshot',10000,1).truncated,false);
+ assert.equal(historyPage([],'snapshot',0,50).nextOffset,null);
+});
 test('history parses root, merge parents and untrusted display text',()=>{
  const rows=parseHistory(row()+row(id+' '+id));
  assert.equal(rows.length,2);assert.deepEqual(rows[0].parents,[]);assert.equal(rows[1].parents.length,2);assert.equal(rows[0].subject,'中文 <script>');
