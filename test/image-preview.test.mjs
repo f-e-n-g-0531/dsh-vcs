@@ -22,12 +22,18 @@ test('PNG metadata chunk count data continuity and pixel budget are bounded',()=
  assert.equal(inspectPng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),tail])).height,4000);
  header.writeUInt32BE(4001,4);assert.throws(()=>inspectPng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),tail])),/dimensions/);
 });
-test('PNG decoding bounds enforce exact scanlines filters and stream consumption',()=>{
+test('PNG decoding bounds enforce exact scanlines filters and stream consumption',async()=>{
  const make=raw=>Buffer.concat([valid.subarray(0,33),chunk('IDAT',deflateSync(raw)),chunk('IEND',Buffer.alloc(0))]);
- assert.equal(validatePng(make(Buffer.from([0,255,255]))).width,1);
- for(const raw of [Buffer.from([0]),Buffer.from([5,0,0]),Buffer.alloc(10000)])assert.throws(()=>validatePng(make(raw)));
- const extra=Buffer.concat([valid.subarray(0,33),chunk('IDAT',Buffer.concat([deflateSync(Buffer.from([0,0,0])),Buffer.from('trailing')])),chunk('IEND',Buffer.alloc(0))]);assert.throws(()=>validatePng(extra),/length/);
- const header=Buffer.from(valid.subarray(16,29));header[12]=1;assert.throws(()=>validatePng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),valid.subarray(33)])),/Interlaced/);
+ assert.equal((await validatePng(make(Buffer.from([0,255,255])))).width,1);
+ for(const raw of [Buffer.from([0]),Buffer.from([5,0,0]),Buffer.alloc(10000)])await assert.rejects(()=>validatePng(make(raw)));
+ const extra=Buffer.concat([valid.subarray(0,33),chunk('IDAT',Buffer.concat([deflateSync(Buffer.from([0,0,0])),Buffer.from('trailing')])),chunk('IEND',Buffer.alloc(0))]);await assert.rejects(()=>validatePng(extra),/length/);
+ const header=Buffer.from(valid.subarray(16,29));header[12]=1;await assert.rejects(()=>validatePng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),valid.subarray(33)])),/Interlaced/);
+});
+test('PNG validation rejects cancellation before and during asynchronous inflate',async()=>{
+ const image=Buffer.concat([valid.subarray(0,33),chunk('IDAT',deflateSync(Buffer.from([0,255,255]))),chunk('IEND',Buffer.alloc(0))]);
+ const before=new AbortController();before.abort();await assert.rejects(validatePng(image,{signal:before.signal}),{name:'AbortError'});
+ const during=new AbortController(),pending=validatePng(image,{signal:during.signal});during.abort();await assert.rejects(pending,{name:'AbortError'});
+ assert.equal((await validatePng(image)).width,1);
 });
 test('PNG structural inspection returns bounded metadata',()=>{assert.deepEqual(inspectPng(valid),{mime:'image/png',width:1,height:1,bytes:valid.length});});
 test('PNG gate rejects non-raster signatures corruption truncation animation and size overflow',()=>{
