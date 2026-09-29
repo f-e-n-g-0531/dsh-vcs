@@ -38,6 +38,12 @@ test('blame refuses configured external ignore-revision files without modifying 
  assert.notEqual(cmd(root,'git',['blame','--line-porcelain',head,'--','file.txt'],true).status,0,'Positive control must read invalid configured file');
  const result=await getFileBlame(repo,{commit:head,id:detail.changes[0].id});assert.deepEqual(result.lines,[]);assert.match(result.notice,/external revision files are not read/);
  assert.equal(cmd(root,'git',['config','--get','blame.ignoreRevsFile']).stdout.trim(),ignore);assert.equal(await fs.readFile(ignore,'utf8'),'not a valid revision');
+ cmd(root,'git',['config','--replace-all','blame.ignoreRevsFile','   ']);
+ const spaces=await getFileBlame(repo,{commit:head,id:detail.changes[0].id});assert.deepEqual(spaces.lines,[]);assert.match(spaces.notice,/external revision files/);
+ cmd(root,'git',['config','--add','blame.ignoreRevsFile','']);
+ const multiple=await getFileBlame(repo,{commit:head,id:detail.changes[0].id});assert.deepEqual(multiple.lines,[]);assert.match(multiple.notice,/external revision files/);
+ cmd(root,'git',['config','--replace-all','blame.ignoreRevsFile','']);
+ const empty=await getFileBlame(repo,{commit:head,id:detail.changes[0].id});assert.equal(empty.lines[0].text,'source');
 });
 test('blame reports empty deleted and unsupported encoding without reading working contents',async t=>{
  const root=await gitRepo(t);await write(root,'empty.txt','');await write(root,'wide.txt',Buffer.concat([Buffer.from([255,254]),Buffer.from('hello','utf16le')]));commit(root);
