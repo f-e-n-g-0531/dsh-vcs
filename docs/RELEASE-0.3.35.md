@@ -20,4 +20,4 @@ d9b5bc98f620a8915375dbbeef0fcf6fb7b0d6f0a5e7aa38791e7a5d950c4594
 dsh plugin --profile web add @feng0531/dsh-vcs@0.3.35
 ```
 
-本次发布没有安装到当前宿主或重启 DSH。安装会改变 profile 配置，需要明确目标；宿主重启由用户执行。按[真实验收清单](<LIVE-ACCEPTANCE.md>)记录实际加载版本、审阅操作及截图/错误。后续发布仍默认要求验收，不将本次例外视作永久豁免。
+本次发布没有由助手安装到当前宿主或重启 DSH。第 175 轮使用只读命令 `dsh plugin --profile web list @feng0531/dsh-vcs --depth 0 --json` 确认 web profile 已安装 0.3.35，来源为 npm 官方 0.3.35 tarball；安装操作的执行者和时间未核实。此结果仅证明磁盘上的安装版本，不能证明当前进程或浏览器实际加载版本。安装会改变 profile 配置，需要明确目标；宿主重启由用户执行。按[真实验收清单](<LIVE-ACCEPTANCE.md>)记录实际加载版本、审阅操作及截图/错误。后续发布仍默认要求验收，不将本次例外视作永久豁免。
