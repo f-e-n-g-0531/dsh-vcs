@@ -49,9 +49,12 @@ test('committed PNG preview uses immutable blob and rejects forged selection',as
  assert.equal(result.width,1);assert.equal(result.height,1);assert.equal(result.mime,'image/png');assert.deepEqual(Buffer.from(result.base64,'base64'),png);
  await assert.rejects(getCommitImage(repo,{commit:head,id:'f'.repeat(64)}),/selected commit/);
  assert.equal(await fs.readFile(path.join(root,'image.png'),'utf8'),'working text');
+ assert.equal((await getCommitImage(repo,{commit:head,id:details.changes[0].id,side:'left'})).absent,true);
+ await assert.rejects(getCommitImage(repo,{commit:head,id:details.changes[0].id,side:'other'}),/side/);
  const controller=new AbortController();controller.abort();await assert.rejects(getCommitImage(repo,{commit:head,id:details.changes[0].id,signal:controller.signal}),{name:'AbortError'});
  await fs.unlink(path.join(root,'image.png'));commit(root);const deleted=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),changes=await getCommitDetails(repo,{commit:deleted});
  await write(root,'image.png',png);assert.deepEqual(await getCommitImage(repo,{commit:deleted,id:changes.changes[0].id}),{commit:deleted,path:'image.png',absent:true});
+ const prior=await getCommitImage(repo,{commit:deleted,id:changes.changes[0].id,side:'left'});assert.equal(prior.commit,head);assert.deepEqual(Buffer.from(prior.base64,'base64'),png);
 });
 test('blame reads committed UTF8 lines with original attribution and bounded output',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','first\nsecond\n');commit(root);
