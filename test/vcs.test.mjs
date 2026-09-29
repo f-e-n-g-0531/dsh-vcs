@@ -105,7 +105,9 @@ test('cancelled historical requests stop before probing even nonexistent roots',
  await assert.rejects(getCommitComparison(repo,{commit,id,signal:controller.signal}),{name:'AbortError'});
 });
 test('partial clone history never hydrates missing promised blobs',async t=>{
- const source=await gitRepo(t);await write(source,'promised.txt','remote only payload');commit(source);
+ const source=await gitRepo(t);cmd(source,'git',['commit','--allow-empty','--no-gpg-sign','-m','empty base']);
+ const base=cmd(source,'git',['rev-parse','HEAD']).stdout.trim();
+ await write(source,'promised.txt','remote only payload');commit(source);
  cmd(source,'git',['config','uploadpack.allowFilter','true']);
  const target=await temp(t);
  cmd(target,'git',['-c','protocol.file.allow=always','clone','--filter=blob:none','--no-checkout',pathToFileURL(source).href,'.']);
@@ -116,6 +118,11 @@ test('partial clone history never hydrates missing promised blobs',async t=>{
  const repo=await detectRepository(target),detail=await getCommitDetails(repo,{commit:commitId});
  await assert.rejects(getCommitComparison(repo,{commit:commitId,id:detail.changes[0].id}),{code:'VCS_COMMAND'});
  assert.ok(missing().includes('?'+oid),'Plugin must leave promised object absent');
+ for(const [left,right] of [[base,commitId],[commitId,base]]){
+  const revisions=await getRevisionChanges(repo,{base:left,target:right});assert.equal(revisions.changes.length,1);
+  await assert.rejects(getRevisionComparison(repo,{base:left,target:right,id:revisions.changes[0].id}),{code:'VCS_COMMAND'});
+  assert.ok(missing().includes('?'+oid),'Revision Diff must not hydrate promised objects');
+ }
  // Positive control: the source can supply the blob if explicitly permitted.
  assert.equal(cmd(target,'git',['-c','protocol.file.allow=always','cat-file','blob',oid]).stdout,'remote only payload');
  assert.ok(!missing().includes('?'+oid),'Positive control must hydrate the object');
@@ -132,6 +139,9 @@ test('history ignores replace refs so snapshots retain original contents',async 
  assert.deepEqual(details.parents,[]);
  const result=await getCommitComparison(repo,{commit:original,id:details.changes[0].id});
  assert.equal(result.right.text,'original');assert.equal(result.left.text,'');
+ const revisions=await getRevisionChanges(repo,{base:original,target:replacement});assert.equal(revisions.changes.length,1);
+ const revision=await getRevisionComparison(repo,{base:original,target:replacement,id:revisions.changes[0].id});
+ assert.equal(revision.left.text,'original');assert.equal(revision.right.text,'replacement');
  assert.equal(cmd(root,'git',['replace','-l']).stdout.trim(),original);
 });
 
