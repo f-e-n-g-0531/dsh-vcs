@@ -30,6 +30,16 @@ test('blame reads committed UTF8 lines with original attribution and bounded out
  const bounded=await getFileBlame(repo,{commit:latest,id:large.changes[0].id});assert.equal(bounded.lines.length,500);assert.equal(bounded.truncated,true);
  await assert.rejects(getFileBlame(repo,{commit:head,id:'f'.repeat(64)}),/selected commit/);
 });
+test('blame reports empty deleted and unsupported encoding without reading working contents',async t=>{
+ const root=await gitRepo(t);await write(root,'empty.txt','');await write(root,'wide.txt',Buffer.concat([Buffer.from([255,254]),Buffer.from('hello','utf16le')]));commit(root);
+ const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root),detail=await getCommitDetails(repo,{commit:head});
+ const read=name=>getFileBlame(repo,{commit:head,id:detail.changes.find(c=>c.path===name).id});
+ const empty=await read('empty.txt');assert.deepEqual(empty.lines,[]);assert.equal(empty.notice,undefined);
+ const wide=await read('wide.txt');assert.deepEqual(wide.lines,[]);assert.match(wide.notice,/UTF-8/);
+ await fs.unlink(path.join(root,'wide.txt'));commit(root);const deleted=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),changes=await getCommitDetails(repo,{commit:deleted});
+ await write(root,'wide.txt','must not blame working file');const result=await getFileBlame(repo,{commit:deleted,id:changes.changes[0].id});assert.deepEqual(result.lines,[]);assert.match(result.notice,/deleted/);
+ const controller=new AbortController();controller.abort();await assert.rejects(getFileBlame(repo,{commit:head,id:detail.changes[0].id,signal:controller.signal}),{name:'AbortError'});
+});
 test('file history pins exact literal path and paginates without working tree reads',async t=>{
  const root=await gitRepo(t),name='[file].txt';
  await write(root,name,'first');await write(root,'f.txt','other');commit(root);
@@ -164,6 +174,8 @@ test('partial clone history never hydrates missing promised blobs',async t=>{
   await assert.rejects(getRevisionComparison(repo,{base:left,target:right,id:revisions.changes[0].id}),{code:'VCS_COMMAND'});
   assert.ok(missing().includes('?'+oid),'Revision Diff must not hydrate promised objects');
  }
+ await assert.rejects(getFileBlame(repo,{commit:commitId,id:detail.changes[0].id}),{code:'VCS_COMMAND'});
+ assert.ok(missing().includes('?'+oid),'Blame must not hydrate promised objects');
  // Positive control: the source can supply the blob if explicitly permitted.
  assert.equal(cmd(target,'git',['-c','protocol.file.allow=always','cat-file','blob',oid]).stdout,'remote only payload');
  assert.ok(!missing().includes('?'+oid),'Positive control must hydrate the object');
@@ -207,6 +219,9 @@ test('historical special files remain bounded and never follow link or submodule
  const large=await compare('large.txt');assert.equal(large.right.text,'');assert.match(large.notice,/2 MiB/);
  const link=await compare('link.txt');assert.equal(link.right.text,'/outside/private-file');assert.match(link.notice,/not followed/);
  const submodule=await compare('submodule');assert.equal(submodule.right.text,seed);assert.match(submodule.notice,/not loaded/);
+ for(const [name,notice] of [['binary.dat',/Binary/],['large.txt',/2 MiB/],['link.txt',/not followed/],['submodule',/not loaded/]]){
+  const result=await getFileBlame(repo,{commit:commitId,id:details.changes.find(row=>row.path===name).id});assert.deepEqual(result.lines,[]);assert.match(result.notice,notice);
+ }
  for(const [base,target,side,emptySide] of [[seed,commitId,'right','left'],[commitId,seed,'left','right']]){
   const revisions=await getRevisionChanges(repo,{base,target});
   const read=name=>getRevisionComparison(repo,{base,target,id:revisions.changes.find(row=>row.path===name).id});
