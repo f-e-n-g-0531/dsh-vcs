@@ -21,6 +21,14 @@ test('real authorized RPC traverses history details and committed diff',async t=
  const detail=await read('vcs/commit',{commit:history.commits[0].id});assert.equal(detail.changes.length,1);
  const result=await read('vcs/commit-compare',{commit:detail.id,id:detail.changes[0].id});assert.equal(result.left.text,'before');assert.equal(result.right.text,'after');
  const next=await read('vcs/history',{snapshot:history.snapshot,offset:1,limit:1});assert.equal(next.commits.length,1);assert.equal(next.nextOffset,null);
+ const blameArgs={commit:detail.id,id:detail.changes[0].id};
+ const blame=await read('vcs/blame',blameArgs);
+ assert.equal(blame.path,'file.txt');assert.equal(blame.commit,detail.id);assert.equal(blame.truncated,false);
+ assert.deepEqual(blame.lines.map(row=>[row.line,row.commit,row.text]),[[1,detail.id,'after']]);
+ assert.equal(blame.lines[0].author,'History');
+ assert.equal((await handler('vcs/blame',{...p,...blameArgs,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
+ assert.equal((await handler('vcs/blame',{...p,...blameArgs,path:'file.txt'})).error.code,'vcs/invalid-request');
+ assert.equal((await handler('vcs/blame',{...p,...blameArgs,id:'f'.repeat(64)})).ok,false);
  const fileArgs={commit:detail.id,id:detail.changes[0].id,limit:1};
  const filePage=await read('vcs/file-history',fileArgs);
  assert.equal(filePage.path,'file.txt');assert.equal(filePage.followsRenames,false);assert.equal(filePage.snapshot,detail.id);
