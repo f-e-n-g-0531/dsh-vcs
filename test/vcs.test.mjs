@@ -31,6 +31,17 @@ test('historical tree reads committed nested entries not working directory conte
  const controller=new AbortController();controller.abort();await assert.rejects(getHistoricalTree(repo,{commit:head,signal:controller.signal}),{name:'AbortError'});
  assert.equal(cmd(root,'git',['status','--porcelain']).stdout,before);assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),head);
 });
+test('historical tree accepts 10000 entries and rejects entry and byte overflow',async t=>{
+ const root=await gitRepo(t);await write(root,'seed','x');commit(root);const repo=await detectRepository(root),blob=cmd(root,'git',['rev-parse','HEAD:seed']).stdout.trim();
+ const make=(count,padding='')=>{
+  const input=Array.from({length:count},(_,i)=>'100644 blob '+blob+'\t'+String(i).padStart(5,'0')+padding+'\0').join('');
+  const built=spawnSync('git',['mktree','-z'],{cwd:root,input,encoding:'utf8',timeout:20000,windowsHide:true});assert.equal(built.status,0,built.stderr);
+  return cmd(root,'git',['commit-tree',built.stdout.trim(),'-m','tree fixture']).stdout.trim();
+ };
+ const exact=await getHistoricalTree(repo,{commit:make(10000)});assert.equal(exact.entries.length,10000);assert.equal(exact.entries[9999].path,'09999');
+ await assert.rejects(getHistoricalTree(repo,{commit:make(10001)}),/entry limit/);
+ await assert.rejects(getHistoricalTree(repo,{commit:make(3000,'x'.repeat(800))}),{code:'TOO_LARGE'});
+});
 test('blame reads committed UTF8 lines with original attribution and bounded output',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','first\nsecond\n');commit(root);
  const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
