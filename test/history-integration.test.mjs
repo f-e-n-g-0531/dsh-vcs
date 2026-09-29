@@ -5,6 +5,21 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHandler} from '../index.mjs';
+test('real references RPC supplies pinned A B targets across branch movement',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'vcs-refs-rpc-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
+ const git=args=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',windowsHide:true,timeout:20000});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ git(['init','-b','main']);git(['config','user.name','Refs']);git(['config','user.email','refs@example.invalid']);git(['config','core.autocrlf','false']);
+ const ids=[];for(const text of ['before','after']){await fs.writeFile(path.join(root,'file.txt'),text);git(['add','.']);git(['commit','--no-gpg-sign','-m',text]);ids.push(git(['rev-parse','HEAD']));}
+ git(['branch','topic',ids[0]]);git(['-c','tag.gpgSign=false','tag','-a','baseline','-m','tag',ids[0]]);await fs.writeFile(path.join(root,'file.txt'),'working');
+ const handler=createHandler({sessions:{get:()=>({header:{cwd:root}})},sessionPersistence:{stat:async()=>null}}),scan=await handler('vcs/repositories',{sessionId:'s'});assert.equal(scan.ok,true);
+ const p={sessionId:'s',repositoryId:scan.value.repositories.find(r=>r.type==='git').id};const read=async(endpoint,extra={})=>{const result=await handler(endpoint,{...p,...extra});assert.equal(result.ok,true,JSON.stringify(result));return result.value;};
+ const refs=(await read('vcs/references')).references;const base=refs.find(r=>r.name==='refs/heads/topic').commit,target=refs.find(r=>r.name==='refs/heads/main').commit;assert.equal(refs.find(r=>r.name==='refs/tags/baseline').commit,base);
+ git(['update-ref','refs/heads/topic',target]);const before=git(['status','--porcelain']),index=git(['ls-files','--stage']);
+ assert.equal((await read('vcs/references')).references.find(r=>r.name==='refs/heads/topic').commit,target);
+ const changes=await read('vcs/revision-changes',{base,target}),diff=await read('vcs/revision-compare',{base,target,id:changes.changes[0].id});assert.equal(diff.left.text,'before');assert.equal(diff.right.text,'after');
+ assert.equal((await handler('vcs/references',{...p,sessionId:'foreign'})).error.code,'vcs/rediscover-required');assert.equal((await handler('vcs/references',{...p,prefix:'refs/remotes/'})).error.code,'vcs/invalid-request');
+ assert.equal(git(['status','--porcelain']),before);assert.equal(git(['ls-files','--stage']),index);assert.equal(git(['rev-parse','HEAD']),target);assert.equal(await fs.readFile(path.join(root,'file.txt'),'utf8'),'working');
+});
 test('real authorized RPC traverses history details and committed diff',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'vcs-history-rpc-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
  const git=args=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',windowsHide:true,timeout:20000});assert.equal(r.status,0,r.stderr);return r.stdout;};
