@@ -5,5 +5,5 @@ const text=html.split('<pre id="report">')[1]?.split('</pre>')[0];
 assert.ok(text,'No report');
 const report=JSON.parse(text.replaceAll('&quot;','"').replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&'));
 assert.equal(report.pass,true,JSON.stringify(report));assert.ok(report.browser);
-assert.deepEqual(report.steps,['pagination','commit','file','diff','filter','parent','stale','unmount']);assert.equal(report.calls,8);
+assert.deepEqual(report.steps,['search','pagination','commit','file','diff','filter','parent','stale','unmount']);assert.equal(report.calls,8);
 console.log(report);

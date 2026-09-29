@@ -18,7 +18,16 @@ const wait=async fn=>{for(let i=0;i<100;i++){if(fn())return;await new Promise(r=
 const button=text=>[...document.querySelectorAll('button')].find(el=>el.textContent===text);
 (async()=>{try{
  await wait(()=>button('First commit'));
+ const search=document.querySelector('input[aria-label="historySearch"]');
+ const searchFor=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(search,value);search.dispatchEvent(new Event('input',{bubbles:true}));};
+ searchFor('Second');await wait(()=>!button('First commit'));
+ if(!button('historyMore')||calls.length!==1)throw Error('Search changed pagination or issued RPC');
  button('historyMore').click();await wait(()=>button('Second commit'));
+ if(button('First commit'))throw Error('Pagination lost search condition');
+ searchFor('missing');await wait(()=>!button('Second commit'));
+ if(!document.querySelector('#root').textContent.includes('historyNoMatch'))throw Error('Missing scoped empty state');
+ searchFor('');await wait(()=>button('First commit')&&button('Second commit'));
+ if(calls.length!==2)throw Error('Search issued extra RPC');
  if(calls[1].payload.snapshot!==a||calls[1].payload.offset!==1)throw Error('Snapshot pagination mismatch');
  button('First commit').click();await wait(()=>button('added · example.txt'));
  button('added · example.txt').click();await wait(()=>document.querySelector('.vcs-text-comparison'));
@@ -43,5 +52,5 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  delayNext=true;button('added · example.txt').click();await wait(()=>delayedResolve);
  root.unmount();if(!delayedSignal.aborted)throw Error('Unmount failed to cancel');
  delayedResolve({path:'STALE',left:{text:''},right:{text:'STALE'}});
- document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['pagination','commit','file','diff','filter','parent','stale','unmount'],calls:calls.length});
+ document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['search','pagination','commit','file','diff','filter','parent','stale','unmount'],calls:calls.length});
  }catch(e){document.querySelector('#report').textContent=JSON.stringify({pass:false,error:String(e)});}})();
