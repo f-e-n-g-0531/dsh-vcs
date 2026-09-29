@@ -213,6 +213,8 @@ test('partial clone history never hydrates missing promised blobs',async t=>{
  }
  await assert.rejects(getFileBlame(repo,{commit:commitId,id:detail.changes[0].id}),{code:'VCS_COMMAND'});
  assert.ok(missing().includes('?'+oid),'Blame must not hydrate promised objects');
+ const tree=await getHistoricalTree(repo,{commit:commitId});assert.equal(tree.entries.find(e=>e.path==='promised.txt').oid,oid);
+ assert.ok(missing().includes('?'+oid),'Tree listing must not hydrate file blobs');
  // Positive control: the source can supply the blob if explicitly permitted.
  assert.equal(cmd(target,'git',['-c','protocol.file.allow=always','cat-file','blob',oid]).stdout,'remote only payload');
  assert.ok(!missing().includes('?'+oid),'Positive control must hydrate the object');
@@ -250,6 +252,10 @@ test('historical special files remain bounded and never follow link or submodule
  cmd(root,'git',['commit','--no-gpg-sign','-m','special objects']);
  const repo=await detectRepository(root),commitId=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
  const before={head:commitId,index:cmd(root,'git',['ls-files','--stage']).stdout,status:cmd(root,'git',['status','--porcelain']).stdout,target:await fs.readFile(path.join(root,'target.txt'),'utf8')};
+ const tree=await getHistoricalTree(repo,{commit:commitId});
+ assert.deepEqual(tree.entries.find(e=>e.path==='link.txt'),{path:'link.txt',mode:'120000',type:'blob',oid:blob});
+ assert.deepEqual(tree.entries.find(e=>e.path==='submodule'),{path:'submodule',mode:'160000',type:'commit',oid:seed});
+ assert.ok(!tree.entries.some(e=>e.path.startsWith('submodule/')||e.path.startsWith('link.txt/')));
  const details=await getCommitDetails(repo,{commit:commitId});
  const compare=name=>getCommitComparison(repo,{commit:commitId,id:details.changes.find(row=>row.path===name).id});
  const binary=await compare('binary.dat');assert.equal(binary.binary,true);
