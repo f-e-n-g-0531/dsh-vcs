@@ -9,6 +9,13 @@ test('history Monaco is opt-in with stable identity and fallback',async()=>{
  const wrapper=await readFile(new URL('../src/HistoryComparison.jsx',import.meta.url),'utf8');
  assert.ok(wrapper.includes('JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])'));
 });
+test('history editor controls are ready-only and instance scoped',async()=>{
+ const source=await readFile(new URL('../src/HistoryViewer.jsx',import.meta.url),'utf8');
+ assert.ok(source.includes('ready&&<div'));
+ assert.ok(source.includes('viewer.current?.options({sideBySide,ignoreWhitespace,wrap})'));
+ for(const direction of ['previous','next'])assert.ok(source.includes("viewer.current?.navigate('"+direction+"')"));
+ assert.ok(source.includes('viewer.current=null;try{task.dispose();}'));
+});
 test('history panel scopes pagination and cancels stale responses',async()=>{
  const source=await readFile(new URL('../src/HistoryPanel.jsx',import.meta.url),'utf8');
  assert.ok(source.includes("rpc('vcs/history'"));
