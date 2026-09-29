@@ -96,7 +96,9 @@
     "revisionBase": "A（左侧）",
     "revisionTarget": "B（右侧）",
     "revisionSwap": "交换 A/B",
-    "revisionEmpty": "两个版本没有文件变更。"
+    "revisionEmpty": "两个版本没有文件变更。",
+    "fileHistory": "路径历史",
+    "fileHistoryScope": "固定提交快照下的精确路径历史；不追踪重命名前路径，同路径删除后重建的记录也会包含。"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -195,6 +197,8 @@
     "revisionBase": "A (left)",
     "revisionTarget": "B (right)",
     "revisionSwap": "Swap A/B",
-    "revisionEmpty": "No file changes between these revisions."
+    "revisionEmpty": "No file changes between these revisions.",
+    "fileHistory": "Path history",
+    "fileHistoryScope": "Exact-path history at the pinned commit. Does not follow renames; includes deletion and recreation at the same path."
   }
 }
