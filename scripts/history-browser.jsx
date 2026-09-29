@@ -32,6 +32,18 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  button('First commit').click();await wait(()=>button('added · example.txt'));
  button('added · example.txt').click();await wait(()=>document.querySelector('.vcs-text-comparison'));
  if(!document.querySelector('.vcs-text-comparison').textContent.includes('historical content'))throw Error('Missing historical content');
+ const originalFetch=globalThis.fetch;let assetRequests=0;
+ globalThis.fetch=async(url,options)=>{
+  assetRequests++;
+  if(!String(url).includes('vcs-assets/editor.js')||options.credentials!=='same-origin')throw Error('Incorrect editor asset request');
+  return new Response('Unauthorized',{status:401});
+ };
+ button('historyAdvanced').click();await wait(()=>document.querySelector('#root').textContent.includes('HTTP 401'));
+ if(!document.querySelector('.vcs-text-comparison')?.textContent.includes('historical content'))throw Error('Asset failure lost text fallback');
+ if(assetRequests!==1)throw Error('Unexpected editor resource retry');
+ button('historyBasic').click();await wait(()=>button('historyAdvanced'));
+ if(document.querySelector('link[href*="editor.css"]'))throw Error('Editor stylesheet leaked after disable');
+ globalThis.fetch=originalFetch;
  const countBeforeFilter=calls.length;
  const input=document.querySelector('input[aria-label="commitFileSearch"]');
  const enter=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));};
@@ -52,5 +64,5 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  delayNext=true;button('added · example.txt').click();await wait(()=>delayedResolve);
  root.unmount();if(!delayedSignal.aborted)throw Error('Unmount failed to cancel');
  delayedResolve({path:'STALE',left:{text:''},right:{text:'STALE'}});
- document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['search','pagination','commit','file','diff','filter','parent','stale','unmount'],calls:calls.length});
+ document.querySelector('#report').textContent=JSON.stringify({pass:true,browser:navigator.userAgent,steps:['search','pagination','commit','file','diff','editor-fallback','filter','parent','stale','unmount'],calls:calls.length});
  }catch(e){document.querySelector('#report').textContent=JSON.stringify({pass:false,error:String(e)});}})();
