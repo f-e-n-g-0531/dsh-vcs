@@ -31,6 +31,15 @@ test('commit details enforce grants, fields and forward selected parent',async()
  assert.equal(count,0);assert.equal((await h.call('vcs/commit',p,controller.signal)).value.id,id);assert.equal(count,1);
  h.move();assert.equal((await h.call('vcs/commit',p)).error.code,'vcs/rediscover-required');
 });
+test('historical comparison requires grants and opaque ID and forwards cancellation',async()=>{
+ const commit='a'.repeat(40),id='b'.repeat(64),controller=new AbortController();let count=0;
+ const h=setup({getCommitComparison:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit,id,parentIndex:0,signal:controller.signal});return {path:'file'};}});
+ const p={...payload,commit,id};
+ assert.equal((await h.call('vcs/commit-compare',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{id:'../file'},{path:'secret'},{commit:'HEAD'},{parentIndex:null}])assert.equal((await h.call('vcs/commit-compare',{...p,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(count,0);assert.equal((await h.call('vcs/commit-compare',p,controller.signal)).value.path,'file');assert.equal(count,1);
+ h.expire();assert.equal((await h.call('vcs/commit-compare',p)).error.code,'vcs/rediscover-required');
+});
 test('history cancellation during adapter work suppresses successful response',async()=>{
  const controller=new AbortController();const h=setup({listHistory:async()=>{controller.abort();return {};}});await h.discover();assert.equal((await h.call('vcs/history',payload,controller.signal)).error.code,'vcs/cancelled');
 });

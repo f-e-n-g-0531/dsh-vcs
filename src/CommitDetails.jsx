@@ -1,5 +1,7 @@
 import React,{useState,useEffect} from 'react';
+import HistoryComparison from './HistoryComparison.jsx';
 export default function CommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover}){
+ const [selected,setSelected]=useState(null);
  const [parentIndex,setParentIndex]=useState(0),[details,setDetails]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{
   const controller=new AbortController();setDetails(null);setError('');
@@ -10,9 +12,10 @@ export default function CommitDetails({sessionId,repositoryId,commit,rpc,t,onRed
  if(!details)return <p role="status">{t('loading')}</p>;
  return <section aria-label={t('commitDetails')}><h3>{details.subject}</h3><code>{details.id}</code>
  <p>{details.author} · {details.date}</p>
- {details.parents.length>1&&<label>{t('commitParent')} <select value={parentIndex} onChange={e=>{setDetails(null);setParentIndex(Number(e.target.value));}}>{details.parents.map((id,index)=><option key={id} value={index}>{index+1}: {id.slice(0,10)}</option>)}</select></label>}
+ {details.parents.length>1&&<label>{t('commitParent')} <select value={parentIndex} onChange={e=>{setSelected(null);setDetails(null);setParentIndex(Number(e.target.value));}}>{details.parents.map((id,index)=><option key={id} value={index}>{index+1}: {id.slice(0,10)}</option>)}</select></label>}
  <p>{details.parent||t('commitRoot')} → {details.id.slice(0,10)}</p>
- <ul>{details.changes.map(file=><li key={file.id}>{file.status} · {file.oldPath?file.oldPath+' → ':''}{file.path}</li>)}</ul>
+ <ul>{details.changes.map(file=><li key={file.id}><button aria-pressed={selected===file.id} onClick={()=>setSelected(file.id)}>{file.status} · {file.oldPath?file.oldPath+' → ':''}{file.path}</button></li>)}</ul>
  {!details.changes.length&&<p>{t('commitNoChanges')}</p>}
+ {selected&&<HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={commit} parentIndex={parentIndex} id={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </section>;
 }
