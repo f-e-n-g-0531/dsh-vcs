@@ -28,7 +28,8 @@ try{
  cases.push(mode+'-'+first);
  }
  phase='react-controls';await (await import('./history-viewer-browser.js')).checkViewer();
+ phase='revision-controls';await (await import('./history-viewer-browser.js')).checkRevisions();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls','revision-controls']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);
