@@ -1,5 +1,7 @@
 import React,{useState,useEffect} from 'react';
+import CommitDetails from './CommitDetails.jsx';
 export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
+ const [selected,setSelected]=useState(null);
  const [page,setPage]=useState({commits:[],snapshot:null,nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  // Parent remounts on repository/refresh changes; pagination stays anchored to first snapshot.
  useEffect(()=>{
@@ -11,10 +13,11 @@ export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}
  },[sessionId,repositoryId,offset,retry]);
  return <section className="vcs-history" aria-label={t('history')} aria-busy={busy}>
  <p>{t('historyListOnly')}</p>
- <ol>{page.commits.map(commit=><li key={commit.id}><strong>{commit.subject}</strong><div><code title={commit.id}>{commit.id.slice(0,10)}</code> · {commit.author} · <time dateTime={commit.date}>{commit.date}</time></div></li>)}</ol>
+ <ol>{page.commits.map(commit=><li key={commit.id}><button aria-pressed={selected===commit.id} onClick={()=>setSelected(commit.id)}>{commit.subject}</button><div><code title={commit.id}>{commit.id.slice(0,10)}</code> · {commit.author} · <time dateTime={commit.date}>{commit.date}</time></div></li>)}</ol>
  {busy&&<p role="status">{t('loading')}</p>}
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
+ {selected&&<CommitDetails key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </section>;
 }

@@ -22,6 +22,15 @@ test('history forwards bounded options and signal and discards cwd-stale results
  await h.discover();assert.equal((await h.call('vcs/history',payload,controller.signal)).error.code,'vcs/rediscover-required');
  controller.abort();assert.equal((await h.call('vcs/history',payload,controller.signal)).error.code,'vcs/cancelled');
 });
+test('commit details enforce grants, fields and forward selected parent',async()=>{
+ const id='a'.repeat(40),controller=new AbortController();let count=0;
+ const h=setup({getCommitDetails:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:id,parentIndex:1,signal:controller.signal});return {id};}});
+ const p={...payload,commit:id,parentIndex:1};
+ assert.equal((await h.call('vcs/commit',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{commit:'HEAD'},{parentIndex:null},{parentIndex:-1},{root:'/evil'},{mode:'all'}])assert.equal((await h.call('vcs/commit',{...p,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(count,0);assert.equal((await h.call('vcs/commit',p,controller.signal)).value.id,id);assert.equal(count,1);
+ h.move();assert.equal((await h.call('vcs/commit',p)).error.code,'vcs/rediscover-required');
+});
 test('history cancellation during adapter work suppresses successful response',async()=>{
  const controller=new AbortController();const h=setup({listHistory:async()=>{controller.abort();return {};}});await h.discover();assert.equal((await h.call('vcs/history',payload,controller.signal)).error.code,'vcs/cancelled');
 });
