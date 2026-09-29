@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame, getHistoricalTree, getCommitImage } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame, getHistoricalTree, getCommitImage, listReferences } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -18,6 +18,17 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('local references enumerate branches and commit tags without changing repository state',async t=>{
+ const root=await gitRepo(t),repo=await detectRepository(root);assert.deepEqual(await listReferences(repo),{references:[]});
+ await write(root,'file.txt','one');commit(root);const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ cmd(root,'git',['branch','主题',first]);cmd(root,'git',['tag','light',first]);cmd(root,'git',['-c','tag.gpgSign=false','tag','-a','annotated','-m','tag body',first]);
+ const blob=cmd(root,'git',['rev-parse','HEAD:file.txt']).stdout.trim();cmd(root,'git',['tag','blob-tag',blob]);cmd(root,'git',['update-ref','refs/remotes/origin/main',first]);
+ await write(root,'file.txt','two');commit(root);const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();await write(root,'file.txt','working');
+ const before=cmd(root,'git',['status','--porcelain']).stdout,index=cmd(root,'git',['ls-files','--stage']).stdout;
+ const result=await listReferences(repo);assert.deepEqual(result.references.map(r=>[r.name,r.kind,r.commit]),[['refs/heads/main','branch',head],['refs/heads/主题','branch',first],['refs/tags/annotated','tag',first],['refs/tags/light','tag',first]]);
+ const controller=new AbortController();controller.abort();await assert.rejects(listReferences(repo,{signal:controller.signal}),{name:'AbortError'});
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,before);assert.equal(cmd(root,'git',['ls-files','--stage']).stdout,index);assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),head);
+});
 test('commit details preserve multiline message while history remains summary-only',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','content');cmd(root,'git',['add','.']);
  const message='Review subject\n\n中文 body\n<script>alert(1)</script>\n\nTrailer: value';

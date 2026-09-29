@@ -1,6 +1,6 @@
 import {preparePng} from './image-preview.mjs';
 import { spawn } from 'node:child_process';
-import {parseHistory,HISTORY_FORMAT,historyPage,parseBlame} from './git-history.mjs';
+import {parseHistory,HISTORY_FORMAT,historyPage,parseBlame,parseReferences,REFS_FORMAT} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -242,6 +242,13 @@ export async function listHistory(repo, {snapshot,offset=0,limit=50,signal} = {}
   const rows=parseHistory(text.toString('utf8'),limit+1);
   return historyPage(rows,snapshot,offset,limit);
 }
+export async function listReferences(repo,{signal}={}){
+ signal?.throwIfAborted();repo=await checkedRepo(repo,signal);
+ if(repo.type!=='git')throw new Error('References support Git only');
+ const raw=await git(repo.root,['for-each-ref','--sort=refname','--count=1001','--format='+REFS_FORMAT,'refs/heads/','refs/tags/'],MAX_TEXT,{signal});
+ return {references:parseReferences(raw.toString('utf8'))};
+}
+
 export async function getCommitDetails(repo,options={}) {
   return commitDetails(repo,options,true);
 }
