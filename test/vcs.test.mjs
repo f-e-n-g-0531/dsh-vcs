@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -18,6 +18,29 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('revision file diffs handle rename add delete and reject unrelated IDs',async t=>{
+ const root=await gitRepo(t);await write(root,'old.txt','rename content');await write(root,'deleted.txt','removed');commit(root);
+ const base=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await fs.rename(path.join(root,'old.txt'),path.join(root,'new.txt'));await fs.unlink(path.join(root,'deleted.txt'));await write(root,'added.txt','new content');commit(root);
+ const target=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ await write(root,'new.txt','working only');
+ const changes=(await getRevisionChanges(repo,{base,target})).changes;
+ for(const [name,left,right] of [['new.txt','rename content','rename content'],['added.txt','','new content'],['deleted.txt','removed','']]){
+  const entry=changes.find(c=>c.path===name);assert.ok(entry,name);
+  const result=await getRevisionComparison(repo,{base,target,id:entry.id});assert.equal(result.left.text,left);assert.equal(result.right.text,right);
+  assert.equal(result.left.label,base);assert.equal(result.right.label,target);
+  await assert.rejects(getRevisionComparison(repo,{base:target,target:base,id:entry.id}),/revision pair/);
+ }
+ assert.equal(changes.find(c=>c.path==='new.txt').oldPath,'old.txt');
+ const oldId=(await getCommitDetails(repo,{commit:target})).changes[0].id;
+ await assert.rejects(getRevisionComparison(repo,{base,target,id:oldId}),/revision pair/);
+ await assert.rejects(getRevisionComparison(repo,{base,target,id:'forged'}),/Invalid revision change/);
+ const controller=new AbortController();controller.abort();
+ await assert.rejects(getRevisionComparison(repo,{base,target,id:changes[0].id,signal:controller.signal}),{name:'AbortError'});
+ const reverse=(await getRevisionChanges(repo,{base:target,target:base})).changes.find(c=>c.path==='added.txt');
+ const back=await getRevisionComparison(repo,{base:target,target:base,id:reverse.id});assert.equal(back.left.text,'new content');assert.equal(back.right.text,'');
+ assert.equal(await fs.readFile(path.join(root,'new.txt'),'utf8'),'working only');
+});
 test('local revision change lists bind direction and reject non-commit objects',async t=>{
  const root=await gitRepo(t);await write(root,'one.txt','before');commit(root);
  const base=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();

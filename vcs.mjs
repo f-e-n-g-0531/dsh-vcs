@@ -369,6 +369,15 @@ export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal}=
   const right=entry.status!=='deleted'?await historicalBlob(repo.root,commit,entry.path,signal):{text:''};
   return {...entry,left:{...left,label:details.parent||'Empty tree'},right:{...right,label:commit},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
 }
+export async function getRevisionComparison(repo,{base,target,id,signal}={}){
+  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid revision change id');
+  const details=await getRevisionChanges(repo,{base,target,signal});
+  const entry=details.changes.find(row=>row.id===id);
+  if(!entry)throw new Error('Change is not part of selected revision pair');
+  const left=entry.status!=='added'?await historicalBlob(repo.root,base,entry.oldPath||entry.path,signal):{text:''};
+  const right=entry.status!=='deleted'?await historicalBlob(repo.root,target,entry.path,signal):{text:''};
+  return {...entry,base,target,left:{...left,label:base},right:{...right,label:target},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
+}
 async function properties(root, file, base) {
   const result = parseXML(await svn(root, ['proplist', '--xml', '--verbose', ...(base ? ['--revision', 'BASE'] : []), '--', file + '@']));
   const props = Object.create(null);
