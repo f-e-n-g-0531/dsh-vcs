@@ -271,6 +271,15 @@ function parseCommitChanges(text,scope){
   }
   return changes;
 }
+export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,signal}={}){
+  if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid history pagination');
+  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+  const details=await getCommitDetails(repo,{commit,parentIndex,signal});
+  const entry=details.changes.find(row=>row.id===id);
+  if(!entry)throw new Error('Change is not part of selected commit');
+  const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
+  return {...historyPage(parseHistory(text.toString('utf8'),limit+1),commit,offset,limit),path:entry.path,followsRenames:false};
+}
 export async function getRevisionChanges(repo,{base,target,signal}={}){
   for(const oid of [base,target])if(typeof oid!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))throw new Error('Invalid revision commit id');
   signal?.throwIfAborted();repo=await checkedRepo(repo,signal);

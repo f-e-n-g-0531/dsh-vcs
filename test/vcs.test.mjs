@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -18,6 +18,21 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('file history pins exact literal path and paginates without working tree reads',async t=>{
+ const root=await gitRepo(t),name='[file].txt';
+ await write(root,name,'first');await write(root,'f.txt','other');commit(root);
+ const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await write(root,'f.txt','other changed');commit(root);
+ await write(root,name,'second');commit(root);
+ const snapshot=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ const detail=await getCommitDetails(repo,{commit:snapshot}),id=detail.changes.find(c=>c.path===name).id;
+ const page=await listFileHistory(repo,{commit:snapshot,id,limit:1});assert.equal(page.path,name);assert.equal(page.followsRenames,false);assert.equal(page.commits[0].id,snapshot);assert.equal(page.nextOffset,1);
+ await write(root,name,'third');commit(root);
+ const next=await listFileHistory(repo,{commit:snapshot,id,limit:1,offset:1});assert.equal(next.commits[0].id,first);assert.equal(next.nextOffset,null);assert.equal(next.snapshot,snapshot);
+ await assert.rejects(listFileHistory(repo,{commit:snapshot,id:'a'.repeat(64)}),/selected commit/);
+ await assert.rejects(listFileHistory(repo,{commit:snapshot,id,limit:101}),/pagination/);
+ const controller=new AbortController();controller.abort();await assert.rejects(listFileHistory(repo,{commit:snapshot,id,signal:controller.signal}),{name:'AbortError'});
+});
 test('divergent revision pairs use direct trees and bind IDs to repository roots',async t=>{
  const root=await gitRepo(t);await write(root,'common.txt','ancestor');commit(root);
  const ancestor=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
