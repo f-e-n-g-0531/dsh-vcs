@@ -30,6 +30,15 @@ test('blame reads committed UTF8 lines with original attribution and bounded out
  const bounded=await getFileBlame(repo,{commit:latest,id:large.changes[0].id});assert.equal(bounded.lines.length,500);assert.equal(bounded.truncated,true);
  await assert.rejects(getFileBlame(repo,{commit:head,id:'f'.repeat(64)}),/selected commit/);
 });
+test('blame refuses configured external ignore-revision files without modifying config',async t=>{
+ const root=await gitRepo(t);await write(root,'file.txt','source');commit(root);
+ const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root),detail=await getCommitDetails(repo,{commit:head});
+ const outside=await temp(t),ignore=path.join(outside,'ignore.txt');await fs.writeFile(ignore,'not a valid revision');
+ cmd(root,'git',['config','blame.ignoreRevsFile',ignore]);
+ assert.notEqual(cmd(root,'git',['blame','--line-porcelain',head,'--','file.txt'],true).status,0,'Positive control must read invalid configured file');
+ const result=await getFileBlame(repo,{commit:head,id:detail.changes[0].id});assert.deepEqual(result.lines,[]);assert.match(result.notice,/external revision files are not read/);
+ assert.equal(cmd(root,'git',['config','--get','blame.ignoreRevsFile']).stdout.trim(),ignore);assert.equal(await fs.readFile(ignore,'utf8'),'not a valid revision');
+});
 test('blame reports empty deleted and unsupported encoding without reading working contents',async t=>{
  const root=await gitRepo(t);await write(root,'empty.txt','');await write(root,'wide.txt',Buffer.concat([Buffer.from([255,254]),Buffer.from('hello','utf16le')]));commit(root);
  const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root),detail=await getCommitDetails(repo,{commit:head});

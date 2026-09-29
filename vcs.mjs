@@ -281,7 +281,10 @@ export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
  if(blob.notice||blob.binary||blob.encoding!=='UTF-8')return {...result,notice:blob.notice||'Blame supports UTF-8 regular text only.'};
  if(!blob.text)return result;
  const count=blob.text.split('\n').length-(blob.text.endsWith('\n')?1:0),limit=Math.min(count,500);
- const output=await git(repo.root,['--literal-pathspecs','blame','--line-porcelain','--no-textconv','--encoding=UTF-8','-L','1,'+limit,commit,'--',entry.path],MAX_TEXT,{signal});
+ let ignored;
+ try{ignored=(await git(repo.root,['config','--get-all','blame.ignoreRevsFile'],MAX_TEXT,{signal})).toString('utf8');}catch(e){if(e.code!=='VCS_COMMAND'||e.exitCode!==1)throw e;}
+ if(ignored?.trim())return {...result,notice:'Blame unavailable while blame.ignoreRevsFile is configured; external revision files are not read.'};
+ const output=await git(repo.root,['--literal-pathspecs','blame','--ignore-revs-file=','--line-porcelain','--no-textconv','--encoding=UTF-8','-L','1,'+limit,commit,'--',entry.path],MAX_TEXT,{signal});
  return {...result,lines:parseBlame(output.toString('utf8'),limit),truncated:count>limit};
 }
 export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,signal}={}){
