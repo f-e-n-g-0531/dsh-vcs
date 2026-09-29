@@ -119,7 +119,14 @@
     "graphLimit": "图已达到节点或边上限，部分关系未展示。",
     "graphMissing": "父提交未在当前图中",
     "graphRelations": "父子关系（文本）",
-    "graphInvalid": "当前提交顺序无法绘图；请使用历史列表。"
+    "graphInvalid": "当前提交顺序无法绘图；请使用历史列表。",
+    "imageCompare": "PNG 图片比较",
+    "imageBefore": "所选父提交",
+    "imageAfter": "所选提交",
+    "imageAbsent": "此侧没有文件。",
+    "imageInvalid": "图片响应无效。",
+    "imageMetadata": "预览已移除附加元数据。",
+    "imageScope": "仅支持非交错静态 PNG 普通文件；每侧最多 2 MiB、1600 万像素。元数据被移除，不适用于色彩精确性审阅。工作区修改不包含在内。"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -241,6 +248,13 @@
     "graphLimit": "Node or edge limit reached; some relationships are omitted.",
     "graphMissing": "Parent outside this graph",
     "graphRelations": "Parent relationships (text)",
-    "graphInvalid": "Cannot graph this commit order; use the history list."
+    "graphInvalid": "Cannot graph this commit order; use the history list.",
+    "imageCompare": "PNG image comparison",
+    "imageBefore": "Selected parent",
+    "imageAfter": "Selected commit",
+    "imageAbsent": "No file on this side.",
+    "imageInvalid": "Invalid image response.",
+    "imageMetadata": "Ancillary metadata was removed from this preview.",
+    "imageScope": "Non-interlaced static PNG regular files only; at most 2 MiB and 16 million pixels per side. Metadata is removed; not suitable for color-critical review. Working changes are excluded."
   }
 }
