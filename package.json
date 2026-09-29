@@ -1,6 +1,6 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.3.27",
+  "version": "0.3.28",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
