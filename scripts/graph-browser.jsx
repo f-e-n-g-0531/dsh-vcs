@@ -12,6 +12,14 @@ export async function checkGraph(){
  if(host.querySelectorAll('circle').length!==200||host.querySelectorAll('path').length!==199)throw Error('Graph bounds incorrect');
  if(!host.textContent.includes('graphLimit')||!host.textContent.includes('graphMissing'))throw Error('Missing graph scope markers');
  const node=host.querySelector('ol button');node.click();if(selected!==id(1)||node.title!==id(1))throw Error('Graph selected wrong commit');
- host.querySelector('button').click();await wait(()=>!host.querySelector('svg'));
+ const merge=[{id:id(4),parents:[id(3),id(2)],subject:'merge'},{id:id(3),parents:[id(1)],subject:'left'},{id:id(2),parents:[id(1)],subject:'right'},{id:id(1),parents:[],subject:'root'}];
+ root.render(<HistoryGraph commits={merge} onSelect={value=>selected=value} t={key=>key}/>);
+ await wait(()=>host.querySelectorAll('circle').length===4);
+ if(host.querySelectorAll('path').length!==4||host.textContent.includes('graphMissing')||host.textContent.includes('graphLimit'))throw Error('Merge graph relationships incorrect');
+ const buttons=host.querySelectorAll('ol button');buttons[2].click();if(selected!==id(2))throw Error('Merge branch selection incorrect');
+ const relations=host.querySelectorAll('details li');if(relations.length!==4||!relations[0].textContent.includes(id(3))||!relations[1].textContent.includes(id(2)))throw Error('Merge parent text missing');
+ root.render(<HistoryGraph commits={[merge[3],merge[0],merge[1],merge[2]]} onSelect={value=>selected=value} t={key=>key}/>);
+ await wait(()=>host.querySelector('[role=alert]'));if(host.querySelector('svg')||!host.textContent.includes('graphInvalid'))throw Error('Invalid topology did not fall back');
+ host.querySelector('button').click();await wait(()=>!host.querySelector('[role=alert]'));
  }finally{root.unmount();host.remove();}
 }
