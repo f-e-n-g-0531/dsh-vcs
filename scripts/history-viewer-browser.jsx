@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkGraph} from './graph-browser.jsx';
 export {checkTree} from './tree-browser.jsx';
 export {checkBlame} from './blame-browser.jsx';
 export {checkFileHistory} from './file-history-browser.jsx';

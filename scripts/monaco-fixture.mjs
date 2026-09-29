@@ -32,7 +32,8 @@ try{
  phase='file-history';await (await import('./history-viewer-browser.js')).checkFileHistory();
  phase='blame';await (await import('./history-viewer-browser.js')).checkBlame();
  phase='tree';await (await import('./history-viewer-browser.js')).checkTree();
+ phase='graph';await (await import('./history-viewer-browser.js')).checkGraph();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls','revision-controls','file-history','blame','tree']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls','revision-controls','file-history','blame','tree','graph']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);
