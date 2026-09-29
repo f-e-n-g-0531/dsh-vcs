@@ -10,6 +10,18 @@ for(const order of [[0,1],[1,0]])test('worker environment survives editor dispos
  releases[order[1]]();assert.equal(terminated,1);assert.equal(host.MonacoEnvironment,previous);
  releases[0]();releases[1]();assert.equal(terminated,1);
 });
+for(const order of [[0,1],[1,0]])test('cache-busted module owners share workers '+order,async()=>{
+ const other=await import('../src/editor-environment.mjs?retry='+order.join(''));
+ const host={},factory=()=>({terminate(){terminated++;}});let terminated=0;
+ const a=createEnvironmentOwner(host,factory),b=other.createEnvironmentOwner(host,factory);
+ const releases=[a(),b()],env=host.MonacoEnvironment;
+ env.getWorker('','editorWorkerService');releases[order[0]]();
+ assert.equal(terminated,0);assert.equal(host.MonacoEnvironment,env);
+ env.getWorker('','editorWorkerService');releases[order[1]]();
+ assert.equal(terminated,2);assert.equal(Object.hasOwn(host,'MonacoEnvironment'),false);
+ assert.equal(Object.getOwnPropertySymbols(host).length,0);
+ const again=b();assert.notEqual(host.MonacoEnvironment,env);again();
+});
 test('environment cleanup preserves external replacements and original absence',()=>{
  const host={},acquire=createEnvironmentOwner(host,()=>({terminate(){}}));
  acquire()();assert.equal(Object.hasOwn(host,'MonacoEnvironment'),false);

@@ -1,7 +1,8 @@
-// One worker environment per bundle, retained until the last editor releases it.
+// Share ownership across cache-busted imports of the same editor implementation.
+const ownerKey=Symbol.for('dsh-vcs.editor-environment.v1');
 export function createEnvironmentOwner(host,createWorker){
- let shared;
  return ()=>{
+  let shared=host[ownerKey];
   if(!shared){
    const previous=host.MonacoEnvironment,had=Object.hasOwn(host,'MonacoEnvironment'),workers=new Set();
    const environment={...previous,getWorker(moduleId,label){
@@ -12,7 +13,7 @@ export function createEnvironmentOwner(host,createWorker){
     }
     const worker=createWorker(undefined,label);workers.add(worker);return worker;
    }};
-   shared={previous,had,workers,environment,count:0};host.MonacoEnvironment=environment;
+   shared={previous,had,workers,environment,count:0};host[ownerKey]=shared;host.MonacoEnvironment=environment;
   }
   const state=shared;state.count++;let released=false;
   return ()=>{
@@ -20,7 +21,7 @@ export function createEnvironmentOwner(host,createWorker){
    for(const worker of state.workers){try{worker.terminate();}catch{}}
    state.workers.clear();
    if(host.MonacoEnvironment===state.environment){if(state.had)host.MonacoEnvironment=state.previous;else delete host.MonacoEnvironment;}
-   shared=undefined;
+   if(host[ownerKey]===state)delete host[ownerKey];
   };
  };
 }
