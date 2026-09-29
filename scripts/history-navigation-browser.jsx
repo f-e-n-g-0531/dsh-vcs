@@ -20,7 +20,7 @@ export async function checkHistoryNavigation(){
   const select=host.querySelector('select[aria-label="commitParent"]');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));
   await wait(()=>calls.some(x=>x.endpoint==='vcs/commit'&&x.p.parentIndex===1)&&button('modified · file.txt'));button('modified · file.txt').click();
   await wait(()=>button('fileHistory'));button('fileHistory').click();await wait(()=>button('visit destination'));button('visit destination').click();
-  await wait(()=>host.querySelector('h3')?.textContent==='destination details');
+  await wait(()=>host.querySelector('[aria-label=commitDetails] h3')?.textContent==='destination details');
   const destination=calls.find(x=>x.endpoint==='vcs/commit'&&x.p.commit===b);if(!destination||destination.p.parentIndex!==0)throw Error('Navigation did not reset parent');
   if(calls.filter(x=>['vcs/commit-compare','vcs/file-history'].includes(x.endpoint)).some(x=>!x.signal.aborted))throw Error('Old comparison requests survived navigation');
   if(host.querySelector('select[aria-label="commitParent"]')||host.querySelector('.vcs-text-comparison'))throw Error('Old comparison state survived navigation');
