@@ -2,7 +2,7 @@
 export function reviewShortcut(event, root, search, hasQuery) {
   const target=event.target;
   if(!root?.contains(target)||event.defaultPrevented||event.isComposing)return null;
-  if(target?.closest?.('.monaco-editor'))return null;
+  if(target?.closest?.('.monaco-editor')||target?.closest?.('.vcs-history'))return null;
   if(event.key==='Escape'&&target===search&&hasQuery)return 'clear';
   const editing=target?.isContentEditable||target?.closest?.('input,textarea,select,[role="textbox"]');
   if(editing&&target!==search)return null;
