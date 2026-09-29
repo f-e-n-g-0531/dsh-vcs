@@ -1,5 +1,6 @@
 import React,{useState,useEffect} from 'react';
 import CommitDetails from './CommitDetails.jsx';
+import HistoryGraph from './HistoryGraph.jsx';
 import RevisionPanel from './RevisionPanel.jsx';
 import {filterLoadedCommits} from './history-filter.mjs';
 export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
@@ -24,6 +25,7 @@ export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
  {page.truncated&&<p role="status">{t('historyLimit')}</p>}
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
+ {!!page.commits.length&&<HistoryGraph commits={page.commits} onSelect={setSelected} t={t}/>}
  {!!page.commits.length&&<RevisionPanel commits={page.commits} {...{sessionId,repositoryId,rpc,t,onRediscover}}/>}
  {selected&&<CommitDetails key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </section>;

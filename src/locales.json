@@ -113,7 +113,13 @@
     "treeUp": "上级目录",
     "treeEntries": "个条目",
     "treePrevious": "上一页",
-    "treeNext": "下一页"
+    "treeNext": "下一页",
+    "historyGraph": "局部提交图",
+    "graphScope": "仅展示已加载历史的前 200 个提交，最多 1000 条父子边；不受文本筛选影响，不代表完整分支图。节点点击可查看详情。",
+    "graphLimit": "图已达到节点或边上限，部分关系未展示。",
+    "graphMissing": "父提交未在当前图中",
+    "graphRelations": "父子关系（文本）",
+    "graphInvalid": "当前提交顺序无法绘图；请使用历史列表。"
   },
   "en": {
     "workspaceRoot": "Workspace root",
@@ -229,6 +235,12 @@
     "treeUp": "Parent directory",
     "treeEntries": "entries",
     "treePrevious": "Previous page",
-    "treeNext": "Next page"
+    "treeNext": "Next page",
+    "historyGraph": "Local commit graph",
+    "graphScope": "First 200 loaded commits, at most 1000 parent edges. Independent of text filtering; not a complete branch graph. Select a node for details.",
+    "graphLimit": "Node or edge limit reached; some relationships are omitted.",
+    "graphMissing": "Parent outside this graph",
+    "graphRelations": "Parent relationships (text)",
+    "graphInvalid": "Cannot graph this commit order; use the history list."
   }
 }
