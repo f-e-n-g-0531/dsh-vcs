@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -17,6 +17,22 @@ async function gitRepo(t) { const root = await temp(t); cmd(root, 'git', ['init'
 async function write(root, name, value) { await fs.writeFile(path.join(root, name), value); }
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
+
+test('history snapshots paginate without following moving HEAD', async t=>{
+ const root=await gitRepo(t), repo=await detectRepository(root);
+ assert.deepEqual(await listHistory(repo),{snapshot:null,commits:[],nextOffset:null});
+ for(let i=0;i<3;i++){await write(root,'a.txt',String(i));commit(root);}
+ const first=await listHistory(repo,{limit:2});assert.equal(first.commits.length,2);assert.equal(first.nextOffset,2);
+ await write(root,'a.txt','new');commit(root);
+ const second=await listHistory(repo,{snapshot:first.snapshot,offset:2,limit:2});
+ assert.equal(second.commits.length,1);assert.deepEqual(second.commits[0].parents,[]);assert.equal(second.nextOffset,null);
+ assert.notEqual((await listHistory(repo)).snapshot,first.snapshot);
+ await assert.rejects(listHistory(repo,{snapshot:'--all'}),/snapshot/);
+ await assert.rejects(listHistory(repo,{offset:-1}),/pagination/);
+ await assert.rejects(listHistory(repo,{limit:101}),/pagination/);
+ const controller=new AbortController();controller.abort();await assert.rejects(listHistory(repo,{signal:controller.signal}),{code:'ABORT_ERR'});
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,'');
+});
 
 test('detect none, nested repository, unborn HEAD and opaque ID validation', async t => {
   const plain = await temp(t); assert.equal(await detectRepository(plain), null);

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import {parseHistory,HISTORY_FORMAT} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -216,6 +217,27 @@ async function checkedRepo(repo) {
   const found = await repositoryAt(repo.root, repo.type);
   if (!found || found.type !== repo.type || path.resolve(found.root) !== path.resolve(repo.root)) throw new Error('Repository root changed or is invalid');
   return found;
+}
+export async function listHistory(repo, {snapshot,offset=0,limit=50,signal} = {}) {
+  if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100) throw new Error('Invalid history pagination');
+  if(snapshot!==undefined && (typeof snapshot!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(snapshot))) throw new Error('Invalid history snapshot');
+  if(signal?.aborted) throw Object.assign(new Error('History cancelled'),{code:'ABORT_ERR'});
+  repo=await checkedRepo(repo);
+  if(repo.type!=='git') throw new Error('History currently supports Git only');
+  if(!snapshot){
+    try{snapshot=(await git(repo.root,['rev-parse','--verify','HEAD^{commit}'],MAX_TEXT,{signal})).toString('utf8').trim();}
+    catch(e){
+      if(e.code!=='VCS_COMMAND')throw e;
+      // Distinguish an unborn symbolic HEAD from corruption or other command failures.
+      const ref=(await git(repo.root,['symbolic-ref','-q','HEAD'],MAX_TEXT,{signal})).toString('utf8').trim();
+      try{await git(repo.root,['show-ref','--verify','--quiet',ref],MAX_TEXT,{signal});}
+      catch(missing){if(missing.code==='VCS_COMMAND'&&missing.exitCode===1)return {snapshot:null,commits:[],nextOffset:null};throw missing;}
+      throw e;
+    }
+  }
+  const text=await git(repo.root,['log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,snapshot,'--'],MAX_TEXT,{signal});
+  const rows=parseHistory(text.toString('utf8'),limit+1);
+  return {snapshot,commits:rows.slice(0,limit),nextOffset:rows.length>limit&&offset+limit<=10000?offset+limit:null};
 }
 function modeFor(repo, mode) {
   if (!['all', 'staged', 'unstaged'].includes(mode)) throw new Error('Invalid comparison mode');

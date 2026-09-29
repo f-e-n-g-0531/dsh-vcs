@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {parseHistory,HISTORY_FORMAT} from '../src/git-history.mjs';
+import {parseHistory,HISTORY_FORMAT} from '../git-history.mjs';
 const id='a'.repeat(40), date='2026-09-29T12:00:00+08:00', nul=String.fromCharCode(0);
 const row=(parents='',subject='中文 <script>')=>[id,parents,'作者',date,subject].join(nul)+nul;
 test('history parses root, merge parents and untrusted display text',()=>{
