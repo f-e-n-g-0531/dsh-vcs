@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -17,6 +17,22 @@ async function gitRepo(t) { const root = await temp(t); cmd(root, 'git', ['init'
 async function write(root, name, value) { await fs.writeFile(path.join(root, name), value); }
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
+
+test('commit details cover root rename deletion and selected merge parent',async t=>{
+ const root=await gitRepo(t);await write(root,'old name.txt','content');commit(root);const repo=await detectRepository(root);
+ const head=()=>cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ const first=await getCommitDetails(repo,{commit:head()});assert.equal(first.parent,null);assert.equal(first.changes[0].status,'added');
+ cmd(root,'git',['mv','old name.txt','new name.txt']);commit(root);
+ const renamed=await getCommitDetails(repo,{commit:head()});assert.equal(renamed.changes[0].oldPath,'old name.txt');assert.equal(renamed.changes[0].path,'new name.txt');
+ cmd(root,'git',['checkout','-b','side']);await write(root,'side.txt','side');commit(root);
+ cmd(root,'git',['checkout','main']);await fs.unlink(path.join(root,'new name.txt'));commit(root);
+ assert.equal((await getCommitDetails(repo,{commit:head()})).changes[0].status,'deleted');
+ cmd(root,'git',['merge','--no-ff','--no-gpg-sign','side','-m','merge']);
+ const merged=await getCommitDetails(repo,{commit:head(),parentIndex:1});assert.equal(merged.parents.length,2);assert.equal(merged.parent,merged.parents[1]);assert.equal(merged.changes[0].status,'deleted');
+ await assert.rejects(getCommitDetails(repo,{commit:head(),parentIndex:2}),/parent index/);
+ await assert.rejects(getCommitDetails(repo,{commit:'--all'}),/commit id/);
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,'');
+});
 
 test('history snapshots paginate without following moving HEAD', async t=>{
  const root=await gitRepo(t), repo=await detectRepository(root);

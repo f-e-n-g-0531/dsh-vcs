@@ -239,6 +239,32 @@ export async function listHistory(repo, {snapshot,offset=0,limit=50,signal} = {}
   const rows=parseHistory(text.toString('utf8'),limit+1);
   return {snapshot,commits:rows.slice(0,limit),nextOffset:rows.length>limit&&offset+limit<=10000?offset+limit:null};
 }
+export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
+  if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');
+  if(!Number.isInteger(parentIndex)||parentIndex<0)throw new Error('Invalid parent index');
+  signal?.throwIfAborted();
+  repo=await checkedRepo(repo);
+  if(repo.type!=='git')throw new Error('Commit details support Git only');
+  const raw=await git(repo.root,['log','-z','--no-show-signature','--encoding=UTF-8','--max-count=1','--format='+HISTORY_FORMAT,commit,'--'],MAX_TEXT,{signal});
+  const metadata=parseHistory(raw.toString('utf8'),1)[0];
+  if(!metadata||metadata.id!==commit)throw new Error('Commit object required');
+  if(parentIndex>=Math.max(1,metadata.parents.length))throw new Error('Invalid parent index');
+  const parent=metadata.parents[parentIndex]??null;
+  const args=['diff-tree','--no-commit-id','--name-status','-z','-r','--no-ext-diff','--no-textconv','--find-renames',...(parent?[parent,commit]:['--root',commit]),'--'];
+  const fields=(await git(repo.root,args,MAX_TEXT,{signal})).toString('utf8').split(String.fromCharCode(0));
+  if(fields.pop()!=='')throw new Error('Truncated commit changes');
+  const changes=[];
+  for(let i=0;i<fields.length;){
+    const code=fields[i++];
+    if(!/^(?:[AMDT]|[RC][0-9]{1,3})$/.test(code))throw new Error('Invalid commit change status');
+    const first=fields[i++],renamed=/^[RC]/.test(code),file=renamed?fields[i++]:first;
+    if(!first||!file)throw new Error('Truncated commit path');
+    const entry={path:file,...(renamed?{oldPath:first}:{}),status:statuses[code[0]]||'modified'};
+    changes.push({...entry,id:identity(entry,commit+':'+(parent||'root'))});
+    if(changes.length>10000)throw new Error('Commit exceeds file count limit');
+  }
+  return {...metadata,parent,parentIndex,changes};
+}
 function modeFor(repo, mode) {
   if (!['all', 'staged', 'unstaged'].includes(mode)) throw new Error('Invalid comparison mode');
   if (repo.type === 'svn' && mode !== 'all') throw new Error('SVN supports only all mode');
