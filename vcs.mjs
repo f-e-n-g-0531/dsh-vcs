@@ -271,6 +271,23 @@ function parseCommitChanges(text,scope){
   }
   return changes;
 }
+export async function getHistoricalTree(repo,{commit,signal}={}){
+ if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');
+ repo=await checkedRepo(repo,signal);if(repo.type!=='git')throw new Error('Historical tree supports Git only');
+ const type=(await git(repo.root,['cat-file','-t',commit],MAX_TEXT,{signal})).toString('utf8').trim();if(type!=='commit')throw new Error('Commit object required');
+ const text=(await git(repo.root,['ls-tree','-r','-t','-z','--full-tree',commit],MAX_TEXT,{signal})).toString('utf8');
+ const fields=text.split(String.fromCharCode(0));if(fields.pop()!=='')throw new Error('Truncated historical tree');
+ if(fields.length>10000)throw new Error('Historical tree exceeds entry limit');
+ const entries=fields.map(record=>{
+  const tab=record.indexOf('\t'),head=record.slice(0,tab),file=record.slice(tab+1);
+  const match=/^(040000|100644|100755|120000|160000) (tree|blob|commit) ([a-f0-9]{40}|[a-f0-9]{64})$/.exec(head);
+  if(tab<0||!file||!match)throw new Error('Invalid historical tree entry');
+  const [,mode,type,oid]=match;
+  if(type!==(mode==='040000'?'tree':mode==='160000'?'commit':'blob'))throw new Error('Invalid historical tree type');
+  return {path:file,mode,type,oid};
+ });
+ return {commit,entries};
+}
 export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
  const details=await getCommitDetails(repo,{commit,parentIndex,signal});

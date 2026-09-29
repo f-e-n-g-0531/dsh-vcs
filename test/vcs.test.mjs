@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame, getHistoricalTree } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -18,6 +18,19 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('historical tree reads committed nested entries not working directory contents',async t=>{
+ const root=await gitRepo(t);await fs.mkdir(path.join(root,'nested'));await write(root,'nested/中文 [file].txt','committed');commit(root);
+ const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ await fs.rm(path.join(root,'nested'),{recursive:true});await write(root,'working.txt','not committed');
+ const before=cmd(root,'git',['status','--porcelain']).stdout;
+ const tree=await getHistoricalTree(repo,{commit:head});assert.equal(tree.commit,head);
+ assert.deepEqual(tree.entries.map(e=>[e.path,e.mode,e.type]),[['nested','040000','tree'],['nested/中文 [file].txt','100644','blob']]);
+ assert.ok(tree.entries.every(e=>/^[a-f0-9]{40}$/.test(e.oid)));
+ await assert.rejects(getHistoricalTree(repo,{commit:'HEAD'}),/Invalid commit/);
+ await assert.rejects(getHistoricalTree(repo,{commit:tree.entries[0].oid}),/Commit object/);
+ const controller=new AbortController();controller.abort();await assert.rejects(getHistoricalTree(repo,{commit:head,signal:controller.signal}),{name:'AbortError'});
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,before);assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),head);
+});
 test('blame reads committed UTF8 lines with original attribution and bounded output',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','first\nsecond\n');commit(root);
  const first=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
