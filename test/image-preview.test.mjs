@@ -35,6 +35,15 @@ test('PNG validation rejects cancellation before and during asynchronous inflate
  const during=new AbortController(),pending=validatePng(image,{signal:during.signal});during.abort();await assert.rejects(pending,{name:'AbortError'});
  assert.equal((await validatePng(image)).width,1);
 });
+test('PNG transparency respects palette sample depth and ordering',()=>{
+ const header=Buffer.from(valid.subarray(16,29));header[8]=8;header[9]=3;
+ const prefix=Buffer.concat([valid.subarray(0,8),chunk('IHDR',header)]),pal=chunk('PLTE',Buffer.alloc(6)),alpha=chunk('tRNS',Buffer.from([0,255])),tail=valid.subarray(33);
+ assert.equal(inspectPng(Buffer.concat([prefix,pal,alpha,tail])).width,1);
+ for(const parts of [[prefix,alpha,pal,tail],[prefix,pal,alpha,alpha,tail],[prefix,pal,chunk('tRNS',Buffer.alloc(3)),tail],[prefix,pal,tail.subarray(0,-12),alpha,tail.subarray(-12)],[valid.subarray(0,33),alpha,tail]])assert.throws(()=>inspectPng(Buffer.concat(parts)),/transparency/);
+ header[9]=0;const gray=Buffer.concat([valid.subarray(0,8),chunk('IHDR',header)]);
+ assert.equal(inspectPng(Buffer.concat([gray,chunk('tRNS',Buffer.from([0,255])),tail])).width,1);
+ assert.throws(()=>inspectPng(Buffer.concat([gray,chunk('tRNS',Buffer.from([1,0])),tail])),/sample/);
+});
 test('PNG structural inspection returns bounded metadata',()=>{assert.deepEqual(inspectPng(valid),{mime:'image/png',width:1,height:1,bytes:valid.length});});
 test('PNG gate rejects non-raster signatures corruption truncation animation and size overflow',()=>{
  for(const b of [Buffer.from('<svg/>'),valid.subarray(0,-1),Buffer.concat([valid,Buffer.from('tail')]),Buffer.alloc(2*1024*1024+1),Buffer.concat([valid.subarray(0,33),chunk('acTL',Buffer.alloc(8)),valid.subarray(33)])])assert.throws(()=>inspectPng(b));

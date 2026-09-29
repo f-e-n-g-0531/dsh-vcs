@@ -5,7 +5,7 @@ const inflateAsync=promisify(inflate);
 export function inspectPng(buffer){
  if(!Buffer.isBuffer(buffer)||buffer.length>2*1024*1024)throw new Error('Image byte limit exceeded or invalid input');
  if(buffer.length<8||!buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw new Error('Only PNG is supported');
- let offset=8,width,height,depth,color,seenPalette=false,seenData=false,endedData=false,ended=false,chunks=0;
+ let offset=8,width,height,depth,color,paletteSize=0,seenTransparency=false,seenPalette=false,seenData=false,endedData=false,ended=false,chunks=0;
  while(offset<buffer.length){
   if(++chunks>4096||buffer.length-offset<12)throw new Error('Invalid PNG chunk bounds');
   const length=buffer.readUInt32BE(offset),end=offset+12+length;
@@ -24,8 +24,12 @@ export function inspectPng(buffer){
    depth=buffer[offset+16];color=buffer[offset+17];
    if(!({0:[1,2,4,8,16],2:[8,16],3:[1,2,4,8],4:[8,16],6:[8,16]}[color]?.includes(depth))||buffer[offset+18]!==0||buffer[offset+19]!==0||buffer[offset+20]>1)throw new Error('Invalid PNG encoding');
   }else if(type==='PLTE'){
-   if(seenPalette||seenData||color===0||color===4||!length||length%3||length>768||(color===3&&length/3>2**depth))throw new Error('Invalid PNG palette');
-   seenPalette=true;
+   if(seenPalette||seenTransparency||seenData||color===0||color===4||!length||length%3||length>768||(color===3&&length/3>2**depth))throw new Error('Invalid PNG palette');
+   seenPalette=true;paletteSize=length/3;
+  }else if(type==='tRNS'){
+   if(seenTransparency||seenData||![0,2,3].includes(color)||(color===0&&length!==2)||(color===2&&length!==6)||(color===3&&(!seenPalette||!length||length>paletteSize)))throw new Error('Invalid PNG transparency');
+   if(color!==3)for(let i=0;i<length;i+=2)if(buffer.readUInt16BE(offset+8+i)>=2**depth)throw new Error('Invalid PNG transparent sample');
+   seenTransparency=true;
   }else if(type==='IDAT'){
    if(color===3&&!seenPalette)throw new Error('Missing PNG palette');
    if(endedData)throw new Error('Noncontiguous PNG data');seenData=true;
