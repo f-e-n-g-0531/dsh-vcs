@@ -51,7 +51,7 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  if(document.querySelector('.vcs-text-comparison'))throw Error('Filtered file retained old diff');
  enter('');await wait(()=>button('added · example.txt'));
  if(calls.length!==countBeforeFilter)throw Error('Filtering unexpectedly called RPC');
- const select=document.querySelector('select');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));
+ const select=document.querySelector('select[aria-label="commitParent"]');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));
  await wait(()=>button('added · parent-two.txt'));
  if(document.querySelector('.vcs-text-comparison'))throw Error('Old parent diff retained');
  if(calls.at(-1).payload.parentIndex!==1)throw Error('Parent selection not forwarded');
