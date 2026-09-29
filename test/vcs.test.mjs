@@ -156,6 +156,14 @@ test('historical special files remain bounded and never follow link or submodule
  const large=await compare('large.txt');assert.equal(large.right.text,'');assert.match(large.notice,/2 MiB/);
  const link=await compare('link.txt');assert.equal(link.right.text,'/outside/private-file');assert.match(link.notice,/not followed/);
  const submodule=await compare('submodule');assert.equal(submodule.right.text,seed);assert.match(submodule.notice,/not loaded/);
+ for(const [base,target,side,emptySide] of [[seed,commitId,'right','left'],[commitId,seed,'left','right']]){
+  const revisions=await getRevisionChanges(repo,{base,target});
+  const read=name=>getRevisionComparison(repo,{base,target,id:revisions.changes.find(row=>row.path===name).id});
+  const binary=await read('binary.dat');assert.equal(binary.binary,true);assert.equal(binary[emptySide].text,'');
+  const large=await read('large.txt');assert.equal(large[side].text,'');assert.match(large.notice,/2 MiB/);
+  const link=await read('link.txt');assert.equal(link[side].text,'/outside/private-file');assert.match(link.notice,/not followed/);assert.equal(link[emptySide].text,'');
+  const submodule=await read('submodule');assert.equal(submodule[side].text,seed);assert.match(submodule.notice,/not loaded/);assert.equal(submodule[emptySide].text,'');
+ }
  assert.deepEqual({head:cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),index:cmd(root,'git',['ls-files','--stage']).stdout,status:cmd(root,'git',['status','--porcelain']).stdout,target:await fs.readFile(path.join(root,'target.txt'),'utf8')},before);
 });
 
