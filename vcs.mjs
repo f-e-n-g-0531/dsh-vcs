@@ -329,6 +329,27 @@ async function working(root, relative, svnLink = false) {
   try { const info = await handle.stat(); if (!info.isFile()) throw new Error('Not a regular file'); const buffer = Buffer.alloc(MAX_TEXT + 1); const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0); await confined(root, relative); return decode(buffer.subarray(0, bytesRead)); } finally { await handle.close(); }
 }
 async function gitBlob(root, revision, file) { return content(() => git(root, ['show', '--no-ext-diff', '--no-textconv', revision + ':' + file], MAX_TEXT)); }
+async function historicalBlob(root,revision,file,signal){
+  const listing=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,{signal})).toString('utf8');
+  const records=listing.split(String.fromCharCode(0)).filter(Boolean);
+  const record=records.find(row=>row.slice(row.indexOf('	')+1)===file);
+  if(!record)throw new Error('Historical path missing');
+  const [mode,type,oid]=record.slice(0,record.indexOf('	')).split(' ');
+  if(mode==='160000')return {text:oid,notice:'Submodule commit reference; repository contents are not loaded.'};
+  if(type!=='blob'||!['100644','100755','120000'].includes(mode))return {text:'',notice:'Unsupported historical object type.'};
+  const result=await content(()=>git(root,['cat-file','blob',oid],MAX_TEXT,{signal}));
+  if(mode==='120000')result.notice=[result.notice,'Symbolic link target text; not followed.'].filter(Boolean).join(' ');
+  return result;
+}
+export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal}={}){
+  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+  const details=await getCommitDetails(repo,{commit,parentIndex,signal});
+  const entry=details.changes.find(row=>row.id===id);
+  if(!entry)throw new Error('Historical change is not part of selected commit and parent');
+  const left=details.parent&&entry.status!=='added'?await historicalBlob(repo.root,details.parent,entry.oldPath||entry.path,signal):{text:''};
+  const right=entry.status!=='deleted'?await historicalBlob(repo.root,commit,entry.path,signal):{text:''};
+  return {...entry,left:{...left,label:details.parent||'Empty tree'},right:{...right,label:commit},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
+}
 async function properties(root, file, base) {
   const result = parseXML(await svn(root, ['proplist', '--xml', '--verbose', ...(base ? ['--revision', 'BASE'] : []), '--', file + '@']));
   const props = Object.create(null);

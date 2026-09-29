@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -17,6 +17,19 @@ async function gitRepo(t) { const root = await temp(t); cmd(root, 'git', ['init'
 async function write(root, name, value) { await fs.writeFile(path.join(root, name), value); }
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
+
+test('historical comparison reads committed blobs not working files',async t=>{
+ const root=await gitRepo(t);await write(root,'a.txt','before');commit(root);const repo=await detectRepository(root);
+ const head=()=>cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ const compare=async()=>{const detail=await getCommitDetails(repo,{commit:head()});return getCommitComparison(repo,{commit:head(),id:detail.changes[0].id});};
+ let result=await compare();assert.equal(result.left.text,'');assert.equal(result.right.text,'before');
+ cmd(root,'git',['mv','a.txt','b.txt']);commit(root);await write(root,'b.txt','uncommitted');
+ result=await compare();assert.equal(result.left.text,'before');assert.equal(result.right.text,'before');assert.equal(result.oldPath,'a.txt');
+ const detail=await getCommitDetails(repo,{commit:head()});await assert.rejects(getCommitComparison(repo,{commit:head(),id:'0'.repeat(64)}),/not part/);
+ await fs.unlink(path.join(root,'b.txt'));commit(root);result=await compare();assert.equal(result.left.text,'before');assert.equal(result.right.text,'');
+ await assert.rejects(getCommitComparison(repo,{commit:head(),id:detail.changes[0].id}),/not part/);
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,'');
+});
 
 test('commit details cover root rename deletion and selected merge parent',async t=>{
  const root=await gitRepo(t);await write(root,'old name.txt','content');commit(root);const repo=await detectRepository(root);
