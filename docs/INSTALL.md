@@ -12,6 +12,10 @@ dsh plugin --profile web add @feng0531/dsh-vcs@0.3.21
 
 不要同时保留新旧包；安装后由用户重启。回滚时先移除 @feng0531/dsh-vcs，再安装旧版 tgz。
 
+## 验证已有候选包
+
+在源码检出目录运行 `npm run test:install -- <local-tarball.tgz>` 可直接验证指定的本地候选文件，不重新打包。脚本打印所测文件的 SHA-256，在临时目录中仅安装生产依赖，并以桩宿主验证入口注册；不会更新日常 DSH profile，也不代表真实 GUI 验收。仅对可信的本项目候选包执行。省略参数仍按原流程先打包再验证。
+
 ## 安装前
 
 - 确认 Node.js >=22、DSH Web 接口兼容、Git/SVN 可执行文件可用。
