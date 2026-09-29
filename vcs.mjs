@@ -253,7 +253,11 @@ export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
   if(parentIndex>=Math.max(1,metadata.parents.length))throw new Error('Invalid parent index');
   const parent=metadata.parents[parentIndex]??null;
   const args=['diff-tree','--no-commit-id','--name-status','-z','-r','--no-ext-diff','--no-textconv','--find-renames',...(parent?[parent,commit]:['--root',commit]),'--'];
-  const fields=(await git(repo.root,args,MAX_TEXT,{signal})).toString('utf8').split(String.fromCharCode(0));
+  const changes=parseCommitChanges((await git(repo.root,args,MAX_TEXT,{signal})).toString('utf8'),commit+':'+(parent||'root'));
+  return {...metadata,parent,parentIndex,changes};
+}
+function parseCommitChanges(text,scope){
+  const fields=text.split(String.fromCharCode(0));
   if(fields.pop()!=='')throw new Error('Truncated commit changes');
   const changes=[];
   for(let i=0;i<fields.length;){
@@ -262,10 +266,23 @@ export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
     const first=fields[i++],renamed=/^[RC]/.test(code),file=renamed?fields[i++]:first;
     if(!first||!file)throw new Error('Truncated commit path');
     const entry={path:file,...(renamed?{oldPath:first}:{}),status:statuses[code[0]]||'modified'};
-    changes.push({...entry,id:identity(entry,commit+':'+(parent||'root'))});
+    changes.push({...entry,id:identity(entry,scope)});
     if(changes.length>10000)throw new Error('Commit exceeds file count limit');
   }
-  return {...metadata,parent,parentIndex,changes};
+  return changes;
+}
+export async function getRevisionChanges(repo,{base,target,signal}={}){
+  for(const oid of [base,target])if(typeof oid!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))throw new Error('Invalid revision commit id');
+  signal?.throwIfAborted();repo=await checkedRepo(repo,signal);
+  if(repo.type!=='git')throw new Error('Revision comparison supports Git only');
+  for(const oid of new Set([base,target])){
+    const type=(await git(repo.root,['cat-file','-t',oid],MAX_TEXT,{signal})).toString('utf8').trim();
+    if(type!=='commit')throw new Error('Commit object required');
+  }
+  const args=['diff-tree','--no-commit-id','--name-status','-z','-r','--no-ext-diff','--no-textconv','--find-renames',base,target,'--'];
+  const scope=JSON.stringify(['revision',repo.root,base,target]);
+  const changes=parseCommitChanges((await git(repo.root,args,MAX_TEXT,{signal})).toString('utf8'),scope);
+  return {base,target,changes};
 }
 function modeFor(repo, mode) {
   if (!['all', 'staged', 'unstaged'].includes(mode)) throw new Error('Invalid comparison mode');

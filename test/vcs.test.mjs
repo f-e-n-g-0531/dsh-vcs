@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -18,6 +18,23 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('local revision change lists bind direction and reject non-commit objects',async t=>{
+ const root=await gitRepo(t);await write(root,'one.txt','before');commit(root);
+ const base=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await write(root,'one.txt','after');await write(root,'added.txt','new');commit(root);
+ const target=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ await write(root,'one.txt','working');const before=cmd(root,'git',['status','--porcelain']).stdout;
+ const forward=await getRevisionChanges(repo,{base,target}),reverse=await getRevisionChanges(repo,{base:target,target:base});
+ assert.equal(forward.changes.find(c=>c.path==='added.txt').status,'added');
+ assert.equal(reverse.changes.find(c=>c.path==='added.txt').status,'deleted');
+ assert.notEqual(forward.changes.find(c=>c.path==='one.txt').id,reverse.changes.find(c=>c.path==='one.txt').id);
+ assert.deepEqual((await getRevisionChanges(repo,{base,target:base})).changes,[]);
+ const blob=cmd(root,'git',['rev-parse',base+':one.txt']).stdout.trim();
+ await assert.rejects(getRevisionChanges(repo,{base:blob,target}),/Commit object required/);
+ await assert.rejects(getRevisionChanges(repo,{base:'HEAD',target}),/Invalid revision/);
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,before);
+ assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),target);
+});
 test('historical comparisons preserve nested Unicode and punctuation paths',async t=>{
  const root=await gitRepo(t);
  const names=['nested/中文 空格.txt','nested/[literal].txt','-leading.txt','same.txt','nested/same.txt'];
