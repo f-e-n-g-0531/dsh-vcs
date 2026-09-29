@@ -30,6 +30,15 @@ test('blame reads committed UTF8 lines with original attribution and bounded out
  const bounded=await getFileBlame(repo,{commit:latest,id:large.changes[0].id});assert.equal(bounded.lines.length,500);assert.equal(bounded.truncated,true);
  await assert.rejects(getFileBlame(repo,{commit:head,id:'f'.repeat(64)}),/selected commit/);
 });
+test('blame preserves CRLF blank lines tabs and final unterminated line on literal paths',async t=>{
+ const root=await gitRepo(t),name='[中文].txt';await write(root,name,'first\r\n\r\n\tlast');await write(root,'中.txt','different file');commit(root);
+ const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root),detail=await getCommitDetails(repo,{commit:head});
+ const result=await getFileBlame(repo,{commit:head,id:detail.changes.find(c=>c.path===name).id});
+ assert.deepEqual(result.lines.map(r=>r.text),['first\r','\r','\tlast']);assert.deepEqual(result.lines.map(r=>r.line),[1,2,3]);assert.ok(result.lines.every(r=>r.commit===head));assert.equal(result.truncated,false);
+ await write(root,'exact.txt',Array(500).fill('x').join('\n')+'\n');commit(root);
+ const exact=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),change=await getCommitDetails(repo,{commit:exact});const boundary=await getFileBlame(repo,{commit:exact,id:change.changes[0].id});
+ assert.equal(boundary.lines.length,500);assert.equal(boundary.truncated,false);
+});
 test('blame refuses configured external ignore-revision files without modifying config',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','source');commit(root);
  const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root),detail=await getCommitDetails(repo,{commit:head});
