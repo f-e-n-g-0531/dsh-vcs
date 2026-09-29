@@ -57,3 +57,15 @@ test('PNG gate rejects non-raster signatures corruption truncation animation and
  const corrupt=Buffer.from(valid);corrupt[45]^=1;assert.throws(()=>inspectPng(corrupt),/CRC/);
  const header=Buffer.from(valid.subarray(16,29));header.writeUInt32BE(8193);assert.throws(()=>inspectPng(Buffer.concat([valid.subarray(0,8),chunk('IHDR',header),valid.subarray(33)])),/dimensions/);
 });
+
+test('PNG validation caps concurrent work and releases slots after success failure and cancellation',async()=>{
+ const image=Buffer.concat([valid.subarray(0,33),chunk('IDAT',deflateSync(Buffer.from([0,255,255]))),chunk('IEND',Buffer.alloc(0))]);
+ const controller=new AbortController();
+ const first=validatePng(image),second=validatePng(image,{signal:controller.signal});
+ const cancelled=assert.rejects(second,{name:'AbortError'});
+ await assert.rejects(validatePng(image),{code:'IMAGE_BUSY'});controller.abort();await cancelled;await first;
+ await assert.rejects(validatePng(Buffer.from('invalid')));
+ const bad=Buffer.concat([valid.subarray(0,33),chunk('IDAT',Buffer.from('bad stream')),chunk('IEND',Buffer.alloc(0))]);
+ await assert.rejects(validatePng(bad));
+ const recovered=await Promise.all([validatePng(image),validatePng(image)]);assert.equal(recovered.length,2);
+});

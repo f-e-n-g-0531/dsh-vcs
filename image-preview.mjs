@@ -59,7 +59,15 @@ export async function preparePng(buffer,options){
  return {...metadata,bytes:data.length,originalBytes:metadata.bytes,data,metadataStripped:data.length!==buffer.length};
 }
 
+// Fail fast instead of retaining an unbounded queue of image buffers.
+let activeValidations=0;
 export async function validatePng(buffer,{signal}={}){
+ signal?.throwIfAborted();
+ if(activeValidations>=2)throw Object.assign(new Error('Image validation busy; retry shortly'),{code:'IMAGE_BUSY'});
+ activeValidations++;
+ try{return await validatePngStream(buffer,{signal});}finally{activeValidations--;}
+}
+async function validatePngStream(buffer,{signal}){
  signal?.throwIfAborted();
  const metadata=inspectPng(buffer);
  const depth=buffer[24],color=buffer[25];
