@@ -10,6 +10,23 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+for(const [endpoint,method] of [['vcs/revision-changes','getRevisionChanges'],['vcs/revision-compare','getRevisionComparison']]){
+ test(endpoint+' enforces grants strict fields and forwards immutable versions',async()=>{
+  const controller=new AbortController();let count=0;
+  const p={...payload,base:'a'.repeat(40),target:'b'.repeat(40),...(endpoint.endsWith('compare')?{id:'c'.repeat(64)}:{})};
+  const h=setup({[method]:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.equal(o.base,p.base);assert.equal(o.target,p.target);assert.equal(o.signal,controller.signal);if(p.id)assert.equal(o.id,p.id);return {changes:[]};}});
+  assert.equal((await h.call(endpoint,p)).error.code,'vcs/rediscover-required');await h.discover();
+  for(const extra of [{root:'/evil'},{path:'file'},{mode:'all'},{base:'HEAD'},{target:null},{target:'--all'},{base:undefined},...(p.id?[{id:'forged'}]:[{id:'c'.repeat(64)}])])assert.equal((await h.call(endpoint,{...p,...extra})).error.code,'vcs/invalid-request');
+  assert.equal(count,0);assert.equal((await h.call(endpoint,{...p,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
+  assert.equal((await h.call(endpoint,p,controller.signal)).ok,true);assert.equal(count,1);
+  h.expire();assert.equal((await h.call(endpoint,p)).error.code,'vcs/rediscover-required');
+ });
+ test(endpoint+' discards cwd-stale and cancelled results',async()=>{
+  const p={...payload,base:'a'.repeat(40),target:'b'.repeat(40),...(endpoint.endsWith('compare')?{id:'c'.repeat(64)}:{})};
+  const h=setup({[method]:async()=>{h.move();return {};}});await h.discover();assert.equal((await h.call(endpoint,p)).error.code,'vcs/rediscover-required');
+  const controller=new AbortController(),cancel=setup({[method]:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call(endpoint,p,controller.signal)).error.code,'vcs/cancelled');
+ });
+}
 test('history requires per-session grants and rejects roots and invalid arguments',async()=>{
  const h=setup();assert.equal((await h.call('vcs/history',payload)).error.code,'vcs/rediscover-required');await h.discover();
  for(const extra of [{root:'/evil'},{mode:'all'},{snapshot:'--all'},{offset:-1},{limit:101},{offset:0.5},{offset:null},{limit:null}])assert.equal((await h.call('vcs/history',{...payload,...extra})).error.code,'vcs/invalid-request');
