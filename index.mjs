@@ -24,7 +24,7 @@ const rediscover = () => Object.assign(new Error('Repository authorization is mi
 
 function validatePayload(endpoint, payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw invalid('An object payload is required.');
-  const fields = endpoint==='vcs/commit-image'?['sessionId','repositoryId','commit','parentIndex','id','side'] : endpoint==='vcs/tree'?['sessionId','repositoryId','commit'] : endpoint==='vcs/file-history'?['sessionId','repositoryId','commit','parentIndex','id','offset','limit'] : ['vcs/revision-changes','vcs/revision-compare'].includes(endpoint) ? ['sessionId','repositoryId','base','target',...(endpoint==='vcs/revision-compare'?['id']:[])] : ['vcs/commit-compare','vcs/blame'].includes(endpoint) ? ['sessionId','repositoryId','commit','parentIndex','id'] : endpoint === 'vcs/commit' ? ['sessionId','repositoryId','commit','parentIndex'] : endpoint === 'vcs/history' ? ['sessionId','repositoryId','snapshot','offset','limit'] : endpoint === 'vcs/repositories' ? ['sessionId', 'subdirectory'] : ['sessionId', 'repositoryId', 'mode', ...(endpoint === 'vcs/compare' ? ['id'] : [])];
+  const fields = endpoint==='vcs/references'?['sessionId','repositoryId'] : endpoint==='vcs/commit-image'?['sessionId','repositoryId','commit','parentIndex','id','side'] : endpoint==='vcs/tree'?['sessionId','repositoryId','commit'] : endpoint==='vcs/file-history'?['sessionId','repositoryId','commit','parentIndex','id','offset','limit'] : ['vcs/revision-changes','vcs/revision-compare'].includes(endpoint) ? ['sessionId','repositoryId','base','target',...(endpoint==='vcs/revision-compare'?['id']:[])] : ['vcs/commit-compare','vcs/blame'].includes(endpoint) ? ['sessionId','repositoryId','commit','parentIndex','id'] : endpoint === 'vcs/commit' ? ['sessionId','repositoryId','commit','parentIndex'] : endpoint === 'vcs/history' ? ['sessionId','repositoryId','snapshot','offset','limit'] : endpoint === 'vcs/repositories' ? ['sessionId', 'subdirectory'] : ['sessionId', 'repositoryId', 'mode', ...(endpoint === 'vcs/compare' ? ['id'] : [])];
   if (Object.keys(payload).some(key => !fields.includes(key))) throw invalid('Only Session-addressed repository requests are supported; unknown payload field.');
   if (endpoint === 'vcs/repositories') {
     if (payload.subdirectory !== undefined) {
@@ -69,7 +69,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
     if (current(sessionId, latest) !== entry || latest !== cwd) throw rediscover();
   }
   return async (endpoint, payload, signal) => {
-    if (!['vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/commit-image'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
+    if (!['vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/commit-image', 'vcs/references'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
     let imageSlot=false;
@@ -115,12 +115,14 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       if (repository.type === 'svn' && mode !== 'all') throw invalid('SVN supports only all mode.');
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
-      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/commit-image'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
+      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/commit-image','vcs/references'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
       if(endpoint==='vcs/commit-image'){
         if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');
         activeImages++;imageSlot=true;
       }
-      const value = endpoint === 'vcs/commit-image'
+      const value = endpoint === 'vcs/references'
+        ? await api.listReferences({...repository},{signal})
+        : endpoint === 'vcs/commit-image'
         ? await api.getCommitImage({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,side:payload.side??'right',signal})
         : endpoint === 'vcs/tree'
         ? await api.getHistoricalTree({...repository},{commit:payload.commit,signal})

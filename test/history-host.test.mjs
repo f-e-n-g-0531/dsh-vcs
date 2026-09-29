@@ -10,6 +10,17 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('references RPC requires grants rejects options and discards stale results',async()=>{
+ const controller=new AbortController();let calls=0;
+ const h=setup({listReferences:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{signal:controller.signal});return {references:[]};}});
+ assert.equal((await h.call('vcs/references',payload)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{path:'secret'},{prefix:'refs/remotes/'},{url:'https://example.com'},{limit:1},{commit:'a'.repeat(40)},{mode:'all'}])assert.equal((await h.call('vcs/references',{...payload,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(calls,0);assert.equal((await h.call('vcs/references',{...payload,sessionId:'foreign'})).error.code,'vcs/rediscover-required');assert.deepEqual((await h.call('vcs/references',payload,controller.signal)).value,{references:[]});
+ h.expire();assert.equal((await h.call('vcs/references',payload)).error.code,'vcs/rediscover-required');
+ const moved=setup({listReferences:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/references',payload)).error.code,'vcs/rediscover-required');
+ const cancel=setup({listReferences:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/references',payload,controller.signal)).error.code,'vcs/cancelled');
+ const svn=setup({discoverRepositories:async()=>({repositories:[{...repo,type:'svn'}],warnings:[]}),listReferences:async()=>{throw Error('Must not call');}});await svn.discover();assert.equal((await svn.call('vcs/references',payload)).error.code,'vcs/invalid-request');
+});
 for(const [endpoint,method] of [['vcs/revision-changes','getRevisionChanges'],['vcs/revision-compare','getRevisionComparison']]){
  test(endpoint+' enforces grants strict fields and forwards immutable versions',async()=>{
   const controller=new AbortController();let count=0;
