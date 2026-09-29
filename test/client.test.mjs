@@ -115,7 +115,7 @@ test('review filters can reset search and status together',async()=>{
 
 test('review search supports focus and clear keyboard shortcuts',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
- assert.match(source,/searchNode/);assert.match(source,/key\.toLowerCase\(\)==='f'/);assert.match(source,/key==='Escape'/);
+ assert.match(source,/reviewShortcut/);assert.match(source,/action==='search'/);assert.match(source,/action==='clear'/);
 });
 
 test('review header exposes a safe copy-path control',async()=>{
@@ -130,7 +130,7 @@ test('tree controls can reveal and focus the selected nested file',async()=>{
 
 test('review file navigation supports Alt arrow shortcuts outside text inputs',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
- assert.match(source,/e\.altKey/);assert.match(source,/ArrowLeft/);assert.match(source,/ArrowRight/);assert.match(source,/selectAdjacent\(e\.key==='ArrowLeft'/);
+ assert.match(source,/reviewShortcut\(e,panelNode.current,searchNode.current/);assert.match(source,/selectAdjacent\(action\)/);assert.match(source,/ref=\{panelNode\}/);
 });
 
 test('binary comparison notice identifies the compared sides',async()=>{
