@@ -52,6 +52,17 @@ test('VCS page renders no-session state without repository reads during render',
   assert.match(html,/先打开一个项目会话/);
 });
 
+test('active session renders before discovery without RPC or browser globals',async()=>{
+  const {registrations}=await loadClient();
+  const Page=registrations.find(r=>r.options.name==='main').component;
+  const session={id:'review-session',cwd:'/workspace/中文 project',retainedBy:{mainView:1}};
+  const html=renderToString(React.createElement(Page,{useSessions:select=>select({byId:{[session.id]:session}})}));
+  assert.doesNotMatch(html,/先打开一个项目会话/);
+  assert.match(html,/vcs-status-filter/);
+  assert.match(html,/重命名/);
+  assert.match(html,/vcs-editor/);
+});
+
 test('built page renders seven localized status filters with one active selection',async()=>{
   const {registrations,locale}=await loadClient();
   const Page=registrations.find(r=>r.options.name==='main').component;
