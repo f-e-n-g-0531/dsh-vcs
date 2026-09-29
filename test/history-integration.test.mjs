@@ -21,6 +21,11 @@ test('real authorized RPC traverses history details and committed diff',async t=
  const detail=await read('vcs/commit',{commit:history.commits[0].id});assert.equal(detail.changes.length,1);
  const result=await read('vcs/commit-compare',{commit:detail.id,id:detail.changes[0].id});assert.equal(result.left.text,'before');assert.equal(result.right.text,'after');
  const next=await read('vcs/history',{snapshot:history.snapshot,offset:1,limit:1});assert.equal(next.commits.length,1);assert.equal(next.nextOffset,null);
+ const tree=await read('vcs/tree',{commit:detail.id});assert.equal(tree.commit,detail.id);
+ assert.deepEqual(tree.entries,[{path:'file.txt',mode:'100644',type:'blob',oid:git(['rev-parse',detail.id+':file.txt']).trim()}]);
+ assert.equal((await handler('vcs/tree',{...p,commit:detail.id,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
+ assert.equal((await handler('vcs/tree',{...p,commit:detail.id,path:'file.txt'})).error.code,'vcs/invalid-request');
+ assert.equal((await handler('vcs/tree',{...p,commit:tree.entries[0].oid})).ok,false);
  const blameArgs={commit:detail.id,id:detail.changes[0].id};
  const blame=await read('vcs/blame',blameArgs);
  assert.equal(blame.path,'file.txt');assert.equal(blame.commit,detail.id);assert.equal(blame.truncated,false);
