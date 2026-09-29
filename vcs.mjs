@@ -212,9 +212,11 @@ export async function discoverRepositories(cwd, { signal, maxDepth = 6, maxDirec
   return result;
 }
 
-async function checkedRepo(repo) {
+async function checkedRepo(repo, signal) {
+  signal?.throwIfAborted();
   if (!repo || !['git', 'svn'].includes(repo.type) || typeof repo.root !== 'string') throw new Error('Invalid repository');
-  const found = await repositoryAt(repo.root, repo.type);
+  const found = await repositoryAt(repo.root, repo.type, () => ({signal}));
+  signal?.throwIfAborted();
   if (!found || found.type !== repo.type || path.resolve(found.root) !== path.resolve(repo.root)) throw new Error('Repository root changed or is invalid');
   return found;
 }
@@ -222,7 +224,7 @@ export async function listHistory(repo, {snapshot,offset=0,limit=50,signal} = {}
   if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100) throw new Error('Invalid history pagination');
   if(snapshot!==undefined && (typeof snapshot!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(snapshot))) throw new Error('Invalid history snapshot');
   if(signal?.aborted) throw Object.assign(new Error('History cancelled'),{code:'ABORT_ERR'});
-  repo=await checkedRepo(repo);
+  repo=await checkedRepo(repo,signal);
   if(repo.type!=='git') throw new Error('History currently supports Git only');
   if(!snapshot){
     try{snapshot=(await git(repo.root,['rev-parse','--verify','HEAD^{commit}'],MAX_TEXT,{signal})).toString('utf8').trim();}
@@ -243,7 +245,7 @@ export async function getCommitDetails(repo,{commit,parentIndex=0,signal}={}) {
   if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');
   if(!Number.isInteger(parentIndex)||parentIndex<0)throw new Error('Invalid parent index');
   signal?.throwIfAborted();
-  repo=await checkedRepo(repo);
+  repo=await checkedRepo(repo,signal);
   if(repo.type!=='git')throw new Error('Commit details support Git only');
   const raw=await git(repo.root,['log','-z','--no-show-signature','--encoding=UTF-8','--max-count=1','--format='+HISTORY_FORMAT,commit,'--'],MAX_TEXT,{signal});
   const metadata=parseHistory(raw.toString('utf8'),1)[0];

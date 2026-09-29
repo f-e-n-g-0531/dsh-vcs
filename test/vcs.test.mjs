@@ -18,6 +18,14 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('cancelled historical requests stop before probing even nonexistent roots',async()=>{
+ const controller=new AbortController();controller.abort();
+ const repo={type:'git',root:path.join(os.tmpdir(),'absent-history-root')};
+ const commit='a'.repeat(40),id='b'.repeat(64);
+ await assert.rejects(listHistory(repo,{signal:controller.signal}),{code:'ABORT_ERR'});
+ await assert.rejects(getCommitDetails(repo,{commit,signal:controller.signal}),{name:'AbortError'});
+ await assert.rejects(getCommitComparison(repo,{commit,id,signal:controller.signal}),{name:'AbortError'});
+});
 test('partial clone history never hydrates missing promised blobs',async t=>{
  const source=await gitRepo(t);await write(source,'promised.txt','remote only payload');commit(source);
  cmd(source,'git',['config','uploadpack.allowFilter','true']);
