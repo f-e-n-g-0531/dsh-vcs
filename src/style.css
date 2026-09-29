@@ -31,8 +31,8 @@
 .vcs-root .vcs-filter{display:flex;gap:5px;padding:10px}
 .vcs-root .vcs-filter input{min-width:0;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);padding:7px 9px}
 .vcs-root .vcs-clear-filter{font-size:11px;white-space:nowrap;padding:4px 6px}
-.vcs-root .vcs-status-filter{display:flex;gap:4px;overflow:auto;padding:0 10px 8px}
-.vcs-root .vcs-status-filter button{font-size:11px;white-space:nowrap;padding:3px 6px}
+.vcs-root .vcs-status-filter{display:flex;flex-wrap:wrap;flex-shrink:0;gap:4px;overflow:visible;padding:0 10px 8px}
+.vcs-root .vcs-status-filter button{font-size:11px;flex:0 0 auto;white-space:nowrap;padding:3px 6px}
 .vcs-root .vcs-status-filter button[aria-pressed=true]{background:var(--dsw-alias-interactive-bg-active);color:var(--dsw-alias-label-primary)}
 .vcs-root .vcs-status-filter small{font-size:10px;color:var(--dsw-alias-label-tertiary)}
 .vcs-root .vcs-count{display:flex;align-items:center;gap:8px;padding:0 10px 8px;color:var(--dsw-alias-label-secondary)}

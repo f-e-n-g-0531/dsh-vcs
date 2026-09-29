@@ -118,3 +118,10 @@ test('CI installs the development dependencies required by build and tests',asyn
  const workflow=await readFile(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8');
  assert.match(workflow,/npm ci --include=dev/);
 });
+
+test('status filters wrap without shrinking or clipping controls',async()=>{
+ const css=await readFile(new URL('../src/style.css',import.meta.url),'utf8');
+ assert.match(css,/\.vcs-status-filter\{[^}]*flex-wrap:wrap/);
+ assert.match(css,/\.vcs-status-filter\{[^}]*flex-shrink:0/);
+ assert.match(css,/\.vcs-status-filter button\{[^}]*flex:0 0 auto/);
+});
