@@ -3,11 +3,12 @@ import {createRoot} from 'react-dom/client';
 import RevisionPanel from '../src/RevisionPanel.jsx';
 export async function checkRevisions(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
- const a='a'.repeat(40),b='b'.repeat(40);let delayed,oldSignal;const calls=[];
+ const a='a'.repeat(40),b='b'.repeat(40);let delayed,oldSignal,refLoads=0;const calls=[];
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Revision UI timeout');};
  const button=text=>[...host.querySelectorAll('button')].find(n=>n.textContent.includes(text));
  const rpc=async(endpoint,p,signal)=>{
   calls.push({endpoint,p});
+  if(endpoint==='vcs/references'){refLoads++;if(refLoads===3)throw Error('refs unavailable');return {references:[{name:'refs/heads/topic',commit:(refLoads===1?'e':'f').repeat(40),kind:'branch'}]};}
   if(endpoint==='vcs/revision-changes'){
    if(p.base===p.target)return {changes:[]};
    if(p.base===b){oldSignal=signal;return new Promise(resolve=>delayed=resolve);}
@@ -35,5 +36,14 @@ export async function checkRevisions(){
  delayed({changes:[{id:'d'.repeat(64),path:'STALE.txt',status:'modified'}]});
  await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE'))throw Error('Stale response rendered');
  if(calls.length!==5)throw Error('Unexpected revision RPC count: '+calls.length);
+ if(refLoads)throw Error('References fetched without opt-in');
+ const hasOption=id=>[...host.querySelectorAll('option')].some(o=>o.value===id);
+ button('revisionLoadRefs').click();await wait(()=>hasOption('e'.repeat(40)));
+ choose(0,'e'.repeat(40));await wait(()=>button('pair.txt'));const pinned=calls.at(-1);if(pinned.p.base!=='e'.repeat(40)||pinned.p.target!==a)throw Error('Reference comparison did not pin OID');
+ const comparisons=calls.filter(c=>c.endpoint==='vcs/revision-changes').length;
+ button('revisionLoadRefs').click();await wait(()=>hasOption('f'.repeat(40)));
+ if(host.querySelectorAll('select')[0].value!=='e'.repeat(40)||calls.filter(c=>c.endpoint==='vcs/revision-changes').length!==comparisons)throw Error('Moving reference changed pinned comparison');
+ button('revisionLoadRefs').click();await wait(()=>host.textContent.includes('refs unavailable'));if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Reference failure cleared selection');
+ button('revisionLoadRefs').click();await wait(()=>refLoads===4&&!host.querySelector('[role=alert]'));
  }finally{root.unmount();host.remove();}
 }
