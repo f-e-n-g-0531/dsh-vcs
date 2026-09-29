@@ -3,12 +3,12 @@ import {createRoot} from 'react-dom/client';
 import RevisionPanel from '../src/RevisionPanel.jsx';
 export async function checkRevisions(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
- const a='a'.repeat(40),b='b'.repeat(40);let delayed,oldSignal,refLoads=0;const calls=[];
+ const a='a'.repeat(40),b='b'.repeat(40);let delayed,oldSignal,refLoads=0,refResolve,refSignal;const calls=[];
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Revision UI timeout');};
  const button=text=>[...host.querySelectorAll('button')].find(n=>n.textContent.includes(text));
  const rpc=async(endpoint,p,signal)=>{
   calls.push({endpoint,p});
-  if(endpoint==='vcs/references'){refLoads++;if(refLoads===3)throw Error('refs unavailable');return {references:[{name:'refs/heads/topic',commit:(refLoads===1?'e':'f').repeat(40),kind:'branch'}]};}
+  if(endpoint==='vcs/references'){refLoads++;if(refLoads>=5){refSignal=signal;return new Promise(resolve=>refResolve=resolve);}if(refLoads===3)throw Error('refs unavailable');return {references:[{name:'refs/heads/topic',commit:(refLoads===1?'e':'f').repeat(40),kind:'branch'}]};}
   if(endpoint==='vcs/revision-changes'){
    if(p.base===p.target)return {changes:[]};
    if(p.base===b){oldSignal=signal;return new Promise(resolve=>delayed=resolve);}
@@ -45,5 +45,15 @@ export async function checkRevisions(){
  if(host.querySelectorAll('select')[0].value!=='e'.repeat(40)||calls.filter(c=>c.endpoint==='vcs/revision-changes').length!==comparisons)throw Error('Moving reference changed pinned comparison');
  button('revisionLoadRefs').click();await wait(()=>host.textContent.includes('refs unavailable'));if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Reference failure cleared selection');
  button('revisionLoadRefs').click();await wait(()=>refLoads===4&&!host.querySelector('[role=alert]'));
+ button('revisionLoadRefs').click();await wait(()=>refResolve);
+ for(const [sessionId,repositoryId] of [['other','r'],['other','new-repo']]){
+  const oldResolve=refResolve,signal=refSignal,count=calls.length;
+  root.render(<RevisionPanel commits={[{id:a,subject:'first'}]} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
+  await wait(()=>signal.aborted);
+  if([...host.querySelectorAll('select')].some(s=>s.value)||hasOption('f'.repeat(40))||hasOption('e'.repeat(40))||button('pair.txt')||calls.length!==count)throw Error('Scope change retained selections or auto-loaded refs');
+  oldResolve({references:[{name:'refs/heads/STALE-REF',commit:'d'.repeat(40)}]});await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE-REF'))throw Error('Late refs survived scope change');
+  refResolve=null;button('revisionLoadRefs').click();await wait(()=>refResolve);
+ }
+ root.render(null);await wait(()=>refSignal.aborted);refResolve({references:[]});
  }finally{root.unmount();host.remove();}
 }

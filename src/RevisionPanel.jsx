@@ -16,7 +16,10 @@ function RevisionFiles({sessionId,repositoryId,base,target,rpc,t,onRediscover}){
  {!data.changes.length&&<p>{t('revisionEmpty')}</p>}<ul>{files.map(file=><li key={file.id}><button aria-pressed={selected===file.id} onClick={()=>setSelected(file.id)}>{file.status} · {file.oldPath?file.oldPath+' → ':''}{file.path}</button></li>)}</ul>
  {selected&&<HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} base={base} target={target} id={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}</div>;
 }
-export default function RevisionPanel({commits,sessionId,repositoryId,rpc,t,onRediscover}){
+export default function RevisionPanel(props){
+ return <ScopedRevisionPanel key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;
+}
+function ScopedRevisionPanel({commits,sessionId,repositoryId,rpc,t,onRediscover}){
  const [base,setBase]=useState(''),[target,setTarget]=useState('');
  const [refs,setRefs]=useState([]),[load,setLoad]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{
