@@ -20,6 +20,13 @@
 
 当前资源走 `/vcs-assets/` 固定精确路由，调用 DSH Connection 的认证检查。旧 `/api/vcs-assets/` 注册保留兼容，但客户端不依赖它。RPC 注册显式传入插件上下文，避免 Connection getter 上下文导致 webServer 注入错误。
 
+## 历史读取边界（开发中）
+
+- Git 历史 RPC 复用 Session 仓库授权，提交及父提交绑定的变更 ID 不能作为任意工作区路径使用。
+- 历史内容从对象库读取，不 checkout；符号链接仅显示目标文本，子模块仅显示对象引用。
+- Git 子进程设置 `GIT_NO_REPLACE_OBJECTS=1`，避免 replace refs 改写指定 SHA 的内容；真实替换对象回归已覆盖。
+- 设置 `GIT_NO_LAZY_FETCH=1` 并以空 `GIT_ALLOW_PROTOCOL` 禁止传输协议，防止缺失对象触发隐式远程获取；缺失对象应报错，不自动补齐。部分克隆的真实缺失对象专项回归仍待补充。
+
 ## 后续优先项
 
 1. 在实际 DSH 登录浏览器验证模块、Worker、主题和页面刷新。

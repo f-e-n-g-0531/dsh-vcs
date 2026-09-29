@@ -18,6 +18,20 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('history ignores replace refs so snapshots retain original contents',async t=>{
+ const root=await gitRepo(t);await write(root,'file.txt','original');commit(root);
+ const original=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ await write(root,'file.txt','replacement');commit(root);
+ const replacement=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ cmd(root,'git',['replace',original,replacement]);
+ assert.equal(cmd(root,'git',['show',original+':file.txt']).stdout,'replacement');
+ const repo=await detectRepository(root),details=await getCommitDetails(repo,{commit:original});
+ assert.deepEqual(details.parents,[]);
+ const result=await getCommitComparison(repo,{commit:original,id:details.changes[0].id});
+ assert.equal(result.right.text,'original');assert.equal(result.left.text,'');
+ assert.equal(cmd(root,'git',['replace','-l']).stdout.trim(),original);
+});
+
 test('historical special files remain bounded and never follow link or submodule targets',async t=>{
  const root=await gitRepo(t);
  await write(root,'seed.txt','seed');commit(root);
