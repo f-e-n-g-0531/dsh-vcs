@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkBlame} from './blame-browser.jsx';
 export {checkFileHistory} from './file-history-browser.jsx';
 export {checkRevisions} from './revision-browser.jsx';
 import {createRoot} from 'react-dom/client';

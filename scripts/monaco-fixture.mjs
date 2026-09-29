@@ -30,7 +30,8 @@ try{
  phase='react-controls';await (await import('./history-viewer-browser.js')).checkViewer();
  phase='revision-controls';await (await import('./history-viewer-browser.js')).checkRevisions();
  phase='file-history';await (await import('./history-viewer-browser.js')).checkFileHistory();
+ phase='blame';await (await import('./history-viewer-browser.js')).checkBlame();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls','revision-controls','file-history']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls','revision-controls','file-history','blame']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);
