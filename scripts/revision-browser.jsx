@@ -8,7 +8,7 @@ export async function checkRevisions(){
  const button=text=>[...host.querySelectorAll('button')].find(n=>n.textContent.includes(text));
  const rpc=async(endpoint,p,signal)=>{
   calls.push({endpoint,p});
-  if(endpoint==='vcs/references'){refLoads++;if(refLoads>=5){refSignal=signal;return new Promise(resolve=>refResolve=resolve);}if(refLoads===3)throw Error('refs unavailable');return {references:[{name:'refs/heads/topic',commit:(refLoads===1?'e':'f').repeat(40),kind:'branch'}]};}
+  if(endpoint==='vcs/references'){refLoads++;if(refLoads>=5){refSignal=signal;return new Promise(resolve=>refResolve=resolve);}if(refLoads===3)throw Error('refs unavailable');if(refLoads===4)return {references:[]};return {references:[{name:'refs/heads/topic',commit:(refLoads===1?'e':'f').repeat(40),kind:'branch'}]};}
   if(endpoint==='vcs/revision-changes'){
    if(p.base===p.target)return {changes:[]};
    if(p.base===b){oldSignal=signal;return new Promise(resolve=>delayed=resolve);}
@@ -39,12 +39,14 @@ export async function checkRevisions(){
  if(refLoads)throw Error('References fetched without opt-in');
  const hasOption=id=>[...host.querySelectorAll('option')].some(o=>o.value===id);
  button('revisionLoadRefs').click();await wait(()=>hasOption('e'.repeat(40)));
+ if(!host.textContent.includes('revisionRefsCount: 1'))throw Error('Missing loaded reference count');
  choose(0,'e'.repeat(40));await wait(()=>button('pair.txt'));const pinned=calls.at(-1);if(pinned.p.base!=='e'.repeat(40)||pinned.p.target!==a)throw Error('Reference comparison did not pin OID');
  const comparisons=calls.filter(c=>c.endpoint==='vcs/revision-changes').length;
  button('revisionLoadRefs').click();await wait(()=>hasOption('f'.repeat(40)));
  if(host.querySelectorAll('select')[0].value!=='e'.repeat(40)||calls.filter(c=>c.endpoint==='vcs/revision-changes').length!==comparisons)throw Error('Moving reference changed pinned comparison');
  button('revisionLoadRefs').click();await wait(()=>host.textContent.includes('refs unavailable'));if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Reference failure cleared selection');
- button('revisionLoadRefs').click();await wait(()=>refLoads===4&&!host.querySelector('[role=alert]'));
+ button('revisionLoadRefs').click();await wait(()=>refLoads===4&&host.textContent.includes('revisionRefsEmpty'));
+ if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Empty references cleared pinned selection');
  button('revisionLoadRefs').click();await wait(()=>refResolve);
  for(const [sessionId,repositoryId] of [['other','r'],['other','new-repo']]){
   const oldResolve=refResolve,signal=refSignal,count=calls.length;

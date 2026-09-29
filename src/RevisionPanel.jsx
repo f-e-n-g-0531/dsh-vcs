@@ -21,14 +21,15 @@ export default function RevisionPanel(props){
 }
 function ScopedRevisionPanel({commits,sessionId,repositoryId,rpc,t,onRediscover}){
  const [base,setBase]=useState(''),[target,setTarget]=useState('');
- const [refs,setRefs]=useState([]),[load,setLoad]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [refs,setRefs]=useState([]),[loaded,setLoaded]=useState(false),[load,setLoad]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{
   if(!load)return;const controller=new AbortController();setBusy(true);setError('');
-  rpc('vcs/references',{sessionId,repositoryId},controller.signal).then(value=>{if(!controller.signal.aborted)setRefs(value.references);}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
+  rpc('vcs/references',{sessionId,repositoryId},controller.signal).then(value=>{if(!controller.signal.aborted){setRefs(value.references);setLoaded(true);}}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,load]);
  return <section aria-label={t('revisionTitle')}><h3>{t('revisionTitle')}</h3><p>{t('revisionScope')}</p>
  <button disabled={busy} onClick={()=>setLoad(n=>n+1)}>{t('revisionLoadRefs')}</button><p>{t('revisionRefsScope')}</p>
+ {loaded&&!busy&&!error&&<p role="status">{refs.length?`${t('revisionRefsCount')}: ${refs.length}`:t('revisionRefsEmpty')}</p>}
  {busy&&<p role="status">{t('loading')}</p>}{error&&<p role="alert">{error}</p>}
  {[[base,setBase,'revisionBase'],[target,setTarget,'revisionTarget']].map(([value,setValue,label])=><label key={label}>{t(label)} <select aria-label={t(label)} value={value} onChange={e=>setValue(e.target.value)}><option value="">—</option>{commits.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,10)} · {c.subject}</option>)}{refs.map(ref=><option key={ref.name} value={ref.commit}>{ref.name} · {ref.commit.slice(0,10)}</option>)}{value&&!commits.some(c=>c.id===value)&&!refs.some(r=>r.commit===value)&&<option value={value}>{value}</option>}</select></label>)}
  <button disabled={!base||!target} onClick={()=>{setBase(target);setTarget(base);}}>{t('revisionSwap')}</button>
