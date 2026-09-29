@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+test('history Monaco is opt-in with stable identity and fallback',async()=>{
+ const source=await readFile(new URL('../src/HistoryViewer.jsx',import.meta.url),'utf8');
+ assert.ok(source.includes('if(!enabled)return'));
+ assert.ok(source.includes('task.dispose()'));assert.ok(source.includes('link.remove()'));
+ assert.ok(source.includes('!ready&&<TextComparison'));
+ const wrapper=await readFile(new URL('../src/HistoryComparison.jsx',import.meta.url),'utf8');
+ assert.ok(wrapper.includes('JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])'));
+});
 test('history panel scopes pagination and cancels stale responses',async()=>{
  const source=await readFile(new URL('../src/HistoryPanel.jsx',import.meta.url),'utf8');
  assert.ok(source.includes("rpc('vcs/history'"));
