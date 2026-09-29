@@ -1,5 +1,8 @@
-import {mkdir,writeFile} from 'node:fs/promises';
-await mkdir('test-results',{recursive:true});
+import {mkdir,writeFile,copyFile} from 'node:fs/promises';
+import {build} from 'esbuild';
+await mkdir('test-results/vcs-assets',{recursive:true});
+for(const file of ['editor.js','editor.css','editor.worker.js'])await copyFile('dist/'+file,'test-results/vcs-assets/'+file);
+await build({entryPoints:['scripts/history-viewer-browser.jsx'],outfile:'test-results/history-viewer-browser.js',bundle:true,format:'esm',define:{'process.env.NODE_ENV':'"production"'}});
 await writeFile('test-results/monaco-fixture.html',`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="../dist/editor.css"><div id="a" style="height:300px;width:900px"></div><div id="b" style="height:300px;width:900px"></div><pre id="report">pending</pre><script type="module">
 const report=document.querySelector('#report'),errors=[];let phase='load',sa,sb;
 window.addEventListener('error',e=>errors.push(e.message));
@@ -24,7 +27,8 @@ try{
  if(globalThis.MonacoEnvironment!==initial)throw Error('Environment not restored');
  cases.push(mode+'-'+first);
  }
+ phase='react-controls';await (await import('./history-viewer-browser.js')).checkViewer();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);
