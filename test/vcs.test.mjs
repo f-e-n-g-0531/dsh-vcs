@@ -18,6 +18,13 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('commit details preserve multiline message while history remains summary-only',async t=>{
+ const root=await gitRepo(t);await write(root,'file.txt','content');cmd(root,'git',['add','.']);
+ const message='Review subject\n\n中文 body\n<script>alert(1)</script>\n\nTrailer: value';
+ cmd(root,'git',['commit','--no-gpg-sign','-m',message]);const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ const details=await getCommitDetails(repo,{commit:head});assert.equal(details.subject,'Review subject');assert.equal(details.message.trimEnd(),message);
+ const history=await listHistory(repo);assert.equal(history.commits[0].subject,'Review subject');assert.equal(Object.hasOwn(history.commits[0],'message'),false);
+});
 test('historical tree reads committed nested entries not working directory contents',async t=>{
  const root=await gitRepo(t);await fs.mkdir(path.join(root,'nested'));await write(root,'nested/中文 [file].txt','committed');commit(root);
  const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
