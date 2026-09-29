@@ -25,7 +25,7 @@
 - Git 历史 RPC 复用 Session 仓库授权，提交及父提交绑定的变更 ID 不能作为任意工作区路径使用。
 - 历史内容从对象库读取，不 checkout；符号链接仅显示目标文本，子模块仅显示对象引用。
 - Git 子进程设置 `GIT_NO_REPLACE_OBJECTS=1`，避免 replace refs 改写指定 SHA 的内容；真实替换对象回归已覆盖。
-- 设置 `GIT_NO_LAZY_FETCH=1` 并以空 `GIT_ALLOW_PROTOCOL` 禁止传输协议，防止缺失对象触发隐式远程获取；缺失对象应报错，不自动补齐。部分克隆的真实缺失对象专项回归仍待补充。
+- 设置 `GIT_NO_LAZY_FETCH=1` 并以空 `GIT_ALLOW_PROTOCOL` 禁止传输协议，防止缺失对象触发隐式远程获取；缺失对象应报错，不自动补齐。真实 `--filter=blob:none --no-checkout` 临时部分克隆回归已覆盖：插件读取缺失 blob 失败且对象保持缺失；显式允许 file 协议的正向对照可从同一临时源补齐对象。该测试不访问外部服务器。
 
 ## 后续优先项
 

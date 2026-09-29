@@ -18,6 +18,23 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('partial clone history never hydrates missing promised blobs',async t=>{
+ const source=await gitRepo(t);await write(source,'promised.txt','remote only payload');commit(source);
+ cmd(source,'git',['config','uploadpack.allowFilter','true']);
+ const target=await temp(t);
+ cmd(target,'git',['-c','protocol.file.allow=always','clone','--filter=blob:none','--no-checkout',pathToFileURL(source).href,'.']);
+ const commitId=cmd(source,'git',['rev-parse','HEAD']).stdout.trim();
+ const oid=cmd(source,'git',['rev-parse','HEAD:promised.txt']).stdout.trim();
+ const missing=()=>cmd(target,'git',['-c','protocol.allow=never','rev-list','--objects','--missing=print','HEAD']).stdout;
+ assert.ok(missing().includes('?'+oid),'Fixture must actually omit the promised blob');
+ const repo=await detectRepository(target),detail=await getCommitDetails(repo,{commit:commitId});
+ await assert.rejects(getCommitComparison(repo,{commit:commitId,id:detail.changes[0].id}),{code:'VCS_COMMAND'});
+ assert.ok(missing().includes('?'+oid),'Plugin must leave promised object absent');
+ // Positive control: the source can supply the blob if explicitly permitted.
+ assert.equal(cmd(target,'git',['-c','protocol.file.allow=always','cat-file','blob',oid]).stdout,'remote only payload');
+ assert.ok(!missing().includes('?'+oid),'Positive control must hydrate the object');
+});
+
 test('history ignores replace refs so snapshots retain original contents',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','original');commit(root);
  const original=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
