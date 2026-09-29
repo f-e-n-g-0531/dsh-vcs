@@ -37,6 +37,18 @@ test('historical tree enforces commit-only grants and rejects stale results',asy
  const moved=setup({getHistoricalTree:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree',p)).error.code,'vcs/rediscover-required');
  const cancel=setup({getHistoricalTree:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree',p,controller.signal)).error.code,'vcs/cancelled');
 });
+test('image RPC enforces grants strict fields side defaults and cancellation',async()=>{
+ const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)},controller=new AbortController();const seen=[];
+ const h=setup({getCommitImage:async(r,o)=>{assert.deepEqual(r,repo);assert.equal(o.signal,controller.signal);seen.push(o);return {mime:'image/png'};}});
+ assert.equal((await h.call('vcs/commit-image',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{path:'secret'},{url:'https://example.com'},{width:1},{side:null},{side:'both'},{commit:'HEAD'},{id:'bad'},{parentIndex:-1}])assert.equal((await h.call('vcs/commit-image',{...p,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(seen.length,0);assert.equal((await h.call('vcs/commit-image',{...p,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
+ assert.equal((await h.call('vcs/commit-image',p,controller.signal)).ok,true);assert.equal(seen[0].side,'right');assert.equal(seen[0].parentIndex,0);assert.equal(seen[0].id,p.id);assert.equal(seen[0].commit,p.commit);
+ assert.equal((await h.call('vcs/commit-image',{...p,side:'left',parentIndex:1},controller.signal)).ok,true);assert.equal(seen[1].side,'left');assert.equal(seen[1].parentIndex,1);
+ h.expire();assert.equal((await h.call('vcs/commit-image',p)).error.code,'vcs/rediscover-required');
+ const moved=setup({getCommitImage:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/commit-image',p)).error.code,'vcs/rediscover-required');
+ const cancel=setup({getCommitImage:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/commit-image',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('blame enforces grants opaque selection fixed limits and stale cancellation',async()=>{
  const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)},controller=new AbortController();let calls=0;
  const h=setup({getFileBlame:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,parentIndex:0,id:p.id,signal:controller.signal});return {lines:[]};}});
