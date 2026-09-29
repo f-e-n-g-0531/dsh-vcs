@@ -60,7 +60,7 @@ export function apply(ctx){
       }
       return()=>controller.abort();
     },[sessionId,discovery,repositoryId,mode,refresh]);
-    useEffect(()=>{const focus=()=>{if(document.visibilityState==='visible')refreshStatuses(true);};window.addEventListener('focus',focus);const poll=window.setInterval(focus,30000);return()=>{window.removeEventListener('focus',focus);window.clearInterval(poll);};},[sessionId,repositoryId,mode]);
+    useEffect(()=>{const focus=()=>{if(sessionId&&repositoryId&&document.visibilityState==='visible')refreshStatuses(true);};window.addEventListener('focus',focus);return()=>window.removeEventListener('focus',focus);},[sessionId,repositoryId,mode]);
     const selectedRepository=repositories.find(repo=>repo.id===selected?.repositoryId);
     const selectedStatus=selected?statuses[selected.repositoryId]:null;
     useEffect(()=>{

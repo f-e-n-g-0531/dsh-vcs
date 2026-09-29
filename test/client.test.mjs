@@ -143,6 +143,18 @@ test('copying a path announces success to assistive technology',async()=>{
  assert.match(source,/vcs-sr-only/);assert.match(source,/role="status"/);assert.match(source,/pathCopied/);
 });
 
+test('refresh is manual or on visible window focus, never periodic',async()=>{
+ const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/setInterval|clearInterval|30000/);
+ assert.ok(source.includes("window.addEventListener('focus',focus)"));
+ assert.ok(source.includes("window.removeEventListener('focus',focus)"));
+ assert.ok(source.includes("sessionId&&repositoryId&&document.visibilityState==='visible'"));
+ assert.ok(source.includes('refreshStatuses(true)'));
+ const locales=JSON.parse(await readFile(new URL('../src/locales.json',import.meta.url),'utf8'));
+ assert.equal(locales.zh.autoRefresh,'手动或窗口聚焦时刷新');
+ assert.equal(locales.en.autoRefresh,'Refresh manually or on window focus');
+});
+
 test('CI installs the development dependencies required by build and tests',async()=>{
  const workflow=await readFile(new URL('../.github/workflows/ci.yml',import.meta.url),'utf8');
  assert.match(workflow,/npm ci --include=dev/);
