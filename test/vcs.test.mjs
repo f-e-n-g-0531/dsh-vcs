@@ -49,6 +49,9 @@ test('committed PNG preview uses immutable blob and rejects forged selection',as
  assert.equal(result.width,1);assert.equal(result.height,1);assert.equal(result.mime,'image/png');assert.deepEqual(Buffer.from(result.base64,'base64'),png);
  await assert.rejects(getCommitImage(repo,{commit:head,id:'f'.repeat(64)}),/selected commit/);
  assert.equal(await fs.readFile(path.join(root,'image.png'),'utf8'),'working text');
+ const controller=new AbortController();controller.abort();await assert.rejects(getCommitImage(repo,{commit:head,id:details.changes[0].id,signal:controller.signal}),{name:'AbortError'});
+ await fs.unlink(path.join(root,'image.png'));commit(root);const deleted=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),changes=await getCommitDetails(repo,{commit:deleted});
+ await write(root,'image.png',png);assert.deepEqual(await getCommitImage(repo,{commit:deleted,id:changes.changes[0].id}),{commit:deleted,path:'image.png',absent:true});
 });
 test('blame reads committed UTF8 lines with original attribution and bounded output',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','first\nsecond\n');commit(root);
@@ -234,6 +237,8 @@ test('partial clone history never hydrates missing promised blobs',async t=>{
  assert.ok(missing().includes('?'+oid),'Blame must not hydrate promised objects');
  const tree=await getHistoricalTree(repo,{commit:commitId});assert.equal(tree.entries.find(e=>e.path==='promised.txt').oid,oid);
  assert.ok(missing().includes('?'+oid),'Tree listing must not hydrate file blobs');
+ await assert.rejects(getCommitImage(repo,{commit:commitId,id:detail.changes[0].id}),{code:'VCS_COMMAND'});
+ assert.ok(missing().includes('?'+oid),'Image preview must not hydrate promised objects');
  // Positive control: the source can supply the blob if explicitly permitted.
  assert.equal(cmd(target,'git',['-c','protocol.file.allow=always','cat-file','blob',oid]).stdout,'remote only payload');
  assert.ok(!missing().includes('?'+oid),'Positive control must hydrate the object');
@@ -281,6 +286,9 @@ test('historical special files remain bounded and never follow link or submodule
  const large=await compare('large.txt');assert.equal(large.right.text,'');assert.match(large.notice,/2 MiB/);
  const link=await compare('link.txt');assert.equal(link.right.text,'/outside/private-file');assert.match(link.notice,/not followed/);
  const submodule=await compare('submodule');assert.equal(submodule.right.text,seed);assert.match(submodule.notice,/not loaded/);
+ for(const name of ['link.txt','submodule'])await assert.rejects(getCommitImage(repo,{commit:commitId,id:details.changes.find(e=>e.path===name).id}),/regular file/);
+ await assert.rejects(getCommitImage(repo,{commit:commitId,id:details.changes.find(e=>e.path==='large.txt').id}),{code:'TOO_LARGE'});
+ await assert.rejects(getCommitImage(repo,{commit:commitId,id:details.changes.find(e=>e.path==='binary.dat').id}),/Only PNG/);
  for(const [name,notice] of [['binary.dat',/Binary/],['large.txt',/2 MiB/],['link.txt',/not followed/],['submodule',/not loaded/]]){
   const result=await getFileBlame(repo,{commit:commitId,id:details.changes.find(row=>row.path===name).id});assert.deepEqual(result.lines,[]);assert.match(result.notice,notice);
  }
