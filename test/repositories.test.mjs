@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {changeKey,requestMode,repositoryLabel,groupChanges,changePosition,adjacentChange,directoryAncestors,treeDirectoryIds,reviewStatus,countChangeStatuses,filterChanges,buildChangeTree,createStatusLimiter} from '../src/repositories.mjs';
+import {changeKey,requestMode,repositoryLabel,groupChanges,changePosition,adjacentChange,directoryAncestors,treeDirectoryIds,reviewStatus,countChangeStatuses,filterChanges,buildChangeTree,compareReviewPath,createStatusLimiter} from '../src/repositories.mjs';
 
 test('mixed repositories preserve distinct keys and SVN never receives staged mode',()=>{
  const git={id:'git',type:'git',relativePath:'client',branch:'main'},svn={id:'svn',type:'svn',relativePath:'assets'};
@@ -30,7 +30,7 @@ test('change tree gives directories stable paths, counts, and sorted Unicode fil
  assert.equal(tree.count,0);assert.deepEqual(tree.directories.map(d=>d.id),['src']);
  const src=tree.directories[0];assert.equal(src.count,3);assert.deepEqual(src.directories.map(d=>d.id),['src/a']);
  assert.deepEqual(src.files.map(f=>f.path),['src/z.txt']);
- assert.equal(src.directories[0].count,2);assert.deepEqual(src.directories[0].files.map(f=>f.path),['src/a/中文.txt','src/a/space name.txt']);
+ assert.equal(src.directories[0].count,2);assert.deepEqual(src.directories[0].files.map(f=>f.path),['src/a/space name.txt','src/a/中文.txt']);
  assert.deepEqual(tree.files.map(f=>f.path),['README.md']);
 });
 
@@ -78,4 +78,10 @@ test('directory ancestors reveal a selected nested path without its filename',()
  assert.deepEqual(directoryAncestors('src/ui/client.jsx'),['src','src/ui']);
  assert.deepEqual(directoryAncestors('README.md'),[]);
  assert.deepEqual(directoryAncestors('中文/目录/file.txt'),['中文','中文/目录']);
+});
+
+test('review path comparison is locale independent and Unicode deterministic',()=>{
+ assert.ok(compareReviewPath('space name.txt','中文.txt')<0);
+ assert.ok(compareReviewPath('中文.txt','space name.txt')>0);
+ assert.equal(compareReviewPath('same','same'),0);
 });

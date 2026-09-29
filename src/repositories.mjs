@@ -7,6 +7,8 @@ export function selectProject(repositories, previousId = '') {
 export const changeKey = (repositoryId, changeId) => JSON.stringify([repositoryId, changeId]);
 export const repositoryLabel = (repository, workspaceLabel = '.') => [repository.type.toUpperCase(), repository.relativePath === '.' ? workspaceLabel : repository.relativePath || '.', repository.branch].filter(Boolean).join(' · ');
 export const requestMode = (repository, mode = 'all') => repository.type === 'git' && ['staged', 'unstaged'].includes(mode) ? mode : 'all';
+// Keep review ordering reproducible across browser, Windows, and Linux locale settings.
+export const compareReviewPath = (left = '', right = '') => left === right ? 0 : left < right ? -1 : 1;
 export function buildChangeTree(changes = []) {
   const root = { id: '', name: '', directories: new Map(), files: [], count: 0 };
   for (const change of changes) {
@@ -20,7 +22,7 @@ export function buildChangeTree(changes = []) {
     }
     node.files.push(change);
   }
-  const sort = node => ({...node, directories: [...node.directories.values()].sort((a,b)=>a.name.localeCompare(b.name)).map(sort), files: [...node.files].sort((a,b)=>a.path.localeCompare(b.path))});
+  const sort = node => ({...node, directories: [...node.directories.values()].sort((a,b)=>compareReviewPath(a.name,b.name)).map(sort), files: [...node.files].sort((a,b)=>compareReviewPath(a.path,b.path))});
   return sort(root);
 }
 export function changePosition(changes = [], selectedId) {
