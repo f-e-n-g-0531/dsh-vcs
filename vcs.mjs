@@ -1,3 +1,4 @@
+import {preparePng} from './image-preview.mjs';
 import { spawn } from 'node:child_process';
 import {parseHistory,HISTORY_FORMAT,historyPage,parseBlame} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
@@ -287,6 +288,20 @@ export async function getHistoricalTree(repo,{commit,signal}={}){
   return {path:file,mode,type,oid};
  });
  return {commit,entries};
+}
+export async function getCommitImage(repo,{commit,parentIndex=0,id,signal}={}){
+ if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+ const details=await getCommitDetails(repo,{commit,parentIndex,signal}),entry=details.changes.find(e=>e.id===id);
+ if(!entry)throw new Error('Change is not part of selected commit');
+ if(entry.status==='deleted')return {commit,path:entry.path,absent:true};
+ const listing=(await git(repo.root,['--literal-pathspecs','ls-tree','-z',commit,'--',entry.path],MAX_TEXT,{signal})).toString('utf8');
+ const record=listing.split(String.fromCharCode(0)).find(row=>row.slice(row.indexOf('\t')+1)===entry.path);
+ if(!record)throw new Error('Historical path missing');
+ const [mode,type,oid]=record.slice(0,record.indexOf('\t')).split(' ');
+ if(type!=='blob'||!['100644','100755'].includes(mode))throw new Error('Image preview requires a regular file');
+ const raw=await git(repo.root,['cat-file','blob',oid],MAX_TEXT,{signal});
+ const {data,...metadata}=await preparePng(raw,{signal});
+ return {commit,path:entry.path,oid,...metadata,base64:data.toString('base64')};
 }
 export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame, getHistoricalTree } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame, getHistoricalTree, getCommitImage } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -41,6 +41,14 @@ test('historical tree accepts 10000 entries and rejects entry and byte overflow'
  const exact=await getHistoricalTree(repo,{commit:make(10000)});assert.equal(exact.entries.length,10000);assert.equal(exact.entries[9999].path,'09999');
  await assert.rejects(getHistoricalTree(repo,{commit:make(10001)}),/entry limit/);
  await assert.rejects(getHistoricalTree(repo,{commit:make(3000,'x'.repeat(800))}),{code:'TOO_LARGE'});
+});
+test('committed PNG preview uses immutable blob and rejects forged selection',async t=>{
+ const root=await gitRepo(t),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+ await write(root,'image.png',png);commit(root);const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root),details=await getCommitDetails(repo,{commit:head});
+ await write(root,'image.png','working text');const result=await getCommitImage(repo,{commit:head,id:details.changes[0].id});
+ assert.equal(result.width,1);assert.equal(result.height,1);assert.equal(result.mime,'image/png');assert.deepEqual(Buffer.from(result.base64,'base64'),png);
+ await assert.rejects(getCommitImage(repo,{commit:head,id:'f'.repeat(64)}),/selected commit/);
+ assert.equal(await fs.readFile(path.join(root,'image.png'),'utf8'),'working text');
 });
 test('blame reads committed UTF8 lines with original attribution and bounded output',async t=>{
  const root=await gitRepo(t);await write(root,'file.txt','first\nsecond\n');commit(root);
