@@ -46,6 +46,19 @@ export function inspectPng(buffer){
  return {mime:'image/png',width,height,bytes:buffer.length};
 }
 
+// Stripping color metadata makes this unsuitable for color-critical review.
+export async function preparePng(buffer,options){
+ const metadata=await validatePng(buffer,options),parts=[buffer.subarray(0,8)];
+ for(let offset=8;offset<buffer.length;){
+  const length=buffer.readUInt32BE(offset),end=offset+length+12,type=buffer.toString("ascii",offset+4,offset+8);
+  if(["IHDR","PLTE","tRNS","IDAT","IEND"].includes(type))parts.push(buffer.subarray(offset,end));
+  offset=end;
+ }
+ options?.signal?.throwIfAborted();
+ const data=Buffer.concat(parts);
+ return {...metadata,bytes:data.length,originalBytes:metadata.bytes,data,metadataStripped:data.length!==buffer.length};
+}
+
 export async function validatePng(buffer,{signal}={}){
  signal?.throwIfAborted();
  const metadata=inspectPng(buffer);
