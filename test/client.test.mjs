@@ -52,6 +52,24 @@ test('VCS page renders no-session state without repository reads during render',
   assert.match(html,/先打开一个项目会话/);
 });
 
+test('built page renders seven localized status filters with one active selection',async()=>{
+  const {registrations,locale}=await loadClient();
+  const Page=registrations.find(r=>r.options.name==='main').component;
+  for(const [language,labels] of [
+    ['zh',['全部文件','修改','新增','删除','重命名','冲突','未跟踪']],
+    ['en',['All files','Modified','Added','Deleted','Renamed','Conflict','Untracked']],
+  ]){
+    locale.active=language;
+    const html=renderToString(React.createElement(Page,{useSessions:select=>select({byId:{}})}));
+    const filters=html.match(new RegExp('<div class="vcs-status-filter"[^>]*>(.*?)</div>','s'))?.[1];
+    assert.ok(filters,language+' status filter renders');
+    assert.equal((filters.match(/<button\b/g)||[]).length,7);
+    assert.equal((filters.match(/aria-pressed="true"/g)||[]).length,1);
+    assert.equal((filters.match(/aria-pressed="false"/g)||[]).length,6);
+    for(const label of labels) assert.ok(filters.includes(label),language+': '+label);
+  }
+});
+
 test('review file tree exposes keyboard navigation and directory expansion semantics',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/onFileListKeyDown/);
