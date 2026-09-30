@@ -4,6 +4,7 @@ await mkdir('test-results/vcs-assets',{recursive:true});
 for(const file of ['editor.js','editor.css','editor.worker.js'])await copyFile('dist/'+file,'test-results/vcs-assets/'+file);
 await build({entryPoints:['scripts/history-viewer-browser.jsx'],outfile:'test-results/history-viewer-browser.js',bundle:true,format:'esm',define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/graph-native-browser.jsx'],outfile:'test-results/graph-native-browser.js',bundle:true,format:'esm',define:{'process.env.NODE_ENV':'"production"'}});
+await build({entryPoints:['scripts/blame-native-browser.jsx'],outfile:'test-results/blame-native-browser.js',bundle:true,format:'esm',define:{'process.env.NODE_ENV':'"production"'}});
 await writeFile('test-results/monaco-fixture.html',`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="../dist/editor.css"><div id="a" style="height:300px;width:900px"></div><div id="b" style="height:300px;width:900px"></div><pre id="report">pending</pre><script type="module">
 const report=document.querySelector('#report'),errors=[];let phase='load',sa,sb;
 window.addEventListener('error',e=>errors.push(e.message));

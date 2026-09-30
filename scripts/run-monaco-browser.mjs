@@ -44,4 +44,12 @@ try{
   if(!await evaluate("!document.querySelector('#native-graph svg') && document.activeElement===document.querySelector('#native-graph button') && nativeGraphState.activations===2"))throw Error('Native keyboard collapse failed');
   await writeFile('test-results/graph-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeGraphState'),steps:['arrow-focus','enter-activation','space-activation','tab-exit','reverse-tab-entry','reverse-tab-exit','keyboard-collapse']}));
  }finally{await evaluate('disposeNativeGraph();delete globalThis.disposeNativeGraph');}
+ await evaluate("import('./blame-native-browser.js').then(async m=>{globalThis.disposeNativeBlame=await m.mount();})");
+ try{
+  await press('Enter','Enter',13,'\r');await press(' ','Space',32,' ');
+  if(!await evaluate("nativeBlameState.selected.length===2 && nativeBlameState.selected.every(id=>id==='a'.repeat(40)) && nativeBlameState.trusted.length===2 && nativeBlameState.trusted.every(Boolean) && nativeBlameState.calls===1"))throw Error('Native blame activation failed');
+  await press('Tab','Tab',9);if(!await evaluate("document.activeElement.id==='after-blame'"))throw Error('Native blame Tab exit failed');
+  await press('Tab','Tab',9,undefined,8);if(!await evaluate("document.activeElement===document.querySelector('#native-blame tbody button')"))throw Error('Native blame reverse Tab failed');
+  await writeFile('test-results/blame-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeBlameState')}));
+ }finally{await evaluate('disposeNativeBlame();delete globalThis.disposeNativeBlame');}
 }finally{ws?.close();chrome.kill();await new Promise(r=>chrome.exitCode!==null?r():chrome.once('exit',r));await rm(profile,{recursive:true,force:true,maxRetries:5});}
