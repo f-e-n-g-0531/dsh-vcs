@@ -29,5 +29,21 @@ export async function checkHistoryRefs(){
   button(t('revisionLoadRefs')).click();await wait(()=>host.textContent.includes('REFRESH FAILURE'));if(labels().length!==1)throw Error('Failed refresh discarded prior labels');
   button(t('revisionLoadRefs')).click();await wait(()=>loads===4&&!labels().length&&!host.textContent.includes('REFRESH FAILURE'));
   if(calls.filter(c=>c.endpoint==='vcs/history').length!==1)throw Error('Reference refresh reloaded history snapshot');
- }}finally{root.unmount();host.remove();}
+ }
+ for(const outcome of ['success','error']){
+  const calls=[];let identity={sessionId:'scope',repositoryId:'r'},loads=0,pending,rediscoveries=0;
+  const rpc=async(endpoint,p,signal)=>{calls.push({endpoint,p});if(endpoint==='vcs/history')return {snapshot:a,nextOffset:p.offset?null:50,commits:[{id:p.offset?b:a,subject:p.offset?'page-two':'page-one',parents:[],author:'author',date:'2026-09-30T00:00:00Z'}]};if(endpoint==='vcs/references'){loads++;if(loads===1)return {references:[{commit:b,name:'refs/tags/page-two'}]};return new Promise((resolve,reject)=>pending={resolve,reject,signal});}throw Error('Unexpected scoped refs RPC');};
+  const render=()=>flushSync(()=>root.render(<HistoryPanel key={outcome} {...identity} rpc={rpc} t={k=>k} onRediscover={()=>{rediscoveries++;}}/>));
+  render();await wait(()=>button('page-one'));button('revisionLoadRefs').click();await wait(()=>host.textContent.includes('historyRefsScope'));
+  if(host.querySelector('[aria-label=historyRefsLabel]'))throw Error('Unloaded commit received visible label');
+  button('historyMore').click();await wait(()=>button('page-two')&&host.querySelector('[aria-label=historyRefsLabel]'));
+  if(calls.at(-1).p.snapshot!==a||calls.at(-1).p.offset!==50||loads!==1||host.querySelector('[aria-label=historyRefsLabel]').closest('li').querySelector('button').textContent!=='page-two')throw Error('Paginated reference identity or snapshot changed');
+  for(const patch of [{sessionId:'next'},{repositoryId:'next'}]){
+   pending=null;button('revisionLoadRefs').click();await wait(()=>pending);const old=pending,count=calls.length;
+   identity={...identity,...patch};render();await wait(()=>old.signal.aborted&&button('page-one'));
+   if(outcome==='success')old.resolve({references:[{commit:a,name:'refs/heads/STALE'}]});else old.reject(Object.assign(Error('STALE ERROR'),{code:'vcs/rediscover-required'}));
+   await new Promise(r=>setTimeout(r,50));if(host.querySelector('[aria-label=historyRefsLabel]')||host.textContent.includes('historyRefsScope')||host.textContent.includes('STALE')||rediscoveries||calls.length!==count+1)throw Error('Scoped references leaked or auto-loaded');
+  }
+ }
+ }finally{root.unmount();host.remove();}
 }
