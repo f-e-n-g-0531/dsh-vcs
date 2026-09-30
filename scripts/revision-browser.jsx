@@ -38,8 +38,10 @@ export async function checkRevisions(){
  await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE'))throw Error('Stale response rendered');
  if(calls.length!==5)throw Error('Unexpected revision RPC count: '+calls.length);
  if(refLoads)throw Error('References fetched without opt-in');
+ if(host.querySelectorAll('optgroup[label=revisionLoadedCommits]').length!==2||host.querySelector('optgroup[label=revisionLocalRefs]'))throw Error('Initial revision option groups incorrect');
  const hasOption=id=>[...host.querySelectorAll('option')].some(o=>o.value===id);
  button('revisionLoadRefs').click();await wait(()=>hasOption('e'.repeat(40)));
+ if(host.querySelectorAll('optgroup[label=revisionLocalRefs]').length!==2)throw Error('Loaded references not grouped');
  if(!host.textContent.includes('revisionRefsCount: 1'))throw Error('Missing loaded reference count');
  choose(0,'e'.repeat(40));await wait(()=>button('pair.txt'));const pinned=calls.at(-1);if(pinned.p.base!=='e'.repeat(40)||pinned.p.target!==a)throw Error('Reference comparison did not pin OID');
  const comparisons=calls.filter(c=>c.endpoint==='vcs/revision-changes').length;
@@ -48,6 +50,7 @@ export async function checkRevisions(){
  button('revisionLoadRefs').click();await wait(()=>host.textContent.includes('refs unavailable'));if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Reference failure cleared selection');
  button('revisionLoadRefs').click();await wait(()=>refLoads===4&&host.textContent.includes('revisionRefsEmpty'));
  if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Empty references cleared pinned selection');
+ if(host.querySelector('optgroup[label=revisionLocalRefs]')||host.querySelectorAll('select')[0].selectedOptions[0].parentElement.tagName!=='SELECT')throw Error('Pinned fallback lost after empty reference refresh');
  button('revisionLoadRefs').click();await wait(()=>refResolve);
  for(const [sessionId,repositoryId] of [['other','r'],['other','new-repo']]){
   const oldResolve=refResolve,signal=refSignal,count=calls.length;
