@@ -52,5 +52,11 @@ export async function checkTree(){
  await wait(()=>host.querySelector('[role=alert]')?.textContent.includes('Expired preview authorization'));
  if(rediscoveries!==1||expiredCalls!==1||host.querySelector('pre'))throw Error('Expired preview failed rediscovery or retained body');
  await new Promise(r=>setTimeout(r,50));if(expiredCalls!==1)throw Error('Expired preview automatically retried');
+ let rejectCancelled,cancelledSignal;
+ const cancelledRpc=(_endpoint,_payload,s)=>{cancelledSignal=s;return new Promise((_resolve,reject)=>{rejectCancelled=reject;});};
+ root.render(<HistoricalFile key='cancelled' sessionId='s' repositoryId='r' commit={commit} path='late.txt' rpc={cancelledRpc} t={k=>k} onClose={()=>{}} onRediscover={()=>{rediscoveries++;}}/>);
+ await wait(()=>rejectCancelled);root.render(<p>replacement context</p>);await wait(()=>cancelledSignal.aborted);
+ rejectCancelled(Object.assign(Error('LATE EXPIRED'),{code:'vcs/rediscover-required'}));await new Promise(r=>setTimeout(r,50));
+ if(rediscoveries!==1||host.textContent!=='replacement context')throw Error('Cancelled preview triggered late rediscovery');
  }finally{root.unmount();host.remove();}
 }
