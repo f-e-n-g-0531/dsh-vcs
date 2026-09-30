@@ -18,9 +18,17 @@ export async function checkBlame(){
  await wait(()=>host.querySelector('tbody tr'));
  if(host.querySelector('pre').textContent!==source||host.querySelector('img'))throw Error('Source was not rendered as plain text');
  if(!host.textContent.includes('blameLimit')||!host.textContent.includes('blameScope'))throw Error('Missing boundedness notice');
+ if(host.querySelector('tbody button'))throw Error('Blame without callback became navigable');
  if(host.querySelector('code').title!==commit)throw Error('Missing full commit identity');
  button().click();await wait(()=>!host.querySelector('section'));button().click();await wait(()=>resolveLate);
  button().click();await wait(()=>signal.aborted);resolveLate({lines:[{line:1,commit,author:'STALE',summary:'',text:''}],truncated:false});
  await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE')||calls!==2)throw Error('Closed blame accepted stale result');
+ const selections=[];
+ root.render(<BlamePanel key='navigation' {...{commit,id,rpc}} parentIndex={0} sessionId='s' repositoryId='r' t={key=>key} onRediscover={()=>{}} onSelectCommit={(...args)=>selections.push(args)}/>);
+ await wait(()=>button()?.getAttribute('aria-expanded')==='false');button().click();await wait(()=>host.querySelector('tbody button'));
+ const link=host.querySelector('tbody button'),before=calls;
+ if(link.title!==commit||link.textContent!==commit.slice(0,10))throw Error('Blame navigation identity incorrect');
+ link.focus();if(selections.length||calls!==before)throw Error('Focus activated blame navigation');
+ link.click();if(selections.length!==1||selections[0].length!==1||selections[0][0]!==commit||calls!==before)throw Error('Blame passed path or queried during navigation callback');
  }finally{root.unmount();host.remove();}
 }

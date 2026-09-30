@@ -16,7 +16,7 @@ export default function HistoryComparison({sessionId,repositoryId,commit,parentI
  {comparison.notice&&<p role="status">{comparison.notice}</p>}
  {comparison.binary?<p>{t('binary')}</p>:<HistoryViewer comparison={comparison} identity={base?JSON.stringify([sessionId,repositoryId,base,target,id]):JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} t={t}/>}
  {commit&&!base&&<FileHistory onSelectCommit={onSelectCommit} key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
- {commit&&!base&&<BlamePanel key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
+ {commit&&!base&&<BlamePanel onSelectCommit={onSelectCommit} key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
  {commit&&!base&&<ImageComparison key={JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
  </section>;
 }
