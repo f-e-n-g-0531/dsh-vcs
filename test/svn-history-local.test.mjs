@@ -7,6 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {XMLParser} from 'fast-xml-parser';
 import {svnRevisionPage} from '../src/svn-revision.mjs';
+import {parseSvnLog} from '../src/svn-log.mjs';
 test('local SVN path history skips unrelated revisions and pins numeric snapshot',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-svn-history-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
  const run=(name,args,cwd=root)=>{const r=spawnSync(name,args,{cwd,encoding:'utf8',windowsHide:true,timeout:20000,env:{...process.env,LC_ALL:process.platform==='linux'?'C.UTF-8':'en_US.UTF-8'}});assert.equal(r.status,0,r.stderr);return r.stdout;};
@@ -18,7 +19,7 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  await fs.writeFile(file,'r3');svn(['commit','-m','r3']);
  await fs.writeFile(file,'r4');svn(['commit','-m','r4']);
  const parser=new XMLParser({ignoreAttributes:false,parseAttributeValue:false,isArray:name=>name==='logentry'});
- const revisions=(upper,limit)=>{const xml=svn(['log','--xml','--stop-on-copy','--limit',String(limit),'-r',upper+':0','--',name+'@3']);return (parser.parse(xml).log.logentry||[]).map(e=>e['@_revision']);};
+ const revisions=(upper,limit)=>{const xml=svn(['log','--xml','--stop-on-copy','--limit',String(limit),'-r',upper+':0','--',name+'@3']);return parseSvnLog(xml).map(e=>e.revision);};
  const status=svn(['status','--xml']),info=svn(['info','--xml','--',name+'@']);
  const page=svnRevisionPage(revisions('3',2),{snapshot:'3',limit:1});assert.deepEqual(page,{snapshot:'3',revisions:['3'],nextRevision:'2'});
  assert.deepEqual(svnRevisionPage(revisions(page.nextRevision,2),{snapshot:'3',cursor:page.nextRevision,limit:1}),{snapshot:'3',revisions:['1'],nextRevision:null});
