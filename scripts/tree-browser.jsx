@@ -1,5 +1,6 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
 import HistoricalTree from '../src/HistoricalTree.jsx';
 export async function checkTree(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
@@ -33,7 +34,7 @@ export async function checkTree(){
   if(p.path==='retry-file'&&fail){fail=false;throw Error('Preview fixture failure');}
   return {commit:p.commit,path:p.path,oid,encoding:'UTF-8',text:p.path==='retry-file'?'recovered':'',binary:p.path==='binary-file',notice:p.path==='binary-file'?'Binary fixture notice':''};
  };
- const renderPreview=()=>root.render(<HistoricalTree {...identity} rpc={previewRpc} t={k=>k} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
+ const renderPreview=()=>flushSync(()=>root.render(<HistoricalTree {...identity} rpc={previewRpc} t={k=>k} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>));
  renderPreview();await wait(()=>button('historicalTree')?.getAttribute('aria-expanded')==='false');button('historicalTree').click();await wait(()=>button('retry-file'));
  button('retry-file').click();await wait(()=>host.querySelector('[role=alert]'));button('retry').click();await wait(()=>host.querySelector('pre')?.textContent==='recovered');
  button('empty-file').click();await wait(()=>host.textContent.includes('treeEmpty'));if(host.querySelector('pre'))throw Error('Empty preview retained text');
