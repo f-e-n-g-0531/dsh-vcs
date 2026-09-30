@@ -9,4 +9,5 @@
 - 第347轮：[标签CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36717640179)四平台成功，[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36717726839)成功。Artifact Ubuntu22=11097062477、Ubuntu24=11096628120、Windows22=11096564002、Windows24=11096348943实际下载均779763字节且SHA256与本地一致。
 - [发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36718223234)成功；日志确认npm公开latest发布返回`+ @feng0531/dsh-vcs@0.3.45`。GitHub Release非草稿/非预发布且披露GUI待验，包已下载。
 - 尚未完成发布后核验：本机公开npm元数据经10次有界读取仍未含0.3.45，版本直达接口也返回version not found。疑似传播延迟，但未据此认定两端一致或latest更新；未重复发布。下一轮继续只读核验npm包与SHA256SUMS，不新增功能。
+- 第348轮复核：普通元数据latest仍为0.3.44；带随机查询参数及Cache-Control:no-cache的官方注册表响应CF-Cache-Status=MISS，仍缺少0.3.45，不能仅归因本机缓存。官方常规0.3.45 tgz直达URL返回Not found。GitHub tgz为779763字节，SHA256与已下载SHA256SUMS及候选一致。npm端仍未取得包；不宣称发布闭环完成，不重发、不改dist-tag、不安装。
 - 真实GUI未验收：需确认实际构建身份，手动加载引用、标签显示/截断/换行、移动/失败/空刷新、固定选择保持及Session隔离。自动测试不等同真实宿主流程；不安装、不重启，发布须披露。
