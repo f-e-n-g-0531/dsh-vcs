@@ -1,4 +1,5 @@
 import React from 'react';
+import locales from '../src/locales.json';
 import {createRoot} from 'react-dom/client';
 import RevisionPanel from '../src/RevisionPanel.jsx';
 import HistoryPanel from '../src/HistoryPanel.jsx';
@@ -74,5 +75,18 @@ export async function checkRevisions(){
  button('revisionLoadRefs').click();await wait(()=>hasOption(a)&&hasOption(b));choose(0,a);choose(1,b);
  await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
  if(emptyCalls.filter(c=>c.endpoint==='vcs/history').length!==1||!emptyCalls.some(c=>c.endpoint==='vcs/revision-compare'&&c.p.base===a&&c.p.target===b))throw Error('Empty HEAD comparison lost pinned reference pair');
+ for(const language of ['zh','en']){
+  const seen=[];
+  const localRpc=async(endpoint,p)=>{seen.push({endpoint,p});return endpoint==='vcs/references'?{references:[{name:'refs/heads/same',commit:a},{name:'refs/tags/same',commit:a}]}:{changes:[]};};
+  root.render(<RevisionPanel key={language} commits={[{id:a,subject:'same'}]} sessionId={language} repositoryId='r' rpc={localRpc} t={k=>locales[language][k]} onRediscover={()=>{}}/>);
+  await wait(()=>button(locales[language].revisionLoadRefs));
+  if(seen.length)throw Error('Localized render auto-loaded references');
+  button(locales[language].revisionLoadRefs).click();
+  await wait(()=>host.querySelectorAll('optgroup').length===4);
+  const select=host.querySelector('select'),groups=select.querySelectorAll('optgroup');
+  if(groups[0].label!==locales[language].revisionLoadedCommits||groups[1].label!==locales[language].revisionLocalRefs||groups[1].children.length!==2)throw Error('Localized groups or duplicate refs lost');
+  choose(0,a);choose(1,a);await wait(()=>seen.some(c=>c.endpoint==='vcs/revision-changes'));
+  const pair=seen.at(-1).p;if(pair.base!==a||pair.target!==a)throw Error('Duplicate OID group changed comparison identity');
+ }
  }finally{root.unmount();host.remove();}
 }
