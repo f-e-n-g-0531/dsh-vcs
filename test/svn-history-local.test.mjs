@@ -7,6 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {XMLParser} from 'fast-xml-parser';
 import {parseSvnLogPage} from '../src/svn-log.mjs';
+import {svnPathInScope,relativeSvnPath} from '../src/svn-path.mjs';
 test('local SVN path history skips unrelated revisions and pins numeric snapshot',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-svn-history-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
  const run=(name,args,cwd=root)=>{const r=spawnSync(name,args,{cwd,encoding:'utf8',windowsHide:true,timeout:20000,env:{...process.env,LC_ALL:process.platform==='linux'?'C.UTF-8':'en_US.UTF-8'}});assert.equal(r.status,0,r.stderr);return r.stdout;};
@@ -53,4 +54,14 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const oldHistory=parser.parse(svn(['log','--xml','--stop-on-copy','-r','6:0','--',copyUrl+'@6'])).log.logentry;assert.deepEqual(oldHistory.map(e=>e['@_revision']),['6','5']);
  assert.equal(svn(['cat','-r','6','--',copyUrl+'@6']),'r6');assert.equal(svn(['cat','-r','8','--',copyUrl+'@8']),'new identity r8');
  assert.deepEqual(parser.parse(svn(['status','--xml'])),recreatedStatus);assert.equal(await fs.readFile(path.join(wc,'copy.txt'),'utf8'),'new identity r8');
+ // A path-scoped verbose log still describes the entire shared revision.
+ for(const directory of ['scope','scope-other']){await fs.mkdir(path.join(wc,directory));await fs.writeFile(path.join(wc,directory,'file'),'r9');}
+ svn(['add','--','scope','scope-other']);svn(['commit','-m','r9 shared scope']);
+ const scopedStatus=parser.parse(svn(['status','--xml']));
+ const scoped=parser.parse(svn(['log','--xml','--verbose','-r','9:9','--',rootUrl+'/scope@9'])).log.logentry[0];
+ const paths=scoped.paths.path.map(p=>p['#text']);
+ assert.ok(paths.includes('/scope-other/file'),'Positive control: verbose log exposes paths outside query scope');
+ const allowed=paths.filter(p=>svnPathInScope(p,'/scope'));assert.deepEqual(allowed.sort(),['/scope','/scope/file']);
+ assert.deepEqual(allowed.map(p=>relativeSvnPath(p,'/scope')),['','file']);
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),scopedStatus);
 });
