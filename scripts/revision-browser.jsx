@@ -76,14 +76,17 @@ export async function checkRevisions(){
  button('revisionLoadRefs').click();await wait(()=>hasOption(a)&&hasOption(b));choose(0,a);choose(1,b);
  await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
  if(emptyCalls.filter(c=>c.endpoint==='vcs/history').length!==1||!emptyCalls.some(c=>c.endpoint==='vcs/revision-compare'&&c.p.base===a&&c.p.target===b))throw Error('Empty HEAD comparison lost pinned reference pair');
- let resolveBody,bodySignal;const bodyCalls=[];
- const bodyRpc=async(endpoint,p,signal)=>{bodyCalls.push({endpoint,p});if(endpoint==='vcs/revision-changes')return {changes:[{id:'c'.repeat(64),path:p.base===a?'forward.txt':'reverse.txt',status:'modified'}]};if(endpoint==='vcs/revision-compare'){bodySignal=signal;return new Promise(resolve=>resolveBody=resolve);}throw Error('Unexpected pending-body RPC');};
- flushSync(()=>root.render(<RevisionPanel key='pending-body' commits={[{id:a,subject:'first'},{id:b,subject:'second'}]} sessionId='pending-body' repositoryId='r' rpc={bodyRpc} t={k=>k} onRediscover={()=>{throw Error('Unexpected pending-body rediscovery');}}/>));
+ for(const outcome of ['success','authorization-error']){
+ let resolveBody,rejectBody,bodySignal,rediscoveries=0;const bodyCalls=[];
+ const bodyRpc=async(endpoint,p,signal)=>{bodyCalls.push({endpoint,p});if(endpoint==='vcs/revision-changes')return {changes:[{id:'c'.repeat(64),path:p.base===a?'forward.txt':'reverse.txt',status:'modified'}]};if(endpoint==='vcs/revision-compare'){bodySignal=signal;return new Promise((resolve,reject)=>{resolveBody=resolve;rejectBody=reject;});}throw Error('Unexpected pending-body RPC');};
+ flushSync(()=>root.render(<RevisionPanel key={outcome} commits={[{id:a,subject:'first'},{id:b,subject:'second'}]} sessionId='pending-body' repositoryId='r' rpc={bodyRpc} t={k=>k} onRediscover={()=>{rediscoveries++;}}/>));
  choose(0,a);choose(1,b);await wait(()=>button('forward.txt'));button('forward.txt').click();await wait(()=>resolveBody);
  button('revisionSwap').click();await wait(()=>bodySignal.aborted&&button('reverse.txt'));
  if(bodyCalls.length!==3||bodyCalls.at(-1).p.base!==b||bodyCalls.at(-1).p.target!==a||button('reverse.txt').getAttribute('aria-pressed')!=='false')throw Error('Pending-body swap failed pair reset');
- resolveBody({path:'forward.txt',left:{label:a,text:'LATE LEFT BODY'},right:{label:b,text:'LATE RIGHT BODY'}});await new Promise(r=>setTimeout(r,50));
- if(host.textContent.includes('LATE')||host.querySelector('.vcs-text-comparison')||bodyCalls.length!==3)throw Error('Cancelled A/B body appeared after swap');
+ if(outcome==='authorization-error')rejectBody(Object.assign(Error('LATE AUTHORIZATION'),{code:'vcs/rediscover-required'}));
+ else resolveBody({path:'forward.txt',left:{label:a,text:'LATE LEFT BODY'},right:{label:b,text:'LATE RIGHT BODY'}});await new Promise(r=>setTimeout(r,50));
+ if(rediscoveries||host.querySelector('[role=alert]')||host.textContent.includes('LATE')||host.querySelector('.vcs-text-comparison')||bodyCalls.length!==3)throw Error('Cancelled A/B body appeared after swap');
+ }
  for(const language of ['zh','en']){
   const seen=[];
   const localRpc=async(endpoint,p)=>{seen.push({endpoint,p});return endpoint==='vcs/references'?{references:[{name:'refs/heads/same',commit:a},{name:'refs/tags/same',commit:a}]}:{changes:[]};};
