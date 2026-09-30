@@ -35,6 +35,10 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
  if(calls.at(-1).endpoint!=='vcs/commit'||calls.at(-1).payload.commit!==b)throw Error('Graph selection did not load matching detail');
  const beforeFocus=calls.length;graphButtons[1].focus();graphButtons[1].dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true,cancelable:true}));
  if(document.activeElement!==graphButtons[0]||graphButtons[1].getAttribute('aria-current')!=='true'||calls.length!==beforeFocus)throw Error('Graph focus changed selected context');
+ searchFor('First');await wait(()=>!button('added · example.txt')&&!document.querySelector('section[aria-label=historyGraph] [aria-current=true]'));
+ if(calls.length!==beforeFocus)throw Error('Search reset issued RPC');
+ searchFor('');await wait(()=>button('Second commit'));
+ if(document.querySelector('section[aria-label=historyGraph] [aria-current=true]'))throw Error('Clearing search restored stale graph selection');
  button('First commit').click();await wait(()=>graphButtons[0].getAttribute('aria-current')==='true'&&button('added · example.txt'));
  if(graphButtons[1].hasAttribute('aria-current')||calls.at(-1).payload.commit!==a)throw Error('List selection did not synchronize graph and detail');
  button('added · example.txt').click();await wait(()=>document.querySelector('.vcs-text-comparison'));
