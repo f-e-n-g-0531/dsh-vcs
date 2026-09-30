@@ -9,6 +9,7 @@ import {XMLParser} from 'fast-xml-parser';
 import {parseSvnLogPage} from '../src/svn-log.mjs';
 import {relativeSvnPath} from '../src/svn-path.mjs';
 import {parseSvnDetail} from '../src/svn-detail.mjs';
+import {parseSvnPropertyNames} from '../src/svn-property-names.mjs';
 import {planSvnComparison} from '../src/svn-comparison-plan.mjs';
 test('local SVN path history skips unrelated revisions and pins numeric snapshot',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-svn-history-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
@@ -114,5 +115,11 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const specialProperties=parser.parse(svn(['proplist','--xml','--verbose','-r','13','--',rootUrl+'/scope/special@13']));
  assert.equal(specialProperties.properties.target.property['@_name'],'svn:special');
  assert.equal(svn(['cat','-r','13','--',rootUrl+'/scope/special@13']),'link ../outside-target');
+ const namesXml=(suffix,revision)=>svn(['proplist','--xml','-r',revision,'--',rootUrl+suffix+'@'+revision]);
+ assert.deepEqual(parseSvnPropertyNames(namesXml('/scope/special','13'),{target:rootUrl+'/scope/special'}),{target:rootUrl+'/scope/special',names:['svn:special'],special:true});
+ assert.deepEqual(parseSvnPropertyNames(namesXml('/scope/imported','12'),{target:rootUrl+'/scope/imported'}),{target:rootUrl+'/scope/imported',names:['review:test'],special:false});
+ const emptyNames=namesXml('/scope/imported','11');
+ assert.equal(parser.parse(emptyNames).properties.target,undefined);
+ assert.throws(()=>parseSvnPropertyNames(emptyNames,{target:rootUrl+'/scope/imported'}));
  assert.deepEqual(parser.parse(svn(['status','--xml'])),specialStatus);
 });
