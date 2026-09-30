@@ -85,7 +85,8 @@ export async function checkRevisions(){
   await wait(()=>host.querySelectorAll('optgroup').length===4);
   const select=host.querySelector('select'),groups=select.querySelectorAll('optgroup');
   if(groups[0].label!==locales[language].revisionLoadedCommits||groups[1].label!==locales[language].revisionLocalRefs||groups[1].children.length!==2)throw Error('Localized groups or duplicate refs lost');
-  choose(0,a);choose(1,a);await wait(()=>seen.some(c=>c.endpoint==='vcs/revision-changes'));
+  const chooseReference=(side,name)=>{const field=host.querySelectorAll('select')[side];const option=[...field.options].find(o=>o.parentElement.tagName==='OPTGROUP'&&o.textContent.startsWith(name+' · '));if(!option)throw Error('Missing named reference option');field.selectedIndex=option.index;field.dispatchEvent(new Event('change',{bubbles:true}));};
+  chooseReference(0,'refs/heads/same');chooseReference(1,'refs/tags/same');await wait(()=>seen.some(c=>c.endpoint==='vcs/revision-changes'));
   const pair=seen.at(-1).p;if(pair.base!==a||pair.target!==a)throw Error('Duplicate OID group changed comparison identity');
  }
  }finally{root.unmount();host.remove();}
