@@ -2,7 +2,10 @@ import React,{useState,useEffect} from 'react';
 import HistoricalTree from './HistoricalTree.jsx';
 import HistoryComparison from './HistoryComparison.jsx';
 import {filterCommitFiles} from './history-filter.mjs';
-export default function CommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}){
+export default function CommitDetails(props){
+ return <ScopedCommitDetails key={JSON.stringify([props.sessionId,props.repositoryId,props.commit])} {...props}/>;
+}
+function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}){
  const [selected,setSelected]=useState(null),[query,setQuery]=useState('');
  const [parentIndex,setParentIndex]=useState(0),[details,setDetails]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{
