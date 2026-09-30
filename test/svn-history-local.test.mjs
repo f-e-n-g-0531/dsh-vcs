@@ -35,4 +35,13 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  assert.deepEqual(copyLog(false).map(e=>e['@_revision']),['6','5','4','3','1']);
  assert.equal(svn(['cat','-r','5','--','copy.txt@6']),'r4');
  assert.deepEqual(parser.parse(svn(['status','--xml'])),parser.parse(copyStatus));assert.deepEqual(parser.parse(svn(['info','--xml','--','copy.txt@'])),parser.parse(copyInfo));assert.equal(await fs.readFile(path.join(wc,'copy.txt'),'utf8'),'r6');
+ // Delete only in the temporary fixture; use the repository URL for the old identity.
+ svn(['delete','--','copy.txt']);svn(['commit','-m','r7 deletion']);
+ const deletedStatus=parser.parse(svn(['status','--xml']));
+ const rootUrl=pathToFileURL(repository).href,copyUrl=rootUrl+'/copy.txt';
+ const deletion=parser.parse(svn(['log','--xml','--verbose','-r','7:7','--',rootUrl+'@7'])).log.logentry[0];
+ assert.equal(deletion.paths.path['@_action'],'D');assert.equal(deletion.paths.path['#text'],'/copy.txt');
+ assert.equal(svn(['cat','-r','6','--',copyUrl+'@6']),'r6');
+ await assert.rejects(fs.stat(path.join(wc,'copy.txt')),{code:'ENOENT'});
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),deletedStatus);
 });
