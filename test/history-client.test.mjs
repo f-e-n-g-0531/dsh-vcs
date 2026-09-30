@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 test('revision reference entry remains available without loaded HEAD commits',async()=>{
  const source=await readFile(new URL('../src/HistoryPanel.jsx',import.meta.url),'utf8');
- assert.ok(source.includes('\n <RevisionPanel commits={page.commits}'));
+ assert.ok(source.includes('\n <RevisionPanel onReferencesLoaded={setReferences} commits={page.commits}'));
  assert.ok(source.includes('!!page.commits.length&&<HistoryGraph'));
  const revisions=await readFile(new URL('../src/RevisionPanel.jsx',import.meta.url),'utf8');
  assert.ok(revisions.includes('if(!load)return;'));
