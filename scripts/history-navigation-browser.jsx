@@ -52,6 +52,11 @@ export async function checkHistoryNavigation(){
   const jumpCalls=calls.slice(beforeBlameJump);
   if(jumpCalls.length!==1||jumpCalls[0].endpoint!=='vcs/commit'||jumpCalls[0].p.commit!==a||jumpCalls[0].p.parentIndex!==0)throw Error('Blame navigation carried file path or wrong commit parent');
   if(!blameCall.signal.aborted||host.querySelector('[aria-label=blame]')||host.querySelector('.vcs-text-comparison')||button('modified · file.txt').getAttribute('aria-pressed')!=='false')throw Error('Blame navigation retained old review state');
+  const sameParent=host.querySelector('select[aria-label=commitParent]');sameParent.value='1';sameParent.dispatchEvent(new Event('change',{bubbles:true}));
+  await wait(()=>calls.at(-1)?.p.parentIndex===1&&button('modified · file.txt'));button('modified · file.txt').click();await wait(()=>button('blame'));button('blame').click();
+  await wait(()=>host.querySelector('[aria-label=blame] tbody button'));const sameBlame=calls.findLast(x=>x.endpoint==='vcs/blame'),sameCount=calls.length;
+  host.querySelector('[aria-label=blame] tbody button').click();await wait(()=>sameBlame.signal.aborted&&host.querySelector('select[aria-label=commitParent]')?.value==='0');
+  if(calls.length!==sameCount+1||calls.at(-1).endpoint!=='vcs/commit'||calls.at(-1).p.commit!==a||host.querySelector('.vcs-text-comparison')||button('modified · file.txt')?.getAttribute('aria-pressed')!=='false')throw Error('Same commit blame navigation failed to reset details');
   for(const path of ['missing.txt','file.txt']){
    const navigationCalls=[];const navRpc=(endpoint,p,signal)=>{navigationCalls.push({endpoint,p});return rpc(endpoint,p,signal);};
    root.render(<CommitDetails key={path} initialPath={path} sessionId='s' repositoryId='r' commit={a} rpc={navRpc} t={k=>k} onRediscover={()=>{}}/>);

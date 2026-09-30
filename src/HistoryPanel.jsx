@@ -9,6 +9,7 @@ export default function HistoryPanel(props){
 function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const [selection,setSelection]=useState({id:null,path:null,revision:0}),[query,setQuery]=useState('');
  const selected=selection.id;
+ const navigateCommit=(id,path=null)=>setSelection(old=>({id,path,revision:old.revision+1}));
  const setSelected=(id,path=null)=>setSelection(old=>({id,path,revision:old.revision+(path||old.path?1:0)}));
  const [page,setPage]=useState({commits:[],snapshot:null,nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  // Scope changes remount locally; parent still remounts for refresh. Pagination pins first snapshot.
@@ -32,6 +33,6 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  {!!page.commits.length&&<HistoryGraph commits={page.commits} selected={selected} onSelect={setSelected} t={t}/>}
  <RevisionPanel commits={page.commits} {...{sessionId,repositoryId,rpc,t,onRediscover}}/>
- {selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={setSelected} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+ {selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </section>;
 }
