@@ -23,5 +23,16 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const page=svnRevisionPage(revisions('3',2),{snapshot:'3',limit:1});assert.deepEqual(page,{snapshot:'3',revisions:['3'],nextRevision:'2'});
  assert.deepEqual(svnRevisionPage(revisions(page.nextRevision,2),{snapshot:'3',cursor:page.nextRevision,limit:1}),{snapshot:'3',revisions:['1'],nextRevision:null});
  assert.equal(svn(['cat','-r','3','--',name+'@3']),'r3');assert.equal(await fs.readFile(file,'utf8'),'r4');
- assert.equal(svn(['status','--xml']),status);assert.equal(svn(['info','--xml','--',name+'@']),info);
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),parser.parse(status));assert.deepEqual(parser.parse(svn(['info','--xml','--',name+'@'])),parser.parse(info));
+ // Fixture writes create a copy at r5; subsequent review commands remain read-only.
+ svn(['copy','--',name+'@','copy.txt']);svn(['commit','-m','r5 copy']);
+ await fs.writeFile(path.join(wc,'copy.txt'),'r6');svn(['commit','-m','r6 edit']);
+ const copyStatus=svn(['status','--xml']),copyInfo=svn(['info','--xml','--','copy.txt@']);
+ const copyLog=stop=>parser.parse(svn(['log','--xml','--verbose',...(stop?['--stop-on-copy']:[]),'-r','6:0','--','copy.txt@6'])).log.logentry;
+ const stopped=copyLog(true);assert.deepEqual(stopped.map(e=>e['@_revision']),['6','5']);
+ const copy=stopped[1].paths.path;assert.equal(copy['@_action'],'A');assert.equal(copy['@_copyfrom-path'],'/'+name);assert.equal(copy['@_copyfrom-rev'],'4');
+ // Positive control proves the default command would cross the copy boundary.
+ assert.deepEqual(copyLog(false).map(e=>e['@_revision']),['6','5','4','3','1']);
+ assert.equal(svn(['cat','-r','5','--','copy.txt@6']),'r4');
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),parser.parse(copyStatus));assert.deepEqual(parser.parse(svn(['info','--xml','--','copy.txt@'])),parser.parse(copyInfo));assert.equal(await fs.readFile(path.join(wc,'copy.txt'),'utf8'),'r6');
 });
