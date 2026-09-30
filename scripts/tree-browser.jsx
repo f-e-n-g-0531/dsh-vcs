@@ -14,7 +14,9 @@ export async function checkTree(){
  if(host.querySelectorAll('li').length!==3||button('link')||button('submodule'))throw Error('Special objects are navigable');
  button('nested/').click();await wait(()=>button('treeNext'));if(host.querySelectorAll('li').length!==100)throw Error('First page unbounded');
  button('treeNext').click();await wait(()=>button('treePrevious'));if(host.querySelectorAll('li').length!==1||button('treeNext'))throw Error('Last page incorrect');
- button('treePrevious').click();await wait(()=>host.querySelectorAll('li').length===100);
+ const search=host.querySelector('input[aria-label=treeSearch]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(search,'file100');search.dispatchEvent(new Event('input',{bubbles:true}));
+ await wait(()=>host.querySelectorAll('li').length===1&&!button('treePrevious'));if(!host.textContent.includes('file100')||calls!==1)throw Error('Tree filter failed to reset page or made RPC');
+ Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(search,'');search.dispatchEvent(new Event('input',{bubbles:true}));await wait(()=>host.querySelectorAll('li').length===100);
  button('treeUp').click();await wait(()=>button('nested/'));if(calls!==1)throw Error('Navigation made extra RPC');
  button('historicalTree').click();await wait(()=>!host.querySelector('section'));button('historicalTree').click();await wait(()=>resolveLate);
  button('historicalTree').click();await wait(()=>signal.aborted);resolveLate({commit,entries:[{path:'STALE',mode:'100644',type:'blob',oid}]});
