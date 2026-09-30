@@ -1,4 +1,5 @@
 import React from 'react';
+import locales from '../src/locales.json';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import HistoricalTree from '../src/HistoricalTree.jsx';
@@ -27,6 +28,20 @@ export async function checkTree(){
  button('historicalTree').click();await wait(()=>!host.querySelector('section'));button('historicalTree').click();await wait(()=>resolveLate);
  button('historicalTree').click();await wait(()=>signal.aborted);resolveLate({commit,entries:[{path:'STALE',mode:'100644',type:'blob',oid}]});
  await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE')||calls!==2)throw Error('Closed tree accepted stale response');
+ for(const language of ['zh','en']){
+  const t=k=>locales[language][k],parent=' spaced 中文%2F ',child='<img>',directory=parent+'/'+child;let treeRequests=0,previewSignal,resolvePreview;
+  const crumbEntries=[parent,directory].map(path=>({path,type:'tree',mode:'040000',oid})).concat(Array.from({length:101},(_,i)=>({path:directory+'/file'+i,type:'blob',mode:'100644',oid})));
+  const crumbRpc=async(endpoint,p,s)=>{if(endpoint==='vcs/tree'){treeRequests++;return {entries:crumbEntries};}previewSignal=s;return new Promise(resolve=>resolvePreview=resolve);};
+  flushSync(()=>root.render(<HistoricalTree key={language} sessionId='crumb' repositoryId='r' commit={commit} rpc={crumbRpc} t={t} onRediscover={()=>{throw Error('Unexpected breadcrumb rediscovery');}}/>));
+  button(t('historicalTree')).click();await wait(()=>button(parent+'/'));button(parent+'/').click();await wait(()=>button(child+'/'));button(child+'/').click();await wait(()=>button(t('treeNext')));
+  const nav=()=>host.querySelector('nav');if(nav().getAttribute('aria-label')!==t('treeBreadcrumbs')||nav().querySelector('[aria-current=location]')?.textContent!==child||nav().querySelector('img'))throw Error('Breadcrumb identity or escaping failed');
+  button(t('treeNext')).click();await wait(()=>button(t('treePrevious')));nav().querySelector('button').click();await wait(()=>button(parent+'/'));
+  button(parent+'/').click();await wait(()=>button(child+'/'));button(child+'/').click();await wait(()=>button(t('treeNext')));if(button(t('treePrevious')))throw Error('Breadcrumb retained old pagination');
+  const input=host.querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'file0');input.dispatchEvent(new Event('input',{bubbles:true}));await wait(()=>host.querySelectorAll('li').length===1);button('file0').click();await wait(()=>resolvePreview);
+  [...nav().querySelectorAll('button')].find(b=>b.textContent===parent).click();await wait(()=>previewSignal.aborted&&button(child+'/'));
+  if(host.querySelector('input').value||host.querySelector('[aria-label="'+t('treePreview')+'"]')||treeRequests!==1)throw Error('Ancestor navigation retained search/preview or reread tree');
+  resolvePreview({text:'LATE BREADCRUMB',oid});await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('LATE BREADCRUMB'))throw Error('Late breadcrumb preview leaked');
+ }
  const pending=[],requests=[];let fail=true,identity={sessionId:'preview',repositoryId:'r',commit};
  const previewRpc=async(endpoint,p,s)=>{
   requests.push({endpoint,p,s});if(endpoint==='vcs/tree')return {commit:p.commit,entries:['retry-file','empty-file','binary-file','pending-file'].map(path=>({path,type:'blob',mode:'100644',oid}))};
