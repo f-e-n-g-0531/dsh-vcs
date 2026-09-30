@@ -22,9 +22,9 @@ try{
  if(!JSON.parse(report).pass)throw Error('Main browser fixture failed');
  const evaluate=async expression=>{const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
  await evaluate("import('./graph-native-browser.js').then(m=>{globalThis.disposeNativeGraph=m.mount();})");
- const press=async(key,code,virtualKey,text)=>{
-  await call('Input.dispatchKeyEvent',{type:'keyDown',key,code,windowsVirtualKeyCode:virtualKey,...(text?{text}: {})});
-  await call('Input.dispatchKeyEvent',{type:'keyUp',key,code,windowsVirtualKeyCode:virtualKey});
+ const press=async(key,code,virtualKey,text,modifiers=0)=>{
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key,code,modifiers,windowsVirtualKeyCode:virtualKey,...(text?{text}: {})});
+  await call('Input.dispatchKeyEvent',{type:'keyUp',key,code,modifiers,windowsVirtualKeyCode:virtualKey});
  };
  try{
   await press('ArrowDown','ArrowDown',40);
@@ -36,6 +36,12 @@ try{
   if(!await evaluate("nativeGraphState.activations===2 && nativeGraphState.selected==='1'.padStart(40,'0') && nativeGraphState.trusted.every(Boolean)"))throw Error('Native Space activation failed');
   await press('End','End',35);await press('Tab','Tab',9);
   if(!await evaluate("document.activeElement===document.querySelector('#native-graph summary') && nativeGraphState.activations===2"))throw Error('Native Tab exit failed');
-  await writeFile('test-results/graph-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeGraphState'),steps:['arrow-focus','enter-activation','space-activation','tab-exit']}));
+  await press('Tab','Tab',9,undefined,8);
+  if(!await evaluate("document.activeElement===document.querySelectorAll('#native-graph ol button')[1]"))throw Error('Native reverse Tab entry failed');
+  await press('Home','Home',36);await press('Tab','Tab',9,undefined,8);
+  if(!await evaluate("document.activeElement===document.querySelector('#native-graph button')"))throw Error('Native reverse Tab exit failed');
+  await press('Enter','Enter',13,'\r');
+  if(!await evaluate("!document.querySelector('#native-graph svg') && document.activeElement===document.querySelector('#native-graph button') && nativeGraphState.activations===2"))throw Error('Native keyboard collapse failed');
+  await writeFile('test-results/graph-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeGraphState'),steps:['arrow-focus','enter-activation','space-activation','tab-exit','reverse-tab-entry','reverse-tab-exit','keyboard-collapse']}));
  }finally{await evaluate('disposeNativeGraph();delete globalThis.disposeNativeGraph');}
 }finally{ws?.close();chrome.kill();await new Promise(r=>chrome.exitCode!==null?r():chrome.once('exit',r));await rm(profile,{recursive:true,force:true,maxRetries:5});}
