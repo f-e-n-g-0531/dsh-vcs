@@ -16,6 +16,9 @@ function FileHistoryPages({sessionId,repositoryId,commit,parentIndex,id,rpc,t,on
  </section>;
 }
 export default function FileHistory(props){
+ return <ScopedFileHistory key={JSON.stringify([props.sessionId,props.repositoryId,props.commit,props.parentIndex,props.id])} {...props}/>;
+}
+function ScopedFileHistory(props){
  const [open,setOpen]=useState(false);
  return <div><button aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{props.t('fileHistory')}</button>{open&&<FileHistoryPages {...props}/>}</div>;
 }
