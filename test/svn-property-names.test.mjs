@@ -6,6 +6,13 @@ test('SVN names-only preflight detects special property and explicit empty targe
  assert.deepEqual(parseSvnPropertyNames(wrap('<property name="svn:special"/><property name="custom:value"/>'),{target}),{target,names:['svn:special','custom:value'],special:true});
  assert.deepEqual(parseSvnPropertyNames(wrap(''),{target}),{target,names:[],special:false});
 });
+test('SVN property structure permits only XML whitespace',()=>{
+ assert.deepEqual(parseSvnPropertyNames(wrap(' \t\r\n'),{target}).names,[]);
+ for(const text of ['\u00a0','\u2003','\ufeff','&#160;']){
+  assert.throws(()=>parseSvnPropertyNames(wrap(text),{target}));
+  assert.throws(()=>parseSvnPropertyNames(wrap('<property name="x">'+text+'</property>'),{target}));
+ }
+});
 test('SVN property preflight bounds bytes count names and unique targets',()=>{
  const props=Array.from({length:10000},(_,i)=>'<property name="p'+i+'"/>').join('');
  assert.equal(parseSvnPropertyNames(wrap(props),{target}).names.length,10000);

@@ -4,7 +4,7 @@ export function parseSvnPropertyNames(xml,{target}={}){
  if(typeof target!=='string'||!target||target.length>32768)throw new Error('Invalid SVN property target');
  if(typeof xml!=='string'||Buffer.byteLength(xml,'utf8')>2*1024*1024||/<!DOCTYPE|<!ENTITY/i.test(xml)||XMLValidator.validate(xml)!==true)throw new Error('Invalid SVN property XML');
  const doc=new XMLParser({ignoreAttributes:false,parseAttributeValue:false,parseTagValue:false,trimValues:false,isArray:name=>name==='target'||name==='property'}).parse(xml);
- const check=(value,keys)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!keys.includes(k)&&!(k==='#text'&&typeof value[k]==='string'&&value[k].trim()==='')))throw new Error('Invalid SVN property structure');};
+ const check=(value,keys)=>{if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!keys.includes(k)&&!(k==='#text'&&typeof value[k]==='string'&&/^[ \t\r\n]*$/.test(value[k]))))throw new Error('Invalid SVN property structure');};
  check(doc,['?xml','properties']);check(doc.properties,['target']);
  const targets=doc.properties.target;
  if(!Array.isArray(targets)||targets.length!==1)throw new Error('Expected one SVN property target');
