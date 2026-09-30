@@ -3,10 +3,13 @@ import CommitDetails from './CommitDetails.jsx';
 import HistoryGraph from './HistoryGraph.jsx';
 import RevisionPanel from './RevisionPanel.jsx';
 import {filterLoadedCommits} from './history-filter.mjs';
-export default function HistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
+export default function HistoryPanel(props){
+ return <ScopedHistoryPanel key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;
+}
+function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const [selected,setSelected]=useState(null),[query,setQuery]=useState('');
  const [page,setPage]=useState({commits:[],snapshot:null,nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
- // Parent remounts on repository/refresh changes; pagination stays anchored to first snapshot.
+ // Scope changes remount locally; parent still remounts for refresh. Pagination pins first snapshot.
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
   rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(offset?{snapshot:page.snapshot}:{})},controller.signal).then(value=>{

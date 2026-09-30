@@ -37,5 +37,23 @@ export async function checkHistoryNavigation(){
    button('modified · file.txt').click();await wait(()=>host.querySelector('.vcs-text-comparison'));
    if(!host.textContent.includes(locales[language].commitMessageLimit))throw Error('Omission notice lost after selecting file');
   }
+  const pending=[],scopedCalls=[];
+  const scopedRpc=async(endpoint,p,signal)=>{
+   scopedCalls.push({endpoint,p,signal});
+   if(endpoint!=='vcs/history')return rpc(endpoint,p,signal);
+   if(p.offset)return new Promise(resolve=>pending.push({resolve,signal}));
+   return {snapshot:a,commits:[row(a,'scope start')],nextOffset:50};
+  };
+  const renderScope=(sessionId,repositoryId)=>root.render(<HistoryPanel {...{sessionId,repositoryId}} rpc={scopedRpc} t={k=>k} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
+  renderScope('one','r');await wait(()=>button('scope start'));
+  for(const [sessionId,repositoryId] of [['two','r'],['two','other']]){
+   button('scope start').click();await wait(()=>host.querySelector('[aria-label=commitDetails]'));
+   const count=pending.length;button('historyMore').click();await wait(()=>pending.length>count);const old=pending.at(-1);
+   renderScope(sessionId,repositoryId);await wait(()=>old.signal.aborted&&scopedCalls.some(x=>x.p.sessionId===sessionId&&x.p.repositoryId===repositoryId&&x.endpoint==='vcs/history'));
+   const request=scopedCalls.find(x=>x.p.sessionId===sessionId&&x.p.repositoryId===repositoryId&&x.endpoint==='vcs/history');
+   if(request.p.offset!==0||Object.hasOwn(request.p,'snapshot')||host.querySelector('[aria-label=commitDetails]'))throw Error('Scope switch retained history cursor or selection');
+   old.resolve({snapshot:a,commits:[row(c,'STALE PAGE')],nextOffset:null});await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE PAGE'))throw Error('Stale page survived scope switch');
+   await wait(()=>button('scope start'));
+  }
  }finally{root.unmount();host.remove();}
 }
