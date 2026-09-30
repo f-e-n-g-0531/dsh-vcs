@@ -2,6 +2,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import HistoricalTree from '../src/HistoricalTree.jsx';
+import HistoricalFile from '../src/HistoricalFile.jsx';
 export async function checkTree(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
  const commit='a'.repeat(40),oid='b'.repeat(40);let calls=0,resolveLate,signal;
@@ -45,5 +46,11 @@ export async function checkTree(){
   old.resolve({text:'OLD PREVIEW',oid});await new Promise(r=>setTimeout(r,50));if(host.querySelector('section')||requests.length!==count||host.textContent.includes('OLD PREVIEW'))throw Error('Preview scope leaked or fetched automatically');
   button('historicalTree').click();await wait(()=>button('pending-file'));
  }
+ let rediscoveries=0,expiredCalls=0;
+ const expiredRpc=async()=>{expiredCalls++;throw Object.assign(Error('Expired preview authorization'),{code:'vcs/rediscover-required'});};
+ root.render(<HistoricalFile sessionId='expired' repositoryId='r' commit={commit} path='file.txt' rpc={expiredRpc} t={k=>k} onClose={()=>{}} onRediscover={()=>{rediscoveries++;}}/>);
+ await wait(()=>host.querySelector('[role=alert]')?.textContent.includes('Expired preview authorization'));
+ if(rediscoveries!==1||expiredCalls!==1||host.querySelector('pre'))throw Error('Expired preview failed rediscovery or retained body');
+ await new Promise(r=>setTimeout(r,50));if(expiredCalls!==1)throw Error('Expired preview automatically retried');
  }finally{root.unmount();host.remove();}
 }
