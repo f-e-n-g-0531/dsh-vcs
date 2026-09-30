@@ -1,6 +1,11 @@
 import {XMLParser,XMLValidator} from 'fast-xml-parser';
-import {parseSvnRevision} from './svn-revision.mjs';
+import {parseSvnRevision,svnRevisionPage} from './svn-revision.mjs';
 // Offline preparation only: this module does not authorize or perform requests.
+export function parseSvnLogPage(xml,options){
+ const entries=parseSvnLog(xml);
+ const page=svnRevisionPage(entries.map(entry=>entry.revision),options);
+ return {snapshot:page.snapshot,entries:entries.slice(0,page.revisions.length),nextRevision:page.nextRevision};
+}
 export function parseSvnLog(xml){
  if(typeof xml!=='string'||Buffer.byteLength(xml,'utf8')>2*1024*1024||/<!DOCTYPE|<!ENTITY/i.test(xml)||XMLValidator.validate(xml)!==true)throw new Error('Invalid SVN log XML');
  const parser=new XMLParser({ignoreAttributes:false,parseAttributeValue:false,parseTagValue:false,trimValues:false,isArray:name=>name==='logentry'});
