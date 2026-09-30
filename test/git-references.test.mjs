@@ -1,7 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {parseReferences} from '../git-history.mjs';
 const a='a'.repeat(40),b='b'.repeat(40);
+test('reference name validation agrees with Git for supported local namespaces',()=>{
+ const valid=['main','主题/版本','feature/a-b_c','@','a@b','a.locked','a./b','release#1','x%y','x;y','x(y)','x{y}','x]y'];
+ const invalid=['','/a','a/','a//b','.hidden','x/.hidden','a.lock','x/a.lock/y','a.','a..b','a@{b','a b','a~b','a^b','a:b','a?b','a*b','a[b','a'+String.fromCharCode(92)+'b','a'+String.fromCharCode(127)+'b',...Array.from({length:32},(_,i)=>'a'+String.fromCharCode(i)+'b')];
+ for(const prefix of ['refs/heads/','refs/tags/'])for(const [names,expected] of [[valid,true],[invalid,false]])for(const short of names){
+  const name=prefix+short;
+  // NUL cannot be passed as a process argument, but must still be rejected by framing.
+  if(!name.includes(String.fromCharCode(0))){
+   const git=spawnSync('git',['check-ref-format',name],{encoding:'utf8',windowsHide:true,timeout:5000});
+   assert.ifError(git.error);assert.ok(git.status===0||git.status===1,git.stderr);assert.equal(git.status===0,expected,JSON.stringify(name));
+  }
+  if(expected)assert.equal(parseReferences(row(name))[0].name,name);else assert.throws(()=>parseReferences(row(name)),undefined,JSON.stringify(name));
+ }
+});
 const row=(name,type='commit',id=a,pt='',p='')=>[name,type,id,pt,p,''].join('\0')+'\n';
 test('references distinguish branches lightweight and annotated commit tags',()=>{
  assert.deepEqual(parseReferences(row('refs/heads/主题')+row('refs/tags/light')+row('refs/tags/release','tag',a,'commit',b)),[
