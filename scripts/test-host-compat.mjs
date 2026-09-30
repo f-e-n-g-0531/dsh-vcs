@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import React from 'react';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
@@ -13,6 +15,11 @@ assert.equal(hostManifest.name,'@deepseek-ai/dsh');assert.equal(hostManifest.ver
 const requireHost=createRequire(path.resolve(manifest));
 const {Context}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/cordis')));
 const {HostConnectionService}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-client-connection')));
+const rendererDeps=new Map();
+for(const name of ['react','react-dom','react-dom/client','react/jsx-runtime','@deepseek-ai/dsh-client-ui-slots','@deepseek-ai/cordis'])rendererDeps.set(name,await import(pathToFileURL((name.startsWith('react')?createRequire(import.meta.url):requireHost).resolve(name))));
+let renderer;
+vm.runInNewContext(await readFile(requireHost.resolve('@deepseek-ai/dsh-client-ui-renderer/client'),'utf8'),{window:{__ModuleLoader__:{load(row){renderer=row.factory(name=>{assert.ok(rendererDeps.has(name),name);return rendererDeps.get(name);});}}},console,queueMicrotask,AbortController});
+const {SlotRegistry}=renderer;
 const ctx=new Context(),routes=new Map();
 let authenticated=false;
 try{
@@ -46,5 +53,19 @@ try{
  await fiber.dispose();assert.equal(routes.size,0);
  assert.equal((await fetcher.fetch(new Request('http://127.0.0.1:3080/api/vcs-assets/editor.css'))).status,404);
  const reloaded=await ctx.plugin(plugin);assert.equal(routes.size,4);await reloaded.dispose();assert.equal(routes.size,0);
+ const clientCtx=new Context();
+ try{
+  new SlotRegistry(clientCtx);
+  clientCtx.provide('locale',{register:()=>()=>{},bind:()=>key=>key});
+  clientCtx.provide('layout',{selectPanel(){throw Error('Unexpected navigation');}});
+  clientCtx.provide('connection',{rpc:{call(){throw Error('Unexpected activation RPC');}}});clientCtx.provide('uiSession',{});
+  clientCtx.slots.register({name:'root',children:{main:{kind:'keyed',scope:'root'},'sidebar.panellist':{kind:'list',scope:'root'}}},()=>null);
+  let client;
+  vm.runInNewContext(await readFile(new URL('../dist/client.js',import.meta.url),'utf8'),{window:{__ModuleLoader__:{load(row){client=row.factory(name=>{assert.equal(name,'react');return React;});}}},URL,AbortController,console});
+  const loaded=await clientCtx.plugin(client);
+  assert.equal(clientCtx.slots.entries('main').length,1);assert.equal(clientCtx.slots.entries('sidebar.panellist').length,1);assert.equal(clientCtx.slots.entries('root').length,1);
+  await loaded.dispose();assert.equal(clientCtx.slots.entries('main').length,0);assert.equal(clientCtx.slots.entries('sidebar.panellist').length,0);assert.equal(clientCtx.slots.entries('root').length,1);
+ }finally{await clientCtx.fiber.dispose();}
+ console.log('Real client SlotRegistry load/unload passed with fixture shell/locale; not actual page rendering.');
  console.log('Real Cordis/Connection registration, admission, assets and disposal passed; not live GUI acceptance.');
 }finally{await ctx.fiber.dispose();}
