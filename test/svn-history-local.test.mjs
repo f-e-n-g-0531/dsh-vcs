@@ -104,4 +104,15 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const props=revision=>parser.parse(svn(['proplist','--xml','--verbose','-r',revision,'--',rootUrl+'/scope/imported@'+revision]));
  assert.notDeepEqual(props('11'),props('12'));assert.equal(props('12').properties.target.property['#text'],'property r12');
  assert.deepEqual(parser.parse(svn(['status','--xml'])),propertyStatus);
+ const specialPath=path.join(wc,'scope','special');
+ if(process.platform==='win32'){await fs.writeFile(specialPath,'link ../outside-target');svn(['add','--','scope/special']);await fs.writeFile(path.join(root,'special-value'),'*');svn(['propset','svn:special','--file',path.join(root,'special-value'),'--','scope/special']);}
+ else{await fs.symlink('../outside-target',specialPath);svn(['add','--','scope/special']);}
+ svn(['commit','-m','r13 special file']);
+ const specialStatus=parser.parse(svn(['status','--xml']));
+ const specialDetail=parseSvnDetail(svn(['log','--xml','--verbose','-r','13:13','--',rootUrl+'/scope@13']),{scope:'/scope',revision:'13'});
+ assert.equal(specialDetail.changes[0].kind,'file');
+ const specialProperties=parser.parse(svn(['proplist','--xml','--verbose','-r','13','--',rootUrl+'/scope/special@13']));
+ assert.equal(specialProperties.properties.target.property['@_name'],'svn:special');
+ assert.equal(svn(['cat','-r','13','--',rootUrl+'/scope/special@13']),'link ../outside-target');
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),specialStatus);
 });
