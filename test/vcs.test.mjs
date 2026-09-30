@@ -316,6 +316,8 @@ test('partial clone history never hydrates missing promised blobs',async t=>{
  assert.ok(missing().includes('?'+oid),'Blame must not hydrate promised objects');
  const tree=await getHistoricalTree(repo,{commit:commitId});assert.equal(tree.entries.find(e=>e.path==='promised.txt').oid,oid);
  assert.ok(missing().includes('?'+oid),'Tree listing must not hydrate file blobs');
+ await assert.rejects(getHistoricalFile(repo,{commit:commitId,path:'promised.txt'}),{code:'VCS_COMMAND'});
+ assert.ok(missing().includes('?'+oid),'Historical file preview must not hydrate promised objects');
  await assert.rejects(getCommitImage(repo,{commit:commitId,id:detail.changes[0].id}),{code:'VCS_COMMAND'});
  assert.ok(missing().includes('?'+oid),'Image preview must not hydrate promised objects');
  // Positive control: the source can supply the blob if explicitly permitted.
@@ -337,6 +339,7 @@ test('history ignores replace refs so snapshots retain original contents',async 
  const revisions=await getRevisionChanges(repo,{base:original,target:replacement});assert.equal(revisions.changes.length,1);
  const revision=await getRevisionComparison(repo,{base:original,target:replacement,id:revisions.changes[0].id});
  assert.equal(revision.left.text,'original');assert.equal(revision.right.text,'replacement');
+ assert.equal((await getHistoricalFile(repo,{commit:original,path:'file.txt'})).text,'original');
  assert.equal(cmd(root,'git',['replace','-l']).stdout.trim(),original);
 });
 
@@ -359,6 +362,7 @@ test('historical special files remain bounded and never follow link or submodule
  assert.deepEqual(tree.entries.find(e=>e.path==='link.txt'),{path:'link.txt',mode:'120000',type:'blob',oid:blob});
  assert.deepEqual(tree.entries.find(e=>e.path==='submodule'),{path:'submodule',mode:'160000',type:'commit',oid:seed});
  assert.ok(!tree.entries.some(e=>e.path.startsWith('submodule/')||e.path.startsWith('link.txt/')));
+ for(const file of ['link.txt','submodule'])await assert.rejects(getHistoricalFile(repo,{commit:commitId,path:file}),/regular file/);
  const details=await getCommitDetails(repo,{commit:commitId});
  const compare=name=>getCommitComparison(repo,{commit:commitId,id:details.changes.find(row=>row.path===name).id});
  const binary=await compare('binary.dat');assert.equal(binary.binary,true);
