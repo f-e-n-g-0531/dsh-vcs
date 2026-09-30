@@ -9,6 +9,7 @@ import {XMLParser} from 'fast-xml-parser';
 import {parseSvnLogPage} from '../src/svn-log.mjs';
 import {relativeSvnPath} from '../src/svn-path.mjs';
 import {parseSvnDetail} from '../src/svn-detail.mjs';
+import {planSvnComparison} from '../src/svn-comparison-plan.mjs';
 test('local SVN path history skips unrelated revisions and pins numeric snapshot',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-svn-history-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
  const run=(name,args,cwd=root)=>{const r=spawnSync(name,args,{cwd,encoding:'utf8',windowsHide:true,timeout:20000,env:{...process.env,LC_ALL:process.platform==='linux'?'C.UTF-8':'en_US.UTF-8'}});assert.equal(r.status,0,r.stderr);return r.stdout;};
@@ -81,4 +82,11 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  assert.equal(svn(['cat','-r','10','--',rootUrl+'/scope/imported@10']),'r9');
  assert.equal(svn(['cat','-r','11','--',rootUrl+'/scope/imported@11']),'replacement r11');
  assert.deepEqual(parser.parse(svn(['status','--xml'])),replacementStatus);assert.equal(await fs.readFile(path.join(wc,'scope','imported'),'utf8'),'replacement r11');
+ const readSide=side=>side.empty?'':svn(['cat','-r',side.revision,'--',rootUrl+side.path.split('/').map(encodeURIComponent).join('/')+'@'+side.pegRevision]);
+ for(const [revision,target,action,left,right] of [['1','/'+name,'A','','r1'],['3','/'+name,'M','r1','r3'],['7','/copy.txt','D','r6',''],['11','/scope/imported','R','r9','replacement r11']]){
+  const detail=parseSvnDetail(svn(['log','--xml','--verbose','-r',revision+':'+revision,'--',rootUrl+'@11']),{scope:'/',revision});
+  const plan=planSvnComparison(detail.changes,{scope:'/',revision,path:target});
+  assert.equal(plan.action,action);assert.equal(readSide(plan.left),left);assert.equal(readSide(plan.right),right);
+ }
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),replacementStatus);
 });
