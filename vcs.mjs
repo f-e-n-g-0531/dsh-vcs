@@ -287,6 +287,16 @@ function parseCommitChanges(text,scope){
   }
   return changes;
 }
+export async function getHistoricalFile(repo,{commit,path:file,signal}={}){
+ if(typeof file!=='string'||!file||file.includes('\0'))throw new Error('Invalid historical path');
+ repo=await checkedRepo(repo,signal);
+ const tree=await getHistoricalTree(repo,{commit,signal}),entry=tree.entries.find(row=>row.path===file);
+ if(!entry)throw new Error('Path is not part of selected commit');
+ if(entry.type!=='blob'||!['100644','100755'].includes(entry.mode))throw new Error('Historical file preview requires a regular file');
+ const result=await content(()=>git(repo.root,['cat-file','blob',entry.oid],MAX_TEXT,{signal}));
+ signal?.throwIfAborted();
+ return {commit,path:file,oid:entry.oid,...result};
+}
 export async function getHistoricalTree(repo,{commit,signal}={}){
  if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');
  repo=await checkedRepo(repo,signal);if(repo.type!=='git')throw new Error('Historical tree supports Git only');

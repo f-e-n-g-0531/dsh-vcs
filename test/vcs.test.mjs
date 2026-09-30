@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame, getHistoricalTree, getCommitImage, listReferences } from '../vcs.mjs';
+import { detectRepository, listChanges, getComparison, listHistory, getCommitDetails, getCommitComparison, getRevisionChanges, getRevisionComparison, listFileHistory, getFileBlame, getHistoricalTree, getHistoricalFile, getCommitImage, listReferences } from '../vcs.mjs';
 
 function cmd(cwd, name, args, fail = false) {
   const result = spawnSync(name, args, { cwd, windowsHide: true, shell: false, encoding: 'utf8', timeout: 20000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: process.platform === 'linux' ? 'C.UTF-8' : 'en_US.UTF-8' } });
@@ -65,6 +65,18 @@ test('oversized commit body does not prevent details or file comparison',async t
  const blame=await getFileBlame(repo,{commit:head,id:details.changes[0].id});assert.equal(blame.lines[0].text,'content');
  const history=await listFileHistory(repo,{commit:head,id:details.changes[0].id});assert.equal(history.commits[0].id,head);
 });
+test('historical file reads only committed regular blobs with literal membership',async t=>{
+ const root=await gitRepo(t);await fs.mkdir(path.join(root,'nested'));await write(root,'nested/中文[1].txt','committed');await write(root,'binary',Buffer.from([0,1,2]));await write(root,'large','x'.repeat(2*1024*1024+1));commit(root);
+ const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
+ await write(root,'nested/中文[1].txt','working');const status=cmd(root,'git',['status','--porcelain']).stdout;
+ const result=await getHistoricalFile(repo,{commit:head,path:'nested/中文[1].txt'});assert.equal(result.text,'committed');assert.equal(result.commit,head);assert.match(result.oid,/^[a-f0-9]{40}$/);
+ assert.equal((await getHistoricalFile(repo,{commit:head,path:'binary'})).binary,true);assert.ok((await getHistoricalFile(repo,{commit:head,path:'large'})).notice);
+ for(const file of ['nested','../outside','nested/*',':(glob)*','missing'])await assert.rejects(getHistoricalFile(repo,{commit:head,path:file}),/regular file|not part/);
+ await assert.rejects(getHistoricalFile(repo,{commit:'HEAD',path:'binary'}),/Invalid commit/);
+ const controller=new AbortController();controller.abort();await assert.rejects(getHistoricalFile(repo,{commit:head,path:'binary',signal:controller.signal}),{name:'AbortError'});
+ assert.equal(cmd(root,'git',['status','--porcelain']).stdout,status);assert.equal(await fs.readFile(path.join(root,'nested/中文[1].txt'),'utf8'),'working');
+});
+
 test('historical tree reads committed nested entries not working directory contents',async t=>{
  const root=await gitRepo(t);await fs.mkdir(path.join(root,'nested'));await write(root,'nested/中文 [file].txt','committed');commit(root);
  const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
