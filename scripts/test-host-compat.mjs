@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
-import {apply,createHandler,resolveSessionCwd} from '../index.mjs';
+import {readFile} from 'node:fs/promises';
+import * as plugin from '../index.mjs';
+const {createHandler,resolveSessionCwd}=plugin;
 // Explicit installed DSH package path; no profile boot, HTTP listener, or user credentials.
 const manifest=process.argv[2];
 if(!manifest)throw Error('Usage: node scripts/test-host-compat.mjs <installed-dsh-package.json>');
+const hostManifest=JSON.parse(await readFile(path.resolve(manifest),'utf8'));
+assert.equal(hostManifest.name,'@deepseek-ai/dsh');assert.equal(hostManifest.version,'0.2.0-rc.2','This compatibility fixture currently targets only DSH 0.2.0-rc.2');
 const requireHost=createRequire(path.resolve(manifest));
 const {Context}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/cordis')));
 const {HostConnectionService}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-client-connection')));
@@ -15,7 +19,7 @@ try{
  ctx.provide('webServer',{register(route){assert.equal(routes.has(route.path),false);routes.set(route.path,route);return ()=>routes.delete(route.path);}});
  ctx.provide('sessions',new Map());ctx.provide('sessionPersistence',{stat:async()=>undefined});
  new HostConnectionService(ctx,[],{isAuthenticated:()=>authenticated});
- apply(ctx);
+ const fiber=await ctx.plugin(plugin);
  assert.deepEqual([...routes.keys()].sort(),['/vcs-assets/editor.css','/vcs-assets/editor.js','/vcs-assets/editor.worker.js','/vcs-rpc']);
  for(const route of routes.values()){
   let status,ended=false;await route.handler({method:'GET',headers:{host:'127.0.0.1:3080'}},{writeHead(n){status=n;},end(){ended=true;}});
@@ -39,7 +43,8 @@ try{
  ctx.sessions.set('fixture',{header:{cwd:process.cwd()}});
  assert.equal(await resolveSessionCwd(ctx,'fixture'),process.cwd());
  assert.equal((await invoke('vcs/status',{sessionId:'fixture',repositoryId:'not-granted'})).error.code,'vcs/rediscover-required');
- await ctx.fiber.dispose();assert.equal(routes.size,0);
+ await fiber.dispose();assert.equal(routes.size,0);
  assert.equal((await fetcher.fetch(new Request('http://127.0.0.1:3080/api/vcs-assets/editor.css'))).status,404);
+ const reloaded=await ctx.plugin(plugin);assert.equal(routes.size,4);await reloaded.dispose();assert.equal(routes.size,0);
  console.log('Real Cordis/Connection registration, admission, assets and disposal passed; not live GUI acceptance.');
 }finally{await ctx.fiber.dispose();}
