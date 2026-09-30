@@ -58,5 +58,13 @@ export async function checkTree(){
  await wait(()=>rejectCancelled);root.render(<p>replacement context</p>);await wait(()=>cancelledSignal.aborted);
  rejectCancelled(Object.assign(Error('LATE EXPIRED'),{code:'vcs/rediscover-required'}));await new Promise(r=>setTimeout(r,50));
  if(rediscoveries!==1||host.textContent!=='replacement context')throw Error('Cancelled preview triggered late rediscovery');
+ let failNext,transitionCalls=0;
+ const transitionRpc=async(_endpoint,p)=>{transitionCalls++;if(p.path==='before.txt')return {text:'PREVIOUS BODY',oid,encoding:'UTF-8'};return new Promise((_resolve,reject)=>{failNext=reject;});};
+ const showTransition=path=>root.render(<HistoricalFile key='transition' sessionId='s' repositoryId='r' commit={commit} path={path} rpc={transitionRpc} t={k=>k} onClose={()=>{}} onRediscover={()=>{rediscoveries++;}}/>);
+ showTransition('before.txt');await wait(()=>host.querySelector('pre')?.textContent==='PREVIOUS BODY');
+ showTransition('after.txt');await wait(()=>failNext&&host.querySelector('[role=status]'));
+ if(host.querySelector('pre')||host.textContent.includes('PREVIOUS BODY'))throw Error('Changed preview retained old body while loading');
+ failNext(Object.assign(Error('Changed path expired'),{code:'vcs/rediscover-required'}));await wait(()=>host.querySelector('[role=alert]'));
+ if(rediscoveries!==2||transitionCalls!==2||host.querySelector('pre'))throw Error('Changed preview authorization transition incorrect');
  }finally{root.unmount();host.remove();}
 }
