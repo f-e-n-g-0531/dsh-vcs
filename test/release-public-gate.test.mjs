@@ -12,3 +12,13 @@ const response=(status,value)=>({ok:status===200,status,json:async()=>value,arra
 const execute=fetch=>run(name=>name==='package.json'?JSON.stringify({name:'@feng0531/dsh-vcs',version:'0.3.45'}):bytes,createHash,assert,fetch,resolve=>resolve());
 test('public release gate retries absent metadata and verifies exact bytes',async()=>{let calls=0;await execute(async()=>{calls++;return calls===1?response(404):calls===2?response(200,metadata):response(200,bytes);});assert.equal(calls,3);});
 test('public release gate refuses unavailable or mismatched artifacts',async()=>{let calls=0;await assert.rejects(execute(async()=>{calls++;return response(404);}),/public artifact is not verified/);assert.equal(calls,10);await assert.rejects(execute(async()=>response(200,{dist:{...metadata.dist,integrity:'wrong'}})),/integrity mismatch/);let n=0;await assert.rejects(execute(async()=>++n===1?response(200,metadata):response(200,Buffer.from('changed'))),/size mismatch|bytes mismatch/);});
+test('public release gate retries missing tarball but fails closed on server errors',async()=>{
+ let n=0;await execute(async()=>{n++;return n%2?response(200,metadata):response(n===2?404:200,bytes);});assert.equal(n,4);
+ for(const status of [401,403,429,500]){let calls=0;await assert.rejects(execute(async()=>{calls++;return response(status);}),/metadata lookup failed/);assert.equal(calls,1);}
+ await assert.rejects(execute(async()=>{throw Error('network timeout');}),/network timeout/);
+});
+test('public release gate rejects foreign package origin before downloading',async()=>{
+ let calls=0;await assert.rejects(execute(async()=>{calls++;return response(200,{dist:{...metadata.dist,tarball:'https://example.com/package.tgz'}});}));assert.equal(calls,1);
+ assert.ok(workflow.indexOf('Verify public npm artifact before GitHub release')<workflow.indexOf('      - name: Publish GitHub release after npm succeeds'));
+ assert.ok(!section.includes('NODE_AUTH_TOKEN'));
+});
