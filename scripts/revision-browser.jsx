@@ -1,6 +1,7 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import RevisionPanel from '../src/RevisionPanel.jsx';
+import HistoryPanel from '../src/HistoryPanel.jsx';
 export async function checkRevisions(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
  const a='a'.repeat(40),b='b'.repeat(40);let delayed,oldSignal,refLoads=0,refResolve,refSignal;const calls=[];
@@ -57,5 +58,18 @@ export async function checkRevisions(){
   refResolve=null;button('revisionLoadRefs').click();await wait(()=>refResolve);
  }
  root.render(null);await wait(()=>refSignal.aborted);refResolve({references:[]});
+ const emptyCalls=[];
+ const emptyRpc=async(endpoint,p,signal)=>{
+  emptyCalls.push({endpoint,p});
+  if(endpoint==='vcs/history')return {commits:[],snapshot:null,nextOffset:null};
+  if(endpoint==='vcs/references')return {references:[{name:'refs/tags/old',kind:'tag',commit:a},{name:'refs/heads/topic',kind:'branch',commit:b}]};
+  return rpc(endpoint,p,signal);
+ };
+ root.render(<HistoryPanel sessionId="empty" repositoryId="r" rpc={emptyRpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
+ await wait(()=>host.textContent.includes('historyEmpty'));
+ if(!button('revisionLoadRefs')||emptyCalls.length!==1||emptyCalls[0].endpoint!=='vcs/history')throw Error('Empty history hid revision entry or fetched refs automatically');
+ button('revisionLoadRefs').click();await wait(()=>hasOption(a)&&hasOption(b));choose(0,a);choose(1,b);
+ await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
+ if(emptyCalls.filter(c=>c.endpoint==='vcs/history').length!==1||!emptyCalls.some(c=>c.endpoint==='vcs/revision-compare'&&c.p.base===a&&c.p.target===b))throw Error('Empty HEAD comparison lost pinned reference pair');
  }finally{root.unmount();host.remove();}
 }
