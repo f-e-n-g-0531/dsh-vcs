@@ -13,7 +13,7 @@ export async function checkHistoryNavigation(){
  const rpc=async(endpoint,p,signal)=>{
   calls.push({endpoint,p,signal});
   if(endpoint==='vcs/history')return {snapshot:a,commits:[row(a,'start')],nextOffset:null};
-  if(endpoint==='vcs/commit')return {...row(p.commit,p.commit===a?'start details':'destination details'),message:p.commit===a?message:'Destination message',parents:p.commit===a?[b,c]:[],parent:p.commit===a?[b,c][p.parentIndex]:null,changes:[{id:'d'.repeat(64),path:'file.txt',status:'modified'}]};
+  if(endpoint==='vcs/commit')return {...row(p.commit,p.commit===a?'start details':'destination details'),message:p.commit===a?message:'Destination message',parents:p.commit===a?[b,c]:[],parent:p.commit===a?[b,c][p.parentIndex]:null,changes:[{id:(p.commit===a?'d':'e').repeat(64),path:'file.txt',status:'modified'}]};
   if(endpoint==='vcs/commit-compare')return {path:'file.txt',left:{label:b,text:'old'},right:{label:a,text:'new'}};
   if(endpoint==='vcs/file-history')return {path:'file.txt',commits:[row(b,'visit destination')],nextOffset:null};
   throw Error('Unexpected navigation RPC '+endpoint);
@@ -30,7 +30,7 @@ export async function checkHistoryNavigation(){
   const destination=calls.find(x=>x.endpoint==='vcs/commit'&&x.p.commit===b);if(!destination||destination.p.parentIndex!==0)throw Error('Navigation did not reset parent');
   if(calls.filter(x=>x.p.commit===a&&['vcs/commit-compare','vcs/file-history'].includes(x.endpoint)).some(x=>!x.signal.aborted))throw Error('Old comparison requests survived navigation');
   await wait(()=>calls.some(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b));
-  const navigated=calls.find(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b);if(navigated.p.parentIndex!==0||navigated.p.id!=='d'.repeat(64)||button('modified · file.txt')?.getAttribute('aria-pressed')!=='true')throw Error('Navigation did not select exact target file');
+  const navigated=calls.find(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b);if(navigated.p.parentIndex!==0||navigated.p.id!=='e'.repeat(64)||button('modified · file.txt')?.getAttribute('aria-pressed')!=='true')throw Error('Navigation did not select exact target file');
   if(host.querySelector('select[aria-label="commitParent"]'))throw Error('Old parent state survived navigation');
   const beforeReplay=calls.filter(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b).length;
   await wait(()=>button('fileHistory'));button('fileHistory').click();await wait(()=>button('visit destination'));button('visit destination').click();
