@@ -1,6 +1,6 @@
 import React,{useState,useEffect} from 'react';
 import HistoricalFile from './HistoricalFile.jsx';
-import {filterTreeEntries} from './tree-filter.mjs';
+import {filterTreeEntries,treeBreadcrumbs} from './tree-filter.mjs';
 function TreeRows({sessionId,repositoryId,commit,rpc,t,onRediscover}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0),[directory,setDirectory]=useState(''),[page,setPage]=useState(0),[query,setQuery]=useState(''),[selected,setSelected]=useState(null);
  useEffect(()=>{
@@ -13,6 +13,7 @@ function TreeRows({sessionId,repositoryId,commit,rpc,t,onRediscover}){
  const prefix=directory?directory+'/':'',entries=filterTreeEntries(data.entries,directory,query);
  const go=path=>{setDirectory(path);setPage(0);setQuery('');setSelected(null);};
  return <section aria-label={t('historicalTree')}><p>{t('historicalTreeScope')}</p><code>{commit}</code><p>{directory||'/'} {directory&&<button onClick={()=>go(directory.includes('/')?directory.slice(0,directory.lastIndexOf('/')):'')}>{t('treeUp')}</button>}</p>
+ <nav aria-label={t('treeBreadcrumbs')}>{treeBreadcrumbs(directory).map(crumb=><React.Fragment key={crumb.path}>{crumb.path&&' / '}{crumb.path===directory?<span aria-current="location">{crumb.name}</span>:<button onClick={()=>go(crumb.path)}>{crumb.name}</button>}</React.Fragment>)}</nav>
  <label>{t('treeSearch')} <input aria-label={t('treeSearch')} value={query} onChange={e=>{setQuery(e.target.value);setPage(0);setSelected(null);}}/></label>
  <p>{entries.length} {t('treeEntries')}</p>{!entries.length&&query&&<p role="status">{t('emptySearch')}</p>}
  <ul>{entries.slice(page*100,page*100+100).map(entry=><li key={entry.path}>{entry.type==='tree'?<button onClick={()=>go(entry.path)}>{entry.path.slice(prefix.length)}/</button>:entry.type==='blob'&&['100644','100755'].includes(entry.mode)?<button aria-pressed={selected===entry.path} onClick={()=>setSelected(entry.path)}>{entry.path.slice(prefix.length)}</button>:<span>{entry.path.slice(prefix.length)}</span>} · <code>{entry.mode} {entry.type} <span title={entry.oid}>{entry.oid.slice(0,10)}</span></code></li>)}</ul>
