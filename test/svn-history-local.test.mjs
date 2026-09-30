@@ -42,6 +42,13 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  await fs.writeFile(path.join(wc,'copy.txt'),'r6');svn(['commit','-m','r6 edit']);
  const copyStatus=svn(['status','--xml']),copyInfo=svn(['info','--xml','--','copy.txt@']);
  const copyLog=stop=>parser.parse(svn(['log','--xml','--verbose',...(stop?['--stop-on-copy']:[]),'-r','6:0','--','copy.txt@6'])).log.logentry;
+ const copyOptions={root:planningRoot,scope:'/',path:'/copy.txt',snapshot:'6',limit:1};
+ const copyFirstPlan=planSvnLog(copyOptions);const copyFirst=parseSvnLogPage(executePlan(copyFirstPlan),copyFirstPlan);
+ assert.deepEqual(copyFirst.entries.map(e=>e.revision),['6']);assert.equal(copyFirst.nextRevision,'5');
+ const copyNextPlan=planSvnLog({...copyOptions,cursor:copyFirst.nextRevision});const copyNext=parseSvnLogPage(executePlan(copyNextPlan),copyNextPlan);
+ assert.deepEqual(copyNext.entries.map(e=>e.revision),['5']);assert.equal(copyNext.nextRevision,null);
+ const creationPlan=planSvnDetail({...copyOptions,revision:'5'});const creationDetail=parseSvnDetail(executePlan(creationPlan),creationPlan);
+ assert.equal(creationDetail.changes[0].copyFromPath,'/'+name);assert.equal(creationDetail.changes[0].copyFromRevision,'4');
  const stopped=copyLog(true);assert.deepEqual(stopped.map(e=>e['@_revision']),['6','5']);
  const copy=stopped[1].paths.path;assert.equal(copy['@_action'],'A');assert.equal(copy['@_copyfrom-path'],'/'+name);assert.equal(copy['@_copyfrom-rev'],'4');
  // Positive control proves the default command would cross the copy boundary.
