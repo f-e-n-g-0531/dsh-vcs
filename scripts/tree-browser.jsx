@@ -25,5 +25,24 @@ export async function checkTree(){
  button('historicalTree').click();await wait(()=>!host.querySelector('section'));button('historicalTree').click();await wait(()=>resolveLate);
  button('historicalTree').click();await wait(()=>signal.aborted);resolveLate({commit,entries:[{path:'STALE',mode:'100644',type:'blob',oid}]});
  await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE')||calls!==2)throw Error('Closed tree accepted stale response');
+ const pending=[],requests=[];let fail=true,identity={sessionId:'preview',repositoryId:'r',commit};
+ const previewRpc=async(endpoint,p,s)=>{
+  requests.push({endpoint,p,s});if(endpoint==='vcs/tree')return {commit:p.commit,entries:['retry-file','empty-file','binary-file','pending-file'].map(path=>({path,type:'blob',mode:'100644',oid}))};
+  if(endpoint!=='vcs/tree-file')throw Error('Unexpected preview endpoint');
+  if(p.path==='pending-file')return new Promise(resolve=>pending.push({resolve,signal:s}));
+  if(p.path==='retry-file'&&fail){fail=false;throw Error('Preview fixture failure');}
+  return {commit:p.commit,path:p.path,oid,encoding:'UTF-8',text:p.path==='retry-file'?'recovered':'',binary:p.path==='binary-file',notice:p.path==='binary-file'?'Binary fixture notice':''};
+ };
+ const renderPreview=()=>root.render(<HistoricalTree {...identity} rpc={previewRpc} t={k=>k} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
+ renderPreview();await wait(()=>button('historicalTree')?.getAttribute('aria-expanded')==='false');button('historicalTree').click();await wait(()=>button('retry-file'));
+ button('retry-file').click();await wait(()=>host.querySelector('[role=alert]'));button('retry').click();await wait(()=>host.querySelector('pre')?.textContent==='recovered');
+ button('empty-file').click();await wait(()=>host.textContent.includes('treeEmpty'));if(host.querySelector('pre'))throw Error('Empty preview retained text');
+ button('binary-file').click();await wait(()=>host.textContent.includes('Binary fixture notice'));if(host.querySelector('pre')||host.textContent.includes('recovered'))throw Error('Binary preview retained text');
+ for(const patch of [{sessionId:'changed'},{repositoryId:'changed'},{commit:'c'.repeat(40)}]){
+  const before=pending.length;button('pending-file').click();await wait(()=>pending.length>before);const old=pending.at(-1),count=requests.length;
+  identity={...identity,...patch};renderPreview();await wait(()=>old.signal.aborted&&button('historicalTree')?.getAttribute('aria-expanded')==='false');
+  old.resolve({text:'OLD PREVIEW',oid});await new Promise(r=>setTimeout(r,50));if(host.querySelector('section')||requests.length!==count||host.textContent.includes('OLD PREVIEW'))throw Error('Preview scope leaked or fetched automatically');
+  button('historicalTree').click();await wait(()=>button('pending-file'));
+ }
  }finally{root.unmount();host.remove();}
 }
