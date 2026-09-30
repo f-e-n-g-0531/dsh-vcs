@@ -13,6 +13,12 @@ if(!manifest)throw Error('Usage: node scripts/test-host-compat.mjs <installed-ds
 const hostManifest=JSON.parse(await readFile(path.resolve(manifest),'utf8'));
 assert.equal(hostManifest.name,'@deepseek-ai/dsh');assert.equal(hostManifest.version,'0.2.0-rc.2','This compatibility fixture currently targets only DSH 0.2.0-rc.2');
 const requireHost=createRequire(path.resolve(manifest));
+const {evaluatePluginCompatibility}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-app-boot')));
+const vcsManifest=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
+for(const version of ['0.1.7-rc.2','0.2.0-rc.2'])assert.equal(evaluatePluginCompatibility(vcsManifest,{},version),undefined);
+for(const version of ['0.1.7-rc.1','0.2.0-rc.1','0.2.0-rc.3','0.2.0','0.3.0'])assert.ok(evaluatePluginCompatibility(vcsManifest,{},version));
+assert.ok(evaluatePluginCompatibility({...vcsManifest,version:'0.3.35',peerDependencies:{'@deepseek-ai/dsh':'0.1.7-rc.2'}},{},hostManifest.version));
+console.log('Actual host peer gate accepts only declared versions and rejects original 0.3.35; no exemption.');
 const {Context}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/cordis')));
 const {HostConnectionService}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-client-connection')));
 const rendererDeps=new Map();
