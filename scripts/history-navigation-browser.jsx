@@ -55,7 +55,7 @@ export async function checkHistoryNavigation(){
   for(const path of ['missing.txt','file.txt']){
    const navigationCalls=[];const navRpc=(endpoint,p,signal)=>{navigationCalls.push({endpoint,p});return rpc(endpoint,p,signal);};
    root.render(<CommitDetails key={path} initialPath={path} sessionId='s' repositoryId='r' commit={a} rpc={navRpc} t={k=>k} onRediscover={()=>{}}/>);
-   await wait(()=>host.querySelector('select[aria-label=commitParent]'));
+   await wait(()=>navigationCalls.some(x=>x.endpoint==='vcs/commit')&&host.querySelector('select[aria-label=commitParent]'));
    if(path==='file.txt')await wait(()=>navigationCalls.some(x=>x.endpoint==='vcs/commit-compare'));
    else if(navigationCalls.some(x=>x.endpoint==='vcs/commit-compare')||button('modified · file.txt').getAttribute('aria-pressed')!=='false')throw Error('Unmatched navigation selected a file');
    const comparisons=navigationCalls.filter(x=>x.endpoint==='vcs/commit-compare').length;
