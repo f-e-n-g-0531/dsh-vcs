@@ -29,7 +29,14 @@ export async function checkGraph(){
  key('ArrowDown');if(document.activeElement!==buttons[3])throw Error('Graph focus exceeded end');
  key('ArrowUp');if(document.activeElement!==buttons[2])throw Error('Graph ArrowUp focus failed');
  key('Home');if(document.activeElement!==buttons[0])throw Error('Graph Home focus failed');
- key('ArrowDown',{altKey:true});if(document.activeElement!==buttons[0]||selected!==priorSelection)throw Error('Graph navigation activated selection or stole modified key');
+ key('ArrowUp');if(document.activeElement!==buttons[0])throw Error('Graph focus exceeded start');
+ for(const modifier of ['altKey','ctrlKey','metaKey','shiftKey']){
+  if(!key('ArrowDown',{[modifier]:true})||document.activeElement!==buttons[0]||selected!==priorSelection)throw Error('Graph stole modified key: '+modifier);
+ }
+ for(const unhandled of ['Tab','Enter',' ','ArrowLeft','ArrowRight']){
+  if(!key(unhandled)||document.activeElement!==buttons[0])throw Error('Graph intercepted unhandled key: '+unhandled);
+ }
+ if(selected!==priorSelection)throw Error('Graph focus navigation selected a commit');
  const relations=host.querySelectorAll('details li');if(relations.length!==4||!relations[0].textContent.includes(id(3))||!relations[1].textContent.includes(id(2)))throw Error('Merge parent text missing');
  root.render(<HistoryGraph commits={[merge[3],merge[0],merge[1],merge[2]]} onSelect={value=>selected=value} t={key=>key}/>);
  await wait(()=>host.querySelector('[role=alert]'));if(host.querySelector('svg')||!host.textContent.includes('graphInvalid'))throw Error('Invalid topology did not fall back');
