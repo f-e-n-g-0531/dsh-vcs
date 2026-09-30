@@ -7,7 +7,8 @@ import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {XMLParser} from 'fast-xml-parser';
 import {parseSvnLogPage} from '../src/svn-log.mjs';
-import {svnPathInScope,relativeSvnPath} from '../src/svn-path.mjs';
+import {relativeSvnPath} from '../src/svn-path.mjs';
+import {scopeSvnChanges} from '../src/svn-changes.mjs';
 test('local SVN path history skips unrelated revisions and pins numeric snapshot',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-svn-history-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
  const run=(name,args,cwd=root)=>{const r=spawnSync(name,args,{cwd,encoding:'utf8',windowsHide:true,timeout:20000,env:{...process.env,LC_ALL:process.platform==='linux'?'C.UTF-8':'en_US.UTF-8'}});assert.equal(r.status,0,r.stderr);return r.stdout;};
@@ -61,7 +62,14 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const scoped=parser.parse(svn(['log','--xml','--verbose','-r','9:9','--',rootUrl+'/scope@9'])).log.logentry[0];
  const paths=scoped.paths.path.map(p=>p['#text']);
  assert.ok(paths.includes('/scope-other/file'),'Positive control: verbose log exposes paths outside query scope');
- const allowed=paths.filter(p=>svnPathInScope(p,'/scope'));assert.deepEqual(allowed.sort(),['/scope','/scope/file']);
+ const normalize=p=>({path:p['#text'],action:p['@_action'],kind:p['@_kind'],...(p['@_copyfrom-path']!==undefined?{copyFromPath:p['@_copyfrom-path'],copyFromRevision:p['@_copyfrom-rev']}:{})});
+ const allowed=scopeSvnChanges(scoped.paths.path.map(normalize),{scope:'/scope',revision:'9'}).map(p=>p.path);assert.deepEqual(allowed.sort(),['/scope','/scope/file']);
  assert.deepEqual(allowed.map(p=>relativeSvnPath(p,'/scope')),['','file']);
  assert.deepEqual(parser.parse(svn(['status','--xml'])),scopedStatus);
+ svn(['copy','--','scope-other/file','scope/imported']);svn(['commit','-m','r10 cross-scope copy']);
+ const copyScopeStatus=parser.parse(svn(['status','--xml']));
+ const cross=parser.parse(svn(['log','--xml','--verbose','-r','10:10','--',rootUrl+'/scope@10'])).log.logentry[0];
+ assert.equal(cross.paths.path['@_copyfrom-path'],'/scope-other/file');
+ assert.deepEqual(scopeSvnChanges([normalize(cross.paths.path)],{scope:'/scope',revision:'10'}),[{path:'/scope/imported',action:'A',kind:'file',copySourceOutsideScope:true}]);
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),copyScopeStatus);
 });
