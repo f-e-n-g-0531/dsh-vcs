@@ -46,6 +46,14 @@ test('real authorized RPC traverses history details and committed diff',async t=
  assert.equal((await handler('vcs/tree',{...p,commit:detail.id,sessionId:'foreign'})).error.code,'vcs/rediscover-required');
  assert.equal((await handler('vcs/tree',{...p,commit:detail.id,path:'file.txt'})).error.code,'vcs/invalid-request');
  assert.equal((await handler('vcs/tree',{...p,commit:tree.entries[0].oid})).ok,false);
+ const preview=await read('vcs/tree-file',{commit:detail.id,path:tree.entries[0].path});
+ assert.equal(preview.text,'after');assert.equal(preview.commit,detail.id);assert.equal(preview.path,'file.txt');assert.equal(preview.oid,tree.entries[0].oid);
+ assert.equal((await read('vcs/tree-file',{commit:next.commits[0].id,path:'file.txt'})).text,'before');
+ assert.equal((await handler('vcs/tree-file',{...p,commit:detail.id,path:'file.txt',sessionId:'foreign'})).error.code,'vcs/rediscover-required');
+ for(const extra of [{root:root},{oid:tree.entries[0].oid},{commit:'HEAD'},{path:'../file.txt'}])assert.equal((await handler('vcs/tree-file',{...p,commit:detail.id,path:'file.txt',...extra})).error.code,'vcs/invalid-request');
+ assert.equal((await handler('vcs/tree-file',{...p,commit:detail.id,path:'not-in-commit'})).ok,false);
+ assert.equal((await handler('vcs/tree-file',{...p,commit:tree.entries[0].oid,path:'file.txt'})).ok,false);
+ const cancelled=new AbortController();cancelled.abort();assert.equal((await handler('vcs/tree-file',{...p,commit:detail.id,path:'file.txt'},cancelled.signal)).error.code,'vcs/cancelled');
  const blameArgs={commit:detail.id,id:detail.changes[0].id};
  const blame=await read('vcs/blame',blameArgs);
  assert.equal(blame.path,'file.txt');assert.equal(blame.commit,detail.id);assert.equal(blame.truncated,false);
