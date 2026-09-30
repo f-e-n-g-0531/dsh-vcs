@@ -30,7 +30,7 @@ function verify() {
     './locale/*.json': './locale/*.json',
   }, 'Manifest exports must match the shipped plugin entrypoints');
   assert.equal(manifest.icon, './icon.svg');
-  assert.equal(manifest.peerDependencies?.['@deepseek-ai/dsh'], '0.1.7-rc.2');
+  assert.equal(manifest.peerDependencies?.['@deepseek-ai/dsh'], '0.1.7-rc.2 || 0.2.0-rc.2');
   assert.equal(manifest.peerDependenciesMeta?.['@deepseek-ai/dsh']?.optional, true);
   assert.equal(manifest.dsh?.bundle?.patch, './cordis.patch.yml');
   assert.equal(manifest.dsh?.client?.platform, 'web');
