@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planSvnLog} from '../src/svn-log-plan.mjs';
+import {planSvnLog,planSvnDetail} from '../src/svn-log-plan.mjs';
 import {parseSvnLogPage} from '../src/svn-log.mjs';
+import {parseSvnDetail} from '../src/svn-detail.mjs';
 const base={root:'https://example.test/repo',scope:'/scope',snapshot:'9007199254740993'};
 test('SVN log plan pins peg independently of descending cursor and bounds lookahead',()=>{
  const plan=planSvnLog({...base,path:'/scope/a@%.txt',cursor:'9007199254740991',limit:100});
@@ -21,6 +22,13 @@ test('SVN log plan and response parser retain snapshot identity across sparse pa
  assert.throws(()=>parseSvnLogPage(xml(['9007199254740980']),second));
  assert.throws(()=>parseSvnLogPage(xml(['9','9']),second));
  assert.throws(()=>parseSvnLogPage(xml(['9','8','7','6']),second));
+});
+test('SVN detail plan binds selected revision and parser while retaining snapshot peg',()=>{
+ const plan=planSvnDetail({...base,revision:'9'});
+ assert.deepEqual(plan.args,['log','--xml','--verbose','--stop-on-copy','--non-interactive','--no-auth-cache','--limit','1','-r','9:9','--','https://example.test/repo/scope@9007199254740993']);
+ assert.equal(parseSvnDetail('<log><logentry revision="9"><paths/></logentry></log>',plan).revision,'9');
+ assert.throws(()=>parseSvnDetail('<log><logentry revision="8"/></log>',plan));
+ for(const override of [{revision:'9007199254740994'},{revision:'HEAD'},{path:'/outside'},{snapshot:'BASE'}])assert.throws(()=>planSvnDetail({...base,revision:'9',...override}));
 });
 test('SVN log plan rejects outside paths and invalid revision or page bounds',()=>{
  for(const override of [{path:'/scope-other/a'},{path:'/scope/../a'},{snapshot:'HEAD'},{cursor:'9007199254740994'},{limit:0},{limit:101},{limit:1.5},{limit:'2'},{root:'file:///repo'}])assert.throws(()=>planSvnLog({...base,...override}));
