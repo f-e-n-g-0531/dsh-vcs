@@ -4,6 +4,8 @@
 
 - 本地255/255测试、构建、19文件包审核、临时生产安装/stub注册通过。不是现有宿主安装或真实GUI验收。
 - 候选SHA256：`2f8c13c8774ab7fe547dae464928b2406d982654fe986856a63534b0752a28fc`。
-- 待同标签四平台CI、Chrome及工件核验，通过后GitHub Actions npm优先发布，再核验两端实际包。
+- 固定标签提交0bdb3c4297a7d30aa660dde3a22ed1c65846a724。[四平台CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36723028476)、[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36723077172)通过。实际下载四份包均779761字节、SHA256与候选一致。Artifact IDs：11102536212、11102047053、11101791902、11101671608。
+- [发布运行](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36723659694)：npm在2026-09-30T13:43:36Z返回接受上传并正在处理；新增公开npm门禁在有界等待后失败，GitHub Release创建未执行。随后15次有界公开元数据查询仍缺少0.3.46，latest=0.3.45。未重复上传或绕过门禁。
+- 待npm公开0.3.46后先下载验证上述SHA256，再恢复同标签发布工作流（已存在且integrity相同则跳过上传），完成GitHub创建与两端核验。当前不宣称正式发布完成。
 - 真实DSH GUI未验收，发布必须披露；不安装、不升级现有宿主、不重启。
 - 0.3.45此前公开可用性延迟已在用户询问最新版本时解除：npm latest=0.3.45，两端779763字节/SHA256 c6cdd8f8e5054c9af7bfd64399a3f1db3dc21df155eb251bff69c49c03c0ddb0一致。
