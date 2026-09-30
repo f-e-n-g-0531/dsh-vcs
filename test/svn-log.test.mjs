@@ -8,6 +8,16 @@ test('SVN parsed pages bind XML ordering and lookahead to pinned bounds',()=>{
  for(const revisions of [['10'],['4','9'],['9','4','3','1']])assert.throws(()=>parseSvnLogPage(xml(revisions),{snapshot:'12',cursor:'9',limit:2}));
  assert.throws(()=>parseSvnLogPage(xml(['9']),{snapshot:'8',cursor:'9'}));
 });
+test('SVN log limits accept exact byte boundary and full lookahead page',()=>{
+ const head='<log><logentry revision="1"><msg>',tail='</msg></logentry></log>',budget=2*1024*1024-Buffer.byteLength(head+tail);
+ const message='中'.repeat(Math.floor(budget/3))+'x'.repeat(budget%3),xml=head+message+tail;
+ assert.equal(Buffer.byteLength(xml),2*1024*1024);assert.equal(parseSvnLog(xml)[0].message,message);
+ assert.throws(()=>parseSvnLog(head+message+'x'+tail));
+ const oversized=head+'中'.repeat(800000)+tail;assert.ok(oversized.length<2*1024*1024);assert.throws(()=>parseSvnLog(oversized));
+ const entries=Array.from({length:101},(_,i)=>'<logentry revision="'+(200-i)+'"/>').join('');
+ const page=parseSvnLogPage('<log>'+entries+'</log>',{snapshot:'200',limit:100});
+ assert.equal(page.entries.length,100);assert.equal(page.entries[99].revision,'101');assert.equal(page.nextRevision,'100');
+});
 test('SVN log parser preserves large revisions and literal message whitespace',()=>{
  assert.deepEqual(parseSvnLog('<?xml version="1.0"?><log><logentry revision="9007199254740993"><author>007</author><date>date</date><msg>  &lt;img&gt;\n中文  </msg></logentry></log>'),[{revision:'9007199254740993',author:'007',date:'date',message:'  <img>\n中文  '}]);
  assert.deepEqual(parseSvnLog('<log/>'),[]);assert.deepEqual(parseSvnLog('<log><logentry revision="0"/></log>'),[{revision:'0',author:'',date:'',message:''}]);
