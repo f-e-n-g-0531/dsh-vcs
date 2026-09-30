@@ -1,5 +1,6 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
 import BlamePanel from '../src/BlamePanel.jsx';
 export async function checkBlame(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
@@ -24,7 +25,7 @@ export async function checkBlame(){
  button().click();await wait(()=>signal.aborted);resolveLate({lines:[{line:1,commit,author:'STALE',summary:'',text:''}],truncated:false});
  await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE')||calls!==2)throw Error('Closed blame accepted stale result');
  const selections=[];
- root.render(<BlamePanel key='navigation' {...{commit,id,rpc}} parentIndex={0} sessionId='s' repositoryId='r' t={key=>key} onRediscover={()=>{}} onSelectCommit={(...args)=>selections.push(args)}/>);
+ flushSync(()=>root.render(<BlamePanel key='navigation' {...{commit,id,rpc}} parentIndex={0} sessionId='s' repositoryId='r' t={key=>key} onRediscover={()=>{}} onSelectCommit={(...args)=>selections.push(args)}/>));
  await wait(()=>button()?.getAttribute('aria-expanded')==='false');button().click();await wait(()=>host.querySelector('tbody button'));
  const link=host.querySelector('tbody button'),before=calls;
  if(link.title!==commit||link.textContent!==commit.slice(0,10))throw Error('Blame navigation identity incorrect');
