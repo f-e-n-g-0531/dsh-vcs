@@ -12,7 +12,7 @@ export function parseSvnDetail(xml,{scope,revision}={}){
  if(entry['@_revision']!==revision)throw new Error('SVN detail revision mismatch');
  const text=key=>{const value=entry[key]??'';if(typeof value!=='string')throw new Error('Invalid SVN detail text');return value;};
  let nodes=[];
- if(entry.paths!==undefined&&entry.paths!==''){check(entry.paths,['path']);nodes=entry.paths.path??[];}
+ if(entry.paths!==undefined&&!(typeof entry.paths==='string'&&entry.paths.trim()==='')){check(entry.paths,['path']);nodes=entry.paths.path??[];}
  const changes=scopeSvnPathNodes(nodes,{scope,revision});
  return {revision,author:text('author'),date:text('date'),message:text('msg'),pathsAvailable:Object.hasOwn(entry,'paths'),changes};
 }

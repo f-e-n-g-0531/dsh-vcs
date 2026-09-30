@@ -11,6 +11,8 @@ test('SVN detail validates revision and scopes all changed paths',()=>{
 test('SVN detail distinguishes unavailable paths from an explicit empty set',()=>{
  const omitted=parseSvnDetail(wrap(''),options);assert.equal(omitted.pathsAvailable,false);assert.deepEqual(omitted.changes,[]);
  const empty=parseSvnDetail(wrap('<paths/>'),options);assert.equal(empty.pathsAvailable,true);assert.deepEqual(empty.changes,[]);
+ const formatted=parseSvnDetail(wrap('<paths>\n  \t</paths>'),options);assert.equal(formatted.pathsAvailable,true);assert.deepEqual(formatted.changes,[]);
+ for(const body of ['<paths>unexpected</paths>','<paths>unexpected<path action="M" kind="file">/scope/a</path></paths>'])assert.throws(()=>parseSvnDetail(wrap(body),options));
  const filtered=parseSvnDetail(wrap('<paths><path action="M" kind="file">/other/file</path></paths>'),options);assert.equal(filtered.pathsAvailable,true);assert.deepEqual(filtered.changes,[]);
 });
 test('SVN detail enforces document bytes path count and r0 boundaries',()=>{
