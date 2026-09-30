@@ -130,7 +130,9 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  assert.equal(specialProperties.properties.target.property['@_name'],'svn:special');
  assert.equal(svn(['cat','-r','13','--',rootUrl+'/scope/special@13']),'link ../outside-target');
  const namesXml=(suffix,revision)=>svn(['proplist','--xml','-r',revision,'--',rootUrl+suffix+'@'+revision]);
- assert.deepEqual(parseSvnPropertyNames(namesXml('/scope/special','13'),{target:rootUrl+'/scope/special'}),{target:rootUrl+'/scope/special',names:['svn:special'],special:true});
+ const specialNamesXml=namesXml('/scope/special','13');
+ assert.equal(parser.parse(specialNamesXml).properties.target['@_path'],rootUrl+'/scope/special','Names-only SVN target must match requested fixture URL');
+ assert.deepEqual(parseSvnPropertyNames(specialNamesXml,{target:rootUrl+'/scope/special'}),{target:rootUrl+'/scope/special',names:['svn:special'],special:true});
  assert.deepEqual(parseSvnPropertyNames(namesXml('/scope/imported','12'),{target:rootUrl+'/scope/imported'}),{target:rootUrl+'/scope/imported',names:['review:test'],special:false});
  const emptyNames=namesXml('/scope/imported','11');
  assert.equal(parser.parse(emptyNames).properties.target,undefined);
