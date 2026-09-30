@@ -73,12 +73,12 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const crossXml=svn(['log','--xml','--verbose','-r','10:10','--',rootUrl+'/scope@10']);
  const cross=parser.parse(crossXml).log.logentry[0];
  assert.equal(cross.paths.path['@_copyfrom-path'],'/scope-other/file');
- assert.deepEqual(parseSvnDetail(crossXml,{scope:'/scope',revision:'10'}).changes,[{path:'/scope/imported',action:'A',kind:'file',copySourceOutsideScope:true}]);
+ assert.deepEqual(parseSvnDetail(crossXml,{scope:'/scope',revision:'10'}).changes,[{path:'/scope/imported',action:'A',kind:'file',copySourceOutsideScope:true,textModified:cross.paths.path['@_text-mods'],propertiesModified:cross.paths.path['@_prop-mods']}]);
  assert.deepEqual(parser.parse(svn(['status','--xml'])),copyScopeStatus);
  svn(['delete','--','scope/imported']);await fs.writeFile(path.join(wc,'scope','imported'),'replacement r11');svn(['add','--','scope/imported']);svn(['commit','-m','r11 replacement']);
  const replacementStatus=parser.parse(svn(['status','--xml']));
  const replacement=parseSvnDetail(svn(['log','--xml','--verbose','-r','11:11','--',rootUrl+'/scope@11']),{scope:'/scope',revision:'11'});
- assert.equal(replacement.pathsAvailable,true);assert.deepEqual(replacement.changes,[{path:'/scope/imported',action:'R',kind:'file'}]);
+ assert.equal(replacement.pathsAvailable,true);assert.deepEqual(replacement.changes,[{path:'/scope/imported',action:'R',kind:'file',textModified:'true',propertiesModified:'false'}]);
  assert.equal(svn(['cat','-r','10','--',rootUrl+'/scope/imported@10']),'r9');
  assert.equal(svn(['cat','-r','11','--',rootUrl+'/scope/imported@11']),'replacement r11');
  assert.deepEqual(parser.parse(svn(['status','--xml'])),replacementStatus);assert.equal(await fs.readFile(path.join(wc,'scope','imported'),'utf8'),'replacement r11');
@@ -98,7 +98,7 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const rawProperty=parser.parse(propertyXml).log.logentry[0].paths.path;
  assert.equal(rawProperty['@_text-mods'],'false');assert.equal(rawProperty['@_prop-mods'],'true');
  const propertyDetail=parseSvnDetail(propertyXml,{scope:'/scope',revision:'12'});
- assert.deepEqual(propertyDetail.changes,[{path:'/scope/imported',action:'M',kind:'file'}]);
+ assert.deepEqual(propertyDetail.changes,[{path:'/scope/imported',action:'M',kind:'file',textModified:'false',propertiesModified:'true'}]);
  const propertyPlan=planSvnComparison(propertyDetail.changes,{scope:'/scope',revision:'12',path:'/scope/imported'});
  assert.equal(readSide(propertyPlan.left),'replacement r11');assert.equal(readSide(propertyPlan.right),'replacement r11');
  const props=revision=>parser.parse(svn(['proplist','--xml','--verbose','-r',revision,'--',rootUrl+'/scope/imported@'+revision]));
