@@ -5,8 +5,13 @@ const options={scope:'/scope',revision:'10'};
 const wrap=body=>'<log><logentry revision="10"><msg> note </msg>'+body+'</logentry></log>';
 test('SVN detail validates revision and scopes all changed paths',()=>{
  const xml=wrap('<paths><path action="A" kind="file" copyfrom-path="/private/a" copyfrom-rev="9">/scope/a</path><path action="M" kind="file">/other/a</path></paths>');
- assert.deepEqual(parseSvnDetail(xml,options),{revision:'10',author:'',date:'',message:' note ',changes:[{path:'/scope/a',action:'A',kind:'file',copySourceOutsideScope:true}]});
+ assert.deepEqual(parseSvnDetail(xml,options),{revision:'10',author:'',date:'',message:' note ',pathsAvailable:true,changes:[{path:'/scope/a',action:'A',kind:'file',copySourceOutsideScope:true}]});
  assert.deepEqual(parseSvnDetail(wrap('<paths/>'),options).changes,[]);
+});
+test('SVN detail distinguishes unavailable paths from an explicit empty set',()=>{
+ const omitted=parseSvnDetail(wrap(''),options);assert.equal(omitted.pathsAvailable,false);assert.deepEqual(omitted.changes,[]);
+ const empty=parseSvnDetail(wrap('<paths/>'),options);assert.equal(empty.pathsAvailable,true);assert.deepEqual(empty.changes,[]);
+ const filtered=parseSvnDetail(wrap('<paths><path action="M" kind="file">/other/file</path></paths>'),options);assert.equal(filtered.pathsAvailable,true);assert.deepEqual(filtered.changes,[]);
 });
 test('SVN detail enforces document bytes path count and r0 boundaries',()=>{
  const zero=body=>'<log><logentry revision="0">'+body+'</logentry></log>';

@@ -14,5 +14,5 @@ export function parseSvnDetail(xml,{scope,revision}={}){
  let nodes=[];
  if(entry.paths!==undefined&&entry.paths!==''){check(entry.paths,['path']);nodes=entry.paths.path??[];}
  const changes=scopeSvnPathNodes(nodes,{scope,revision});
- return {revision,author:text('author'),date:text('date'),message:text('msg'),changes};
+ return {revision,author:text('author'),date:text('date'),message:text('msg'),pathsAvailable:Object.hasOwn(entry,'paths'),changes};
 }
