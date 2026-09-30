@@ -16,6 +16,7 @@ export async function checkHistoryNavigation(){
   if(endpoint==='vcs/commit')return {...row(p.commit,p.commit===a?'start details':'destination details'),message:p.commit===a?message:'Destination message',parents:p.commit===a?[b,c]:[],parent:p.commit===a?[b,c][p.parentIndex]:null,changes:[{id:(p.commit===a?'d':'e').repeat(64),path:'file.txt',status:'modified'}]};
   if(endpoint==='vcs/commit-compare')return {path:'file.txt',left:{label:b,text:'old'},right:{label:a,text:'new'}};
   if(endpoint==='vcs/file-history')return {path:'file.txt',commits:[row(b,'visit destination')],nextOffset:null};
+  if(endpoint==='vcs/blame')return {lines:[{line:1,commit:a,author:'Author',summary:'origin',text:'literal source'}]};
   throw Error('Unexpected navigation RPC '+endpoint);
  };
  try{
@@ -43,6 +44,14 @@ export async function checkHistoryNavigation(){
   setFilter('');await wait(()=>button('modified · file.txt'));
   if(button('modified · file.txt').getAttribute('aria-pressed')!=='false'||calls.length!==countAfterReplay)throw Error('Consumed navigation reselected after search');
   if(calls.filter(x=>x.endpoint==='vcs/history').length!==1)throw Error('Navigation reloaded pinned history');
+  button('modified · file.txt').click();await wait(()=>button('blame'));button('blame').click();
+  await wait(()=>host.querySelector('[aria-label=blame] tbody button'));
+  const blameCall=calls.findLast(x=>x.endpoint==='vcs/blame'),beforeBlameJump=calls.length;
+  host.querySelector('[aria-label=blame] tbody button').click();
+  await wait(()=>host.querySelector('[aria-label=commitDetails] h3')?.textContent==='start details');
+  const jumpCalls=calls.slice(beforeBlameJump);
+  if(jumpCalls.length!==1||jumpCalls[0].endpoint!=='vcs/commit'||jumpCalls[0].p.commit!==a||jumpCalls[0].p.parentIndex!==0)throw Error('Blame navigation carried file path or wrong commit parent');
+  if(!blameCall.signal.aborted||host.querySelector('[aria-label=blame]')||host.querySelector('.vcs-text-comparison')||button('modified · file.txt').getAttribute('aria-pressed')!=='false')throw Error('Blame navigation retained old review state');
   for(const path of ['missing.txt','file.txt']){
    const navigationCalls=[];const navRpc=(endpoint,p,signal)=>{navigationCalls.push({endpoint,p});return rpc(endpoint,p,signal);};
    root.render(<CommitDetails key={path} initialPath={path} sessionId='s' repositoryId='r' commit={a} rpc={navRpc} t={k=>k} onRediscover={()=>{}}/>);
