@@ -22,6 +22,14 @@ export async function checkGraph(){
  if(tracks.join(',')!=='35,47,59,35')throw Error('Merge interval track allocation incorrect: '+tracks.join(','));
  const svg=host.querySelector('svg');if(Number(svg.getAttribute('width'))<Math.max(...tracks)+12)throw Error('Graph tracks clipped by SVG viewport');
  const buttons=host.querySelectorAll('ol button');buttons[2].click();if(selected!==id(2))throw Error('Merge branch selection incorrect');
+ buttons[0].focus();const priorSelection=selected;
+ const key=(value,extra={})=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:value,bubbles:true,cancelable:true,...extra}));
+ key('ArrowDown');if(document.activeElement!==buttons[1])throw Error('Graph ArrowDown focus failed');
+ key('End');if(document.activeElement!==buttons[3])throw Error('Graph End focus failed');
+ key('ArrowDown');if(document.activeElement!==buttons[3])throw Error('Graph focus exceeded end');
+ key('ArrowUp');if(document.activeElement!==buttons[2])throw Error('Graph ArrowUp focus failed');
+ key('Home');if(document.activeElement!==buttons[0])throw Error('Graph Home focus failed');
+ key('ArrowDown',{altKey:true});if(document.activeElement!==buttons[0]||selected!==priorSelection)throw Error('Graph navigation activated selection or stole modified key');
  const relations=host.querySelectorAll('details li');if(relations.length!==4||!relations[0].textContent.includes(id(3))||!relations[1].textContent.includes(id(2)))throw Error('Merge parent text missing');
  root.render(<HistoryGraph commits={[merge[3],merge[0],merge[1],merge[2]]} onSelect={value=>selected=value} t={key=>key}/>);
  await wait(()=>host.querySelector('[role=alert]'));if(host.querySelector('svg')||!host.textContent.includes('graphInvalid'))throw Error('Invalid topology did not fall back');
