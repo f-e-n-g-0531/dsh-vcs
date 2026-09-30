@@ -32,6 +32,16 @@ export async function checkHistoryNavigation(){
   await wait(()=>calls.some(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b));
   const navigated=calls.find(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b);if(navigated.p.parentIndex!==0||navigated.p.id!=='d'.repeat(64)||button('modified · file.txt')?.getAttribute('aria-pressed')!=='true')throw Error('Navigation did not select exact target file');
   if(host.querySelector('select[aria-label="commitParent"]'))throw Error('Old parent state survived navigation');
+  const beforeReplay=calls.filter(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b).length;
+  await wait(()=>button('fileHistory'));button('fileHistory').click();await wait(()=>button('visit destination'));button('visit destination').click();
+  await wait(()=>calls.filter(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b).length===beforeReplay+1);
+  if(!navigated.signal.aborted||button('modified · file.txt')?.getAttribute('aria-pressed')!=='true')throw Error('Same OID navigation did not reset and reselect');
+  const countAfterReplay=calls.length;
+  const filter=host.querySelector('input[aria-label=commitFileSearch]');
+  const setFilter=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(filter,value);filter.dispatchEvent(new Event('input',{bubbles:true}));};
+  setFilter('missing');await wait(()=>!host.querySelector('.vcs-text-comparison')&&!button('modified · file.txt'));
+  setFilter('');await wait(()=>button('modified · file.txt'));
+  if(button('modified · file.txt').getAttribute('aria-pressed')!=='false'||calls.length!==countAfterReplay)throw Error('Consumed navigation reselected after search');
   if(calls.filter(x=>x.endpoint==='vcs/history').length!==1)throw Error('Navigation reloaded pinned history');
   for(const language of ['zh','en']){
    root.render(<CommitDetails key={language} sessionId="s" repositoryId="r" commit={b} t={k=>locales[language][k]} onRediscover={()=>{}} rpc={async(endpoint,p,signal)=>endpoint==='vcs/commit'?{...row(b,'Large body'),parents:[],parent:null,message:'',messageTruncated:true,changes:[{id:'d'.repeat(64),path:'file.txt',status:'modified'}]}:rpc(endpoint,p,signal)}/>);
