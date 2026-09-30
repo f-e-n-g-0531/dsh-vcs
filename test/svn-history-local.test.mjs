@@ -58,7 +58,8 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  // Delete only in the temporary fixture; use the repository URL for the old identity.
  svn(['delete','--','copy.txt']);svn(['commit','-m','r7 deletion']);
  const deletedStatus=parser.parse(svn(['status','--xml']));
- const rootUrl=pathToFileURL(repository).href,copyUrl=rootUrl+'/copy.txt';
+ // SVN renders the unreserved tilde literally (Windows runner uses RUNNER~1).
+ const rootUrl=pathToFileURL(repository).href.replace(/%7E/gi,'~'),copyUrl=rootUrl+'/copy.txt';
  const deletion=parser.parse(svn(['log','--xml','--verbose','-r','7:7','--',rootUrl+'@7'])).log.logentry[0];
  assert.equal(deletion.paths.path['@_action'],'D');assert.equal(deletion.paths.path['#text'],'/copy.txt');
  assert.equal(svn(['cat','-r','6','--',copyUrl+'@6']),'r6');
