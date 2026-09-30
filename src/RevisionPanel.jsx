@@ -19,12 +19,12 @@ function RevisionFiles({sessionId,repositoryId,base,target,rpc,t,onRediscover}){
 export default function RevisionPanel(props){
  return <ScopedRevisionPanel key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;
 }
-function ScopedRevisionPanel({commits,sessionId,repositoryId,rpc,t,onRediscover}){
+function ScopedRevisionPanel({commits,sessionId,repositoryId,rpc,t,onRediscover,onReferencesLoaded}){
  const [base,setBase]=useState(''),[target,setTarget]=useState('');
  const [refs,setRefs]=useState([]),[loaded,setLoaded]=useState(false),[load,setLoad]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
  useEffect(()=>{
   if(!load)return;const controller=new AbortController();setBusy(true);setError('');
-  rpc('vcs/references',{sessionId,repositoryId},controller.signal).then(value=>{if(!controller.signal.aborted){setRefs(value.references);setLoaded(true);}}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
+  rpc('vcs/references',{sessionId,repositoryId},controller.signal).then(value=>{if(!controller.signal.aborted){setRefs(value.references);setLoaded(true);onReferencesLoaded?.(value.references);}}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,load]);
  return <section aria-label={t('revisionTitle')}><h3>{t('revisionTitle')}</h3><p>{t('revisionScope')}</p>
