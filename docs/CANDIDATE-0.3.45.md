@@ -6,5 +6,7 @@
 - 第346轮初次全量250/251：旧源码结构测试固定要求RevisionPanel的第一个prop是commits，新增可选回调导致断言失败；更新为实际无条件入口结构。未更改产品逻辑。
 - 修正后251/251，19文件包校验及临时生产安装/stub注册全部通过。临时安装不是现有宿主升级或真实GUI验收。
 - 本地候选SHA256：`c6cdd8f8e5054c9af7bfd64399a3f1db3dc21df155eb251bff69c49c03c0ddb0`。
-- 待同标签四平台CI、Chrome与候选包一致性；随后按持续授权由GitHub Actions正式发布并核验npm/GitHub。冻结后不追加功能，不移动既有标签。
+- 第347轮：[标签CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36717640179)四平台成功，[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36717726839)成功。Artifact Ubuntu22=11097062477、Ubuntu24=11096628120、Windows22=11096564002、Windows24=11096348943实际下载均779763字节且SHA256与本地一致。
+- [发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36718223234)成功；日志确认npm公开latest发布返回`+ @feng0531/dsh-vcs@0.3.45`。GitHub Release非草稿/非预发布且披露GUI待验，包已下载。
+- 尚未完成发布后核验：本机公开npm元数据经10次有界读取仍未含0.3.45，版本直达接口也返回version not found。疑似传播延迟，但未据此认定两端一致或latest更新；未重复发布。下一轮继续只读核验npm包与SHA256SUMS，不新增功能。
 - 真实GUI未验收：需确认实际构建身份，手动加载引用、标签显示/截断/换行、移动/失败/空刷新、固定选择保持及Session隔离。自动测试不等同真实宿主流程；不安装、不重启，发布须披露。
