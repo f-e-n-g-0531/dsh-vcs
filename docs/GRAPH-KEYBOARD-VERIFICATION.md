@@ -6,4 +6,10 @@
 - [第280轮隔离Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36696585033)成功；真实React组件验证上下移动、首尾定位、尾部边界、Alt组合键不接管，以及焦点移动不改变已选提交。
 - 此工作流同时运行既有历史/Monaco夹具；它不是当前已登录DSH GUI验收，合成键盘事件不是原生Enter/Space激活取证。
 - 245项测试、固定标签CI、同标签Chrome及npm/GitHub包一致性均已通过，按用户本版明确授权提前正式发布；见[0.3.39记录](<CANDIDATE-0.3.39.md>)。真实GUI未验收，用户暂不升级决定有效。
-- [第286轮扩展回归](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36698770518)通过：测试提交ecbb327覆盖首部边界、四种修饰键及未处理按键不阻止默认行为。仅测试变更，不修改发布标签；仍非原生激活证明。
+- [第286轮扩展回归](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36698770518)通过：测试提交ecbb327覆盖首部边界、四种修饰键及未处理按键不阻止默认行为。仅测试变更，不修改发布标签；该轮仍非原生激活证明。
+
+## 浏览器输入接口补充取证
+
+第288轮测试提交1ecdcb2通过[隔离Chrome CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36699145067)。第289轮下载artifact 11089462298并读取graph-native-report.json，确认pass=true、activations=2、trusted=[true,true]，步骤为arrow-focus、enter-activation、space-activation、tab-exit。
+
+此证据使用Chrome DevTools Input.dispatchKeyEvent，证明该隔离组件的浏览器默认Enter/Space激活和Tab退出行为，不是人工物理键盘、辅助技术或现有DSH会话取证。现有DSH GUI验收仍待完成，不能据此勾选通过。测试未改产品代码或0.3.39标签，不需要为仅测试变更另发版本。
