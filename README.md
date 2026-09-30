@@ -1,6 +1,6 @@
 # DSH VCS
 
-DeepSeek Harness（DSH）Web 的只读 Git / SVN 变更预览插件。最新正式发布版本 **0.3.35**，包名 **@feng0531/dsh-vcs**；GitHub 与 npm 已发布且安装包摘要一致。本次应用户明确要求在真实 DSH GUI 尚未验收时发布；自动验证不代表真实 GUI 验收通过。详见[发布核验记录](<docs/RELEASE-0.3.35.md>)。非商业许可证不变。
+DeepSeek Harness（DSH）Web 的只读 Git / SVN 变更预览插件。最新正式发布版本 **0.3.36**，包名 **@feng0531/dsh-vcs**；GitHub 安装包可下载，npm 元数据与 latest 已更新，但发布核验时 npm tarball 下载仍返回 404，安装可用性待复查。本次应用户明确要求在真实 DSH GUI 尚未验收时发布；自动验证不代表真实 GUI 验收通过。详见[发布核验记录](<docs/RELEASE-0.3.36.md>)。非商业许可证不变。
 
 > 项目仓库：https://github.com/f-e-n-g-0531/dsh-vcs 。采用 [DSH VCS 非商业源码公开许可证 1.0](<LICENSE>)：允许非商业使用、修改与分发，禁止商业使用（包括公司内部用于商业项目的开发、测试与维护），商业用途须另行书面授权。分发须保留许可证和版权，修改版须注明修改。第三方组件保持原许可。这是源码公开项目，不是 OSI 认可的开源软件。
 
