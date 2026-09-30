@@ -13,7 +13,7 @@ export async function checkGraph(){
  if(!host.textContent.includes('graphLimit')||!host.textContent.includes('graphMissing'))throw Error('Missing graph scope markers');
  const node=host.querySelector('ol button');node.click();if(selected!==id(1)||node.title!==id(1))throw Error('Graph selected wrong commit');
  const merge=[{id:id(4),parents:[id(3),id(2)],subject:'merge'},{id:id(3),parents:[id(1)],subject:'left'},{id:id(2),parents:[id(1)],subject:'right'},{id:id(1),parents:[],subject:'root'}];
- root.render(<HistoryGraph commits={merge} onSelect={value=>selected=value} t={key=>key}/>);
+ root.render(<HistoryGraph commits={merge} selected={id(2)} onSelect={value=>selected=value} t={key=>key}/>);
  await wait(()=>host.querySelectorAll('circle').length===4);
  if(host.querySelectorAll('path').length!==4||host.textContent.includes('graphMissing')||host.textContent.includes('graphLimit'))throw Error('Merge graph relationships incorrect');
  const curves=[...host.querySelectorAll('path')].map(path=>path.getAttribute('d'));
@@ -37,6 +37,9 @@ export async function checkGraph(){
   if(!key(unhandled)||document.activeElement!==buttons[0])throw Error('Graph intercepted unhandled key: '+unhandled);
  }
  if(selected!==priorSelection)throw Error('Graph focus navigation selected a commit');
+ if(host.querySelectorAll('[aria-current=true]').length!==1||buttons[2].getAttribute('aria-current')!=='true')throw Error('Current graph commit was not preserved during focus navigation');
+ root.render(<HistoryGraph commits={merge} selected={id(99)} onSelect={value=>selected=value} t={key=>key}/>);
+ await wait(()=>!host.querySelector('[aria-current=true]'));
  const relations=host.querySelectorAll('details li');if(relations.length!==4||!relations[0].textContent.includes(id(3))||!relations[1].textContent.includes(id(2)))throw Error('Merge parent text missing');
  root.render(<HistoryGraph commits={[merge[3],merge[0],merge[1],merge[2]]} onSelect={value=>selected=value} t={key=>key}/>);
  await wait(()=>host.querySelector('[role=alert]'));if(host.querySelector('svg')||!host.textContent.includes('graphInvalid'))throw Error('Invalid topology did not fall back');
