@@ -44,4 +44,11 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  assert.equal(svn(['cat','-r','6','--',copyUrl+'@6']),'r6');
  await assert.rejects(fs.stat(path.join(wc,'copy.txt')),{code:'ENOENT'});
  assert.deepEqual(parser.parse(svn(['status','--xml'])),deletedStatus);
+ await fs.writeFile(path.join(wc,'copy.txt'),'new identity r8');svn(['add','--','copy.txt']);svn(['commit','-m','r8 recreate']);
+ const recreatedStatus=parser.parse(svn(['status','--xml']));
+ const newHistory=parser.parse(svn(['log','--xml','--verbose','--stop-on-copy','-r','8:0','--',copyUrl+'@8'])).log.logentry;
+ assert.deepEqual(newHistory.map(e=>e['@_revision']),['8']);assert.equal(newHistory[0].paths.path['@_action'],'A');assert.equal(newHistory[0].paths.path['@_copyfrom-rev'],undefined);
+ const oldHistory=parser.parse(svn(['log','--xml','--stop-on-copy','-r','6:0','--',copyUrl+'@6'])).log.logentry;assert.deepEqual(oldHistory.map(e=>e['@_revision']),['6','5']);
+ assert.equal(svn(['cat','-r','6','--',copyUrl+'@6']),'r6');assert.equal(svn(['cat','-r','8','--',copyUrl+'@8']),'new identity r8');
+ assert.deepEqual(parser.parse(svn(['status','--xml'])),recreatedStatus);assert.equal(await fs.readFile(path.join(wc,'copy.txt'),'utf8'),'new identity r8');
 });
