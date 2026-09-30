@@ -6,12 +6,13 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {XMLParser} from 'fast-xml-parser';
-import {svnRevisionPage} from '../src/svn-revision.mjs';
-import {parseSvnLog} from '../src/svn-log.mjs';
+import {parseSvnLogPage} from '../src/svn-log.mjs';
 test('local SVN path history skips unrelated revisions and pins numeric snapshot',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-svn-history-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
  const run=(name,args,cwd=root)=>{const r=spawnSync(name,args,{cwd,encoding:'utf8',windowsHide:true,timeout:20000,env:{...process.env,LC_ALL:process.platform==='linux'?'C.UTF-8':'en_US.UTF-8'}});assert.equal(r.status,0,r.stderr);return r.stdout;};
  const repository=path.join(root,'repo'),wc=path.join(root,'wc');run('svnadmin',['create',repository]);run('svn',['checkout','--non-interactive',pathToFileURL(repository).href,wc]);
+ const emptyXml=run('svn',['log','--non-interactive','--no-auth-cache','--xml','-r','0:0','--',pathToFileURL(repository).href+'@0']);
+ const emptyPage=parseSvnLogPage(emptyXml,{snapshot:'0'});assert.equal(emptyPage.nextRevision,null);assert.ok(emptyPage.entries.every(e=>e.revision==='0'));
  const name='中文 @ percent%.txt',file=path.join(wc,name);
  const svn=args=>run('svn',['--non-interactive','--no-auth-cache',...args],wc);
  await fs.writeFile(file,'r1');await fs.writeFile(path.join(wc,'other'),'r1');svn(['add','--',name+'@','other']);svn(['commit','-m','r1']);
@@ -19,10 +20,10 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  await fs.writeFile(file,'r3');svn(['commit','-m','r3']);
  await fs.writeFile(file,'r4');svn(['commit','-m','r4']);
  const parser=new XMLParser({ignoreAttributes:false,parseAttributeValue:false,isArray:name=>name==='logentry'});
- const revisions=(upper,limit)=>{const xml=svn(['log','--xml','--stop-on-copy','--limit',String(limit),'-r',upper+':0','--',name+'@3']);return parseSvnLog(xml).map(e=>e.revision);};
+ const pageAt=cursor=>parseSvnLogPage(svn(['log','--xml','--stop-on-copy','--limit','2','-r',cursor+':0','--',name+'@3']),{snapshot:'3',cursor,limit:1});
  const status=svn(['status','--xml']),info=svn(['info','--xml','--',name+'@']);
- const page=svnRevisionPage(revisions('3',2),{snapshot:'3',limit:1});assert.deepEqual(page,{snapshot:'3',revisions:['3'],nextRevision:'2'});
- assert.deepEqual(svnRevisionPage(revisions(page.nextRevision,2),{snapshot:'3',cursor:page.nextRevision,limit:1}),{snapshot:'3',revisions:['1'],nextRevision:null});
+ const page=pageAt('3');assert.equal(page.snapshot,'3');assert.equal(page.nextRevision,'2');assert.deepEqual(page.entries.map(e=>[e.revision,e.message]),[['3','r3']]);
+ const next=pageAt(page.nextRevision);assert.equal(next.snapshot,'3');assert.equal(next.nextRevision,null);assert.deepEqual(next.entries.map(e=>[e.revision,e.message]),[['1','r1']]);
  assert.equal(svn(['cat','-r','3','--',name+'@3']),'r3');assert.equal(await fs.readFile(file,'utf8'),'r4');
  assert.deepEqual(parser.parse(svn(['status','--xml'])),parser.parse(status));assert.deepEqual(parser.parse(svn(['info','--xml','--',name+'@'])),parser.parse(info));
  // Fixture writes create a copy at r5; subsequent review commands remain read-only.
