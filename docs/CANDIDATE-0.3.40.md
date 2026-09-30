@@ -5,7 +5,7 @@
 - 功能提交c296330；[隔离Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36699931987)成功。
 - 第292轮本地245/245测试、19文件包校验及临时生产安装/stub注册通过。
 - 本地包SHA256：`609658d3032e0db39655eb949dcb0d4be79e6dfcee4ae597153ba8fe23b1fa22`。
-- 固定标签CI、同标签Chrome、四平台包一致性尚待验证。
+- 第293轮固定标签 `45353c621b14349a0954c4e1249c392575e6bac2` 的[四平台CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36700364311)及[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36700434780)全部成功。下载四份包均778658字节，SHA256与本地候选一致。Artifact ID：Windows22=11090120530、Ubuntu22=11089890914、Windows24=11089876744、Ubuntu24=11088993849。
 - 真实DSH GUI未验收；用户暂不升级决定有效，不安装不重启。0.3.39提前发布授权不自动适用于本候选。当前正式版仍为0.3.39。
 
 后续真实验收需在授权安装后确认页面版本、从列表或图选择提交后标记与详情OID一致、键盘只移动焦点时标记不变、切换Session/仓库不残留旧标记；隔离组件测试不能替代这些步骤。
