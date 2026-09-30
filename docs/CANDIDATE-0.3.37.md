@@ -20,6 +20,6 @@
 
 本候选包含历史目录筛选、普通文件只读预览、提交详情身份隔离。依然不跟随链接/子模块、不自动fetch、不写工作区。
 
-第265轮用户明确选择“现在正式发布，明确披露未验收项”。[发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36692673747)成功，[GitHub Release](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.37)已创建，下载tgz的SHA256与上述候选一致。首次核验时npm公共查询仍返回版本不存在/latest 0.3.36，npm传播及下载字节核验待续，不重复发布。
+第265轮用户明确选择“现在正式发布，明确披露未验收项”。[发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36692673747)成功，[GitHub Release](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.37)已创建，下载tgz的SHA256与上述候选一致。首次核验遇到npm传播延迟；第266轮确认npm latest为0.3.37，npm与GitHub下载包均778397字节，SHA256均与上述冻结候选一致，发布的SHA256SUMS也匹配。GitHub draft=false、prerelease=false；本阶段正式发布及工件一致性核验已完成。
 
 真实GUI验收仍待完成，发布说明已披露。未安装或重启，当前安装仍为0.3.36。后续main的提交图路由与SVN离线基础均不包含在此冻结版本中。
