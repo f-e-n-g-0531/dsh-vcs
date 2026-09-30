@@ -14,7 +14,7 @@ export function scopeSvnPathNodes(nodes,options){
 }
 export function scopeSvnChanges(records,{scope,revision}={}){
  validateSvnPath(scope);const current=parseSvnRevision(revision);
- if(!Array.isArray(records)||records.length>10000)throw new Error('Invalid SVN changed paths');
+ if(!Array.isArray(records)||records.length>10000||(current===0n&&records.length!==0))throw new Error('Invalid SVN changed paths');
  const seen=new Set();const checked=records.map(record=>{
   if(!record||typeof record!=='object'||Array.isArray(record)||Object.keys(record).some(k=>!['path','action','kind','copyFromPath','copyFromRevision'].includes(k)))throw new Error('Invalid SVN change structure');
   const {path,action,kind,copyFromPath,copyFromRevision}=record;validateSvnPath(path);
