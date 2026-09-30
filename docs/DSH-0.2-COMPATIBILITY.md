@@ -9,11 +9,16 @@
 - 但 register 在宿主类型中是 private；公开 API 是 connection.rpc.handle(channel,handler)。旧版插件显式传 owner 是为避免嵌套 getter 丢失插件上下文，不能无测试切换。
 - 新宿主声明仍提供 connection.fetch.register、connection.admit、sessionPersistence.stat(id,options)、客户端 useSessions、retainedBy 与 layout.selectPanel。仅存在接口不等于运行时兼容。
 
-## 待验证后才能放宽声明
+## 已完成验证与候选
 
-1. 使用已安装的真实 HostConnectionService，在隔离 Context 中注册插件；验证 RPC 路由、静态资源、拒绝未认证请求、释放清理。不接触运行中宿主，不读取用户 Cookie。
-2. 验证 Session cwd 解析与新客户端槽位、选择状态；补充实际契约测试。
-3. 确定使用公开注册入口还是保留受测的 owner 显式适配。
-4. 仅声明经过验证的宿主版本，不使用 * 或强制豁免。新补丁包需独立版本和验证，不能覆盖 0.3.35。
+- 第 187–190 轮真实 Cordis/Connection 隔离测试：注册、401/403、资源、RPC envelope、Session cwd、插件单独卸载/重载通过。
+- 真实 SlotRegistry 客户端注册/卸载通过；使用测试 React、外壳及 locale，不是实际页面渲染。
+- 保留受测的 owner 显式注册；它仍属私有 API 风险，因此只精确支持已声明版本，不推断未来版本兼容。
+- 0.3.36 候选 peer 已改为 `0.1.7-rc.2 || 0.2.0-rc.2`。新宿主真实 evaluatePluginCompatibility 已确认接受这两个版本，拒绝测试中的其他版本和旧 0.3.35 声明，未设置豁免。
+- 205/205、本地包/安装、四平台标签 CI、同标签 Chrome、四平台 tarball 相同摘要均通过。详见[候选核验](<CANDIDATE-0.3.36.md>)。
 
-当前没有修改 peer 范围、安装包或宿主配置。真实 GUI 验收仍未完成。
+## 仍待完成
+
+- 在真实宿主加载固定候选后验证页面版本、Session 选择和 M1–M4 操作；当前没有授权浏览器工具或用户验收结果。
+- 当前只完成候选构建与测试，没有正式发布 0.3.36、改动当前 profile 或自动重启。旧安装不会自动解除拒载。
+- 正式发布需真实验收，或用户针对此候选明确要求提前发布并披露例外。候选安装与用户自行重启后的验收可先于公开发布，不需要强制豁免。
