@@ -16,6 +16,10 @@ export async function checkGraph(){
  root.render(<HistoryGraph commits={merge} onSelect={value=>selected=value} t={key=>key}/>);
  await wait(()=>host.querySelectorAll('circle').length===4);
  if(host.querySelectorAll('path').length!==4||host.textContent.includes('graphMissing')||host.textContent.includes('graphLimit'))throw Error('Merge graph relationships incorrect');
+ const curves=[...host.querySelectorAll('path')].map(path=>path.getAttribute('d'));
+ const tracks=curves.map(d=>Number(d.split(' C ')[1].split(' ')[0]));
+ if(new Set(tracks).size!==4||tracks.some(x=>!Number.isFinite(x)))throw Error('Overlapping merge edges share tracks');
+ const svg=host.querySelector('svg');if(Number(svg.getAttribute('width'))<Math.max(...tracks)+12)throw Error('Graph tracks clipped by SVG viewport');
  const buttons=host.querySelectorAll('ol button');buttons[2].click();if(selected!==id(2))throw Error('Merge branch selection incorrect');
  const relations=host.querySelectorAll('details li');if(relations.length!==4||!relations[0].textContent.includes(id(3))||!relations[1].textContent.includes(id(2)))throw Error('Merge parent text missing');
  root.render(<HistoryGraph commits={[merge[3],merge[0],merge[1],merge[2]]} onSelect={value=>selected=value} t={key=>key}/>);
