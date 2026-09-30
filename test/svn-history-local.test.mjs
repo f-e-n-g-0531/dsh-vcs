@@ -82,7 +82,10 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  assert.equal(svn(['cat','-r','10','--',rootUrl+'/scope/imported@10']),'r9');
  assert.equal(svn(['cat','-r','11','--',rootUrl+'/scope/imported@11']),'replacement r11');
  assert.deepEqual(parser.parse(svn(['status','--xml'])),replacementStatus);assert.equal(await fs.readFile(path.join(wc,'scope','imported'),'utf8'),'replacement r11');
+ const crossPlan=planSvnComparison(parseSvnDetail(crossXml,{scope:'/scope',revision:'10'}).changes,{scope:'/scope',revision:'10',path:'/scope/imported'});
+ assert.deepEqual(crossPlan.left,{empty:true});assert.equal(crossPlan.right.path,'/scope/imported');
  const readSide=side=>side.empty?'':svn(['cat','-r',side.revision,'--',rootUrl+side.path.split('/').map(encodeURIComponent).join('/')+'@'+side.pegRevision]);
+ assert.equal(readSide(crossPlan.right),'r9');
  for(const [revision,target,action,left,right] of [['1','/'+name,'A','','r1'],['3','/'+name,'M','r1','r3'],['7','/copy.txt','D','r6',''],['11','/scope/imported','R','r9','replacement r11']]){
   const detail=parseSvnDetail(svn(['log','--xml','--verbose','-r',revision+':'+revision,'--',rootUrl+'@11']),{scope:'/',revision});
   const plan=planSvnComparison(detail.changes,{scope:'/',revision,path:target});
