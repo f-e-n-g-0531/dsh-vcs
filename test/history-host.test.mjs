@@ -38,6 +38,16 @@ for(const [endpoint,method] of [['vcs/revision-changes','getRevisionChanges'],['
   const controller=new AbortController(),cancel=setup({[method]:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call(endpoint,p,controller.signal)).error.code,'vcs/cancelled');
  });
 }
+test('historical file enforces path grants and rejects stale results',async()=>{
+ const p={...payload,commit:'a'.repeat(40),path:'nested/file.txt'},controller=new AbortController();let count=0;
+ const h=setup({getHistoricalFile:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,path:p.path,signal:controller.signal});return {entries:[]};}});
+ assert.equal((await h.call('vcs/tree-file',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{root:'/evil'},{path:'../secret'},{path:'/secret'},{path:''},{path:null},{path:'a//b'},{path:'a/./b'},{path:'x\0'},{depth:10},{id:'b'.repeat(64)},{commit:'HEAD'},{parentIndex:0}])assert.equal((await h.call('vcs/tree-file',{...p,...extra})).error.code,'vcs/invalid-request');
+ assert.equal(count,0);assert.equal((await h.call('vcs/tree-file',p,controller.signal)).ok,true);assert.equal(count,1);
+ h.expire();assert.equal((await h.call('vcs/tree-file',p)).error.code,'vcs/rediscover-required');
+ const moved=setup({getHistoricalFile:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree-file',p)).error.code,'vcs/rediscover-required');
+ const cancel=setup({getHistoricalFile:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree-file',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('historical tree enforces commit-only grants and rejects stale results',async()=>{
  const p={...payload,commit:'a'.repeat(40)},controller=new AbortController();let count=0;
  const h=setup({getHistoricalTree:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,signal:controller.signal});return {entries:[]};}});
