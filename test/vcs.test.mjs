@@ -18,6 +18,17 @@ async function write(root, name, value) { await fs.writeFile(path.join(root, nam
 function commit(root) { cmd(root, 'git', ['add', '.']); cmd(root, 'git', ['commit', '-m', 'fixture', '--no-gpg-sign']); }
 async function compare(repo, name, mode = 'all') { const entries = await listChanges(repo, mode); const entry = entries.find(e => e.path === name); assert.ok(entry, name + ' missing: ' + JSON.stringify(entries)); return getComparison(repo, { mode, id: entry.id }); }
 
+test('unborn HEAD history still permits reference based immutable comparisons',async t=>{
+ const root=await gitRepo(t);await write(root,'file.txt','before');commit(root);const base=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();cmd(root,'git',['tag','baseline',base]);
+ await write(root,'file.txt','after');commit(root);const target=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();
+ // Fixture setup only: retain main and tag, but point HEAD at an unborn branch.
+ cmd(root,'git',['symbolic-ref','HEAD','refs/heads/unborn']);await write(root,'file.txt','working');
+ const repo=await detectRepository(root),before=cmd(root,'git',['status','--porcelain']).stdout,index=cmd(root,'git',['ls-files','--stage']).stdout;
+ assert.deepEqual(await listHistory(repo),{snapshot:null,commits:[],nextOffset:null});
+ const {references}=await listReferences(repo);assert.equal(references.find(r=>r.name==='refs/tags/baseline').commit,base);assert.equal(references.find(r=>r.name==='refs/heads/main').commit,target);assert.equal(references.some(r=>r.name==='refs/heads/unborn'),false);
+ const changes=await getRevisionChanges(repo,{base,target});const diff=await getRevisionComparison(repo,{base,target,id:changes.changes[0].id});assert.equal(diff.left.text,'before');assert.equal(diff.right.text,'after');
+ assert.equal(cmd(root,'git',['symbolic-ref','HEAD']).stdout.trim(),'refs/heads/unborn');assert.equal(cmd(root,'git',['ls-files','--stage']).stdout,index);assert.equal(cmd(root,'git',['status','--porcelain']).stdout,before);assert.equal(await fs.readFile(path.join(root,'file.txt'),'utf8'),'working');
+});
 test('local reference enumeration accepts 1000 refs and rejects 1001 without truncating silently',async t=>{
  const root=await gitRepo(t);await write(root,'seed','x');commit(root);const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),repo=await detectRepository(root);
  const input=Array.from({length:999},(_,i)=>'create refs/heads/b'+String(i).padStart(4,'0')+' '+head).join('\n')+'\n';
