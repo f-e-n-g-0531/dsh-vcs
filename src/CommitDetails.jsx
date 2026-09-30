@@ -1,16 +1,17 @@
-import React,{useState,useEffect} from 'react';
+import React,{useState,useEffect,useRef} from 'react';
 import HistoricalTree from './HistoricalTree.jsx';
 import HistoryComparison from './HistoryComparison.jsx';
-import {filterCommitFiles} from './history-filter.mjs';
+import {filterCommitFiles,selectExactHistoryPath} from './history-filter.mjs';
 export default function CommitDetails(props){
  return <ScopedCommitDetails key={JSON.stringify([props.sessionId,props.repositoryId,props.commit])} {...props}/>;
 }
-function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}){
+function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit,initialPath}){
+ const navigationPending=useRef(true);
  const [selected,setSelected]=useState(null),[query,setQuery]=useState('');
  const [parentIndex,setParentIndex]=useState(0),[details,setDetails]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{
   const controller=new AbortController();setDetails(null);setError('');
-  rpc('vcs/commit',{sessionId,repositoryId,commit,parentIndex},controller.signal).then(value=>{if(!controller.signal.aborted)setDetails(value);}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();});
+  rpc('vcs/commit',{sessionId,repositoryId,commit,parentIndex},controller.signal).then(value=>{if(!controller.signal.aborted){setDetails(value);if(navigationPending.current){navigationPending.current=false;setSelected(selectExactHistoryPath(value.changes,initialPath));}}}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();});
   return()=>controller.abort();
  },[sessionId,repositoryId,commit,parentIndex,retry]);
  if(error)return <p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>;

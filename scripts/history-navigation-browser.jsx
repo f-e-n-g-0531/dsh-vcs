@@ -28,8 +28,10 @@ export async function checkHistoryNavigation(){
   await wait(()=>host.querySelector('[aria-label=commitDetails] h3')?.textContent==='destination details');
   if(host.querySelector('[aria-label=commitDetails] pre')?.textContent!=='Destination message'||host.textContent.includes('Trailer: value'))throw Error('Old commit message survived navigation');
   const destination=calls.find(x=>x.endpoint==='vcs/commit'&&x.p.commit===b);if(!destination||destination.p.parentIndex!==0)throw Error('Navigation did not reset parent');
-  if(calls.filter(x=>['vcs/commit-compare','vcs/file-history'].includes(x.endpoint)).some(x=>!x.signal.aborted))throw Error('Old comparison requests survived navigation');
-  if(host.querySelector('select[aria-label="commitParent"]')||host.querySelector('.vcs-text-comparison'))throw Error('Old comparison state survived navigation');
+  if(calls.filter(x=>x.p.commit===a&&['vcs/commit-compare','vcs/file-history'].includes(x.endpoint)).some(x=>!x.signal.aborted))throw Error('Old comparison requests survived navigation');
+  await wait(()=>calls.some(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b));
+  const navigated=calls.find(x=>x.endpoint==='vcs/commit-compare'&&x.p.commit===b);if(navigated.p.parentIndex!==0||navigated.p.id!=='d'.repeat(64)||button('modified · file.txt')?.getAttribute('aria-pressed')!=='true')throw Error('Navigation did not select exact target file');
+  if(host.querySelector('select[aria-label="commitParent"]'))throw Error('Old parent state survived navigation');
   if(calls.filter(x=>x.endpoint==='vcs/history').length!==1)throw Error('Navigation reloaded pinned history');
   for(const language of ['zh','en']){
    root.render(<CommitDetails key={language} sessionId="s" repositoryId="r" commit={b} t={k=>locales[language][k]} onRediscover={()=>{}} rpc={async(endpoint,p,signal)=>endpoint==='vcs/commit'?{...row(b,'Large body'),parents:[],parent:null,message:'',messageTruncated:true,changes:[{id:'d'.repeat(64),path:'file.txt',status:'modified'}]}:rpc(endpoint,p,signal)}/>);
