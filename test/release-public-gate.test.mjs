@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+const workflow=readFileSync(new URL('../.github/workflows/release.yml',import.meta.url),'utf8');
+const section=workflow.split('      - name: Verify public npm artifact before GitHub release')[1].split('      - name: Publish GitHub release')[0];
+const code=section.split("<<'NODE'")[1].split('          NODE')[0].split(String.fromCharCode(10)).filter(line=>!line.trim().startsWith('import ')).join(String.fromCharCode(10));
+const run=new (Object.getPrototypeOf(async function(){}).constructor)('readFileSync','createHash','assert','fetch','setTimeout',code);
+const bytes=Buffer.from('fixture'),integrity='sha512-'+createHash('sha512').update(bytes).digest('base64');
+const metadata={dist:{integrity,tarball:'https://registry.npmjs.org/test.tgz'}};
+const response=(status,value)=>({ok:status===200,status,json:async()=>value,arrayBuffer:async()=>value});
+const execute=fetch=>run(name=>name==='package.json'?JSON.stringify({name:'@feng0531/dsh-vcs',version:'0.3.45'}):bytes,createHash,assert,fetch,resolve=>resolve());
+test('public release gate retries absent metadata and verifies exact bytes',async()=>{let calls=0;await execute(async()=>{calls++;return calls===1?response(404):calls===2?response(200,metadata):response(200,bytes);});assert.equal(calls,3);});
+test('public release gate refuses unavailable or mismatched artifacts',async()=>{let calls=0;await assert.rejects(execute(async()=>{calls++;return response(404);}),/public artifact is not verified/);assert.equal(calls,10);await assert.rejects(execute(async()=>response(200,{dist:{...metadata.dist,integrity:'wrong'}})),/integrity mismatch/);let n=0;await assert.rejects(execute(async()=>++n===1?response(200,metadata):response(200,Buffer.from('changed'))),/size mismatch|bytes mismatch/);});
