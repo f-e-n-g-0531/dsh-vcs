@@ -43,6 +43,17 @@ export async function checkHistoryNavigation(){
   setFilter('');await wait(()=>button('modified · file.txt'));
   if(button('modified · file.txt').getAttribute('aria-pressed')!=='false'||calls.length!==countAfterReplay)throw Error('Consumed navigation reselected after search');
   if(calls.filter(x=>x.endpoint==='vcs/history').length!==1)throw Error('Navigation reloaded pinned history');
+  for(const path of ['missing.txt','file.txt']){
+   const navigationCalls=[];const navRpc=(endpoint,p,signal)=>{navigationCalls.push({endpoint,p});return rpc(endpoint,p,signal);};
+   root.render(<CommitDetails key={path} initialPath={path} sessionId='s' repositoryId='r' commit={a} rpc={navRpc} t={k=>k} onRediscover={()=>{}}/>);
+   await wait(()=>host.querySelector('select[aria-label=commitParent]'));
+   if(path==='file.txt')await wait(()=>navigationCalls.some(x=>x.endpoint==='vcs/commit-compare'));
+   else if(navigationCalls.some(x=>x.endpoint==='vcs/commit-compare')||button('modified · file.txt').getAttribute('aria-pressed')!=='false')throw Error('Unmatched navigation selected a file');
+   const comparisons=navigationCalls.filter(x=>x.endpoint==='vcs/commit-compare').length;
+   const parent=host.querySelector('select[aria-label=commitParent]');parent.value='1';parent.dispatchEvent(new Event('change',{bubbles:true}));
+   await wait(()=>navigationCalls.some(x=>x.endpoint==='vcs/commit'&&x.p.parentIndex===1)&&button('modified · file.txt'));
+   if(navigationCalls.filter(x=>x.endpoint==='vcs/commit-compare').length!==comparisons||button('modified · file.txt').getAttribute('aria-pressed')!=='false')throw Error('Parent change reapplied navigation hint');
+  }
   for(const language of ['zh','en']){
    root.render(<CommitDetails key={language} sessionId="s" repositoryId="r" commit={b} t={k=>locales[language][k]} onRediscover={()=>{}} rpc={async(endpoint,p,signal)=>endpoint==='vcs/commit'?{...row(b,'Large body'),parents:[],parent:null,message:'',messageTruncated:true,changes:[{id:'d'.repeat(64),path:'file.txt',status:'modified'}]}:rpc(endpoint,p,signal)}/>);
    await wait(()=>host.textContent.includes(locales[language].commitMessageLimit));
