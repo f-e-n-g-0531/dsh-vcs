@@ -24,13 +24,13 @@ export async function checkRevisions(){
  try{
  root.render(<RevisionPanel commits={[{id:a,subject:'first'},{id:b,subject:'second'}]} sessionId="s" repositoryId="r" rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
  await wait(()=>host.querySelectorAll('select').length===2);choose(0,a);choose(1,b);
- await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
+ await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>button('historyBasic'));button('historyBasic').click();await wait(()=>host.textContent.includes('right revision'));
  const input=host.querySelector('input'),countBefore=calls.length;
  const enter=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));};
  enter('no-match');await wait(()=>host.textContent.includes('emptySearch'));
  if(host.textContent.includes('right revision'))throw Error('Filtered Diff retained');
  enter('original');await wait(()=>button('pair.txt'));if(calls.length!==countBefore)throw Error('Filter issued RPC');
- button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
+ button('pair.txt').click();await wait(()=>button('historyBasic'));button('historyBasic').click();await wait(()=>host.textContent.includes('right revision'));
  button('revisionSwap').click();await wait(()=>delayed);
  if(host.textContent.includes('right revision'))throw Error('Old Diff remained after swap');
  const selects=host.querySelectorAll('select');if(selects[0].value!==b||selects[1].value!==a)throw Error('Swap failed');
@@ -74,7 +74,7 @@ export async function checkRevisions(){
  await wait(()=>host.textContent.includes('historyEmpty'));
  if(!button('revisionLoadRefs')||emptyCalls.length!==1||emptyCalls[0].endpoint!=='vcs/history')throw Error('Empty history hid revision entry or fetched refs automatically');
  button('revisionLoadRefs').click();await wait(()=>hasOption(a)&&hasOption(b));choose(0,a);choose(1,b);
- await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>host.textContent.includes('right revision'));
+ await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>button('historyBasic'));button('historyBasic').click();await wait(()=>host.textContent.includes('right revision'));
  if(emptyCalls.filter(c=>c.endpoint==='vcs/history').length!==1||!emptyCalls.some(c=>c.endpoint==='vcs/revision-compare'&&c.p.base===a&&c.p.target===b))throw Error('Empty HEAD comparison lost pinned reference pair');
  for(const outcome of ['success','authorization-error']){
  let resolveBody,rejectBody,bodySignal,rediscoveries=0;const bodyCalls=[];
