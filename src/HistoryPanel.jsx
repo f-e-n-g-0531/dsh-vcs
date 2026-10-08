@@ -9,7 +9,8 @@ export default function HistoryPanel(props){
 }
 function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const [selection,setSelection]=useState({id:null,path:null,revision:0}),[query,setQuery]=useState('');
- const [references,setReferences]=useState(null);
+ const [references,setReferences]=useState(null),[historyTip,setHistoryTip]=useState(''),[historyRef,setHistoryRef]=useState('');
+ const navigateReference=value=>{const ref=(references||[]).find(row=>JSON.stringify([row.name,row.commit])===value);const tip=ref?.commit||'';setHistoryRef(value);setHistoryTip(tip);setSearch(old=>old?{...old,snapshot:tip||null}:null);setOffset(0);setQuery('');setSelected(null);setPage({commits:[],snapshot:null,nextOffset:null});};
  const [draft,setDraft]=useState({message:'',author:'',path:''}),[search,setSearch]=useState(null);
  const submitSearch=value=>{setSearch({values:value,snapshot:page.snapshot});setOffset(0);setQuery('');setSelected(null);setPage(old=>({...old,commits:[],nextOffset:null}));};
  const referenceIndex=useMemo(()=>indexHistoryReferences(references||[]),[references]);
@@ -20,14 +21,15 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  // Scope changes remount locally; parent still remounts for refresh. Pagination pins first snapshot.
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
-  rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||offset)?{snapshot:search?.snapshot||page.snapshot}:{})},controller.signal).then(value=>{
+  rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||historyTip||offset)?{snapshot:search?.snapshot||historyTip||page.snapshot}:{})},controller.signal).then(value=>{
    if(!controller.signal.aborted)setPage(old=>({...value,commits:offset?[...old.commits,...value.commits]:value.commits}));
   }).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
- },[sessionId,repositoryId,offset,retry,search]);
+ },[sessionId,repositoryId,offset,retry,search,historyTip]);
  const commits=filterLoadedCommits(page.commits,query);
  return <section className="vcs-history" aria-label={t('history')} aria-busy={busy}>
  <div className="vcs-history-list"><p>{t('historyListOnly')}</p>{references!==null&&<p>{t('historyRefsScope')}</p>}
+ <label>{t('historyBranch')} <select aria-label={t('historyBranch')} value={historyRef} disabled={busy} onChange={e=>navigateReference(e.target.value)}><option value="">HEAD</option>{historyRef&&!(references||[]).some(ref=>JSON.stringify([ref.name,ref.commit])===historyRef)&&<option value={historyRef}>{JSON.parse(historyRef)[0]} · {historyTip.slice(0,10)} · {t('historyPinned')}</option>}{(references||[]).map(ref=>{const value=JSON.stringify([ref.name,ref.commit]);return <option key={value} value={value}>{ref.name} · {ref.commit.slice(0,10)}</option>;})}</select></label><p>{t('historyBranchScope')}{historyTip&&<> · <code>{historyTip}</code></>}</p>
  <form aria-label={t('historyServerSearch')} onSubmit={e=>{e.preventDefault();submitSearch({...draft});}}><fieldset disabled={busy}><legend>{t('historyServerSearch')}</legend><p>{t('historyServerScope')}</p>{['message','author','path'].map(field=><label key={field}>{t('historyServer_'+field)} <input maxLength={1024} aria-label={t('historyServer_'+field)} value={draft[field]} onChange={e=>setDraft(old=>({...old,[field]:e.target.value}))}/></label>)}<button type="submit">{t('historyServerApply')}</button><button type="button" onClick={()=>{setDraft({message:'',author:'',path:''});submitSearch({});}}>{t('historyServerClear')}</button></fieldset></form>
  {search&&<p role="status">{t('historyServerActive')}: {JSON.stringify(search.values)} · <code>{search.snapshot||page.snapshot}</code></p>}
  <label>{t('historySearch')} <input aria-label={t('historySearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}}/></label><span> {commits.length} / {page.commits.length}</span>

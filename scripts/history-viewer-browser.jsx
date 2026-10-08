@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkBranchHistory} from './branch-history-browser.jsx';
 export {checkHistorySearch} from './history-search-browser.jsx';
 export {checkReviewViews} from './review-views-browser.jsx';
 export {checkHistoryRefs} from './history-refs-browser.jsx';

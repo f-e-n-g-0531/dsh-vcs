@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import HistoryPanel from '../src/HistoryPanel.jsx';
 import locales from '../src/locales.json';
+export {checkBranchHistory} from './branch-history-browser.jsx';
 export async function checkHistorySearch(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host),a='a'.repeat(40),b='b'.repeat(40);
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('History search timeout');};
