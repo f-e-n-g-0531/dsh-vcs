@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkHistorySearch} from './history-search-browser.jsx';
 export {checkReviewViews} from './review-views-browser.jsx';
 export {checkHistoryRefs} from './history-refs-browser.jsx';
 export {checkImageUI} from './image-ui-browser.jsx';

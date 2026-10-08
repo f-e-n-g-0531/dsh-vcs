@@ -1,3 +1,19 @@
+// Search values are literal, bounded and never revision/options or pathspec expressions.
+export function historySearchArgs(search){
+ if(search===undefined)return {args:[],paths:[]};
+ if(!search||typeof search!=='object'||Array.isArray(search)||Object.keys(search).some(k=>!['message','author','path'].includes(k)))throw new Error('Invalid history search');
+ const args=['--fixed-strings','--regexp-ignore-case'],paths=[];
+ for(const key of ['message','author','path']){
+  const value=search[key];if(value===undefined)continue;
+  if(typeof value!=='string'||value.length>1024||/[\0\r\n]/.test(value))throw new Error('Invalid history search value');
+  if(!value)continue;
+  if(key==='path'){
+   if(value.startsWith('/')||value.includes('\\')||value.split('/').some(p=>!p||p==='.'||p==='..'))throw new Error('Invalid history search path');
+   paths.push(value);
+  }else args.push((key==='message'?'--grep=':'--author=')+value);
+ }
+ return {args,paths};
+}
 // Each line-porcelain record carries its own metadata; never interpret filename as an access path.
 export function parseBlame(text,maxLines=500){
  if(typeof text!=='string'||Buffer.byteLength(text,'utf8')>2*1024*1024)throw new Error('Invalid blame output size');
