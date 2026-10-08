@@ -18,7 +18,7 @@ export default function HistoryViewer({comparison,identity,t}){
  useEffect(()=>{if(ready)viewer.current?.options({sideBySide,ignoreWhitespace,wrap});},[ready,sideBySide,ignoreWhitespace,wrap]);
  return <div>
  <button aria-pressed={enabled} onClick={()=>setEnabled(value=>!value)}>{t(enabled?'historyBasic':'historyAdvanced')}</button>
- {ready&&<div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+ {ready&&<div key="controls" style={{display:'flex',flexWrap:'wrap',gap:8}}>
  <button aria-pressed={sideBySide} onClick={()=>setSide(v=>!v)}>{t(sideBySide?'side':'inline')}</button>
  <label><input type="checkbox" checked={ignoreWhitespace} onChange={e=>setWhitespace(e.target.checked)}/>{t('whitespace')}</label>
  <label><input type="checkbox" checked={wrap} onChange={e=>setWrap(e.target.checked)}/>{t('wrap')}</label>
@@ -27,7 +27,7 @@ export default function HistoryViewer({comparison,identity,t}){
  </div>}
  {enabled&&!ready&&!error&&<p role="status">{t('loading')}</p>}
  {error&&<p role="status">{t('fallback')} {error}</p>}
- <div style={{position:'relative',height:360}}>
+ <div key="editor-host" style={{position:'relative',height:360}}>
  <div ref={node} style={{position:'absolute',inset:0,visibility:ready?'visible':'hidden'}} aria-hidden={!ready}/>
  {!ready&&<TextComparison comparison={comparison} labels={comparisonLabels(t)}/>}
  </div></div>;

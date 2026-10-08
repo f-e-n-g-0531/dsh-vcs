@@ -40,7 +40,7 @@ export async function checkReviewViews(){
   window.dispatchEvent(new FocusEvent('focus'));await wait(()=>calls.filter(c=>c.endpoint==='vcs/status').length===statusCount+1);
   await new Promise(r=>setTimeout(r,100));
   if(host.querySelector('.vcs-history-details')!==detail||detail.querySelector('.monaco-diff-editor')!==editor||calls.filter(c=>c.endpoint==='vcs/commit-compare').length!==1)throw Error('Window focus remounted historical review');
-  for(const key of ['fileHistory','blame','imageCompare']){const controls=[...detail.querySelectorAll('button')].filter(b=>b.textContent===t(key));if(controls.length>1)throw Error('Duplicate historical controls: '+key);}
+  for(const key of ['fileHistory','blame','imageCompare']){const controls=[...detail.querySelectorAll('button')].filter(b=>b.textContent===t(key));if(controls.length>1)throw Error('Duplicate historical controls: '+key+' count='+controls.length+' html='+detail.innerHTML.slice(-6000));}
   button(t('workspaceView')).click();await wait(()=>!host.querySelector('.vcs-history')&&getComputedStyle(host.querySelector('.vcs-body')).display!=='none');
   if(calls.filter(c=>c.endpoint==='vcs/compare').length!==1)throw Error('Returning to workspace revived old selection');
  }
