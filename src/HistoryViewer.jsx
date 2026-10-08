@@ -4,7 +4,7 @@ import {comparisonLabels} from './comparison-labels.mjs';
 import {startHistoryEditor} from './history-editor.mjs';
 import {loadEditor} from './editor-loader.mjs';
 import {version} from '../package.json';
-export default function HistoryViewer({comparison,identity,t}){
+export default function HistoryViewer({comparison,identity,t,single=false}){
  const node=useRef(null),viewer=useRef(null);
  const [sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false);
  const [enabled,setEnabled]=useState(true),[ready,setReady]=useState(false),[error,setError]=useState('');
@@ -12,13 +12,13 @@ export default function HistoryViewer({comparison,identity,t}){
   setReady(false);setError('');if(!enabled)return;
   const asset=name=>new URL('vcs-assets/'+name,document.baseURI).href;
   const link=document.createElement('link');link.rel='stylesheet';link.href=asset('editor.css');document.head.appendChild(link);
-  const task=startHistoryEditor({node:node.current,comparison,key:identity,load:signal=>loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry=0',{signal}),onReady:instance=>{viewer.current=instance;setReady(true);},onError:e=>setError(e.message)});
+  const task=startHistoryEditor({node:node.current,comparison,key:identity,single,load:signal=>loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry=0',{signal}),onReady:instance=>{viewer.current=instance;setReady(true);},onError:e=>setError(e.message)});
   return()=>{viewer.current=null;try{task.dispose();}finally{link.remove();}};
- },[enabled,comparison,identity]);
+ },[enabled,comparison,identity,single]);
  useEffect(()=>{if(ready)viewer.current?.options({sideBySide,ignoreWhitespace,wrap});},[ready,sideBySide,ignoreWhitespace,wrap]);
  return <div>
  <button aria-pressed={enabled} onClick={()=>setEnabled(value=>!value)}>{t(enabled?'historyBasic':'historyAdvanced')}</button>
- {ready&&<div key="controls" style={{display:'flex',flexWrap:'wrap',gap:8}}>
+ {ready&&!single&&<div key="controls" style={{display:'flex',flexWrap:'wrap',gap:8}}>
  <button aria-pressed={sideBySide} onClick={()=>setSide(v=>!v)}>{t(sideBySide?'side':'inline')}</button>
  <label><input type="checkbox" checked={ignoreWhitespace} onChange={e=>setWhitespace(e.target.checked)}/>{t('whitespace')}</label>
  <label><input type="checkbox" checked={wrap} onChange={e=>setWrap(e.target.checked)}/>{t('wrap')}</label>

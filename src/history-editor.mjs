@@ -1,5 +1,5 @@
 // Own one editor instance; callers own DOM/CSS and decide whether to show fallback.
-export function startHistoryEditor({load,node,comparison,key,onReady=()=>{},onError=()=>{}}){
+export function startHistoryEditor({load,node,comparison,key,single=false,onReady=()=>{},onError=()=>{}}){
  const controller=new AbortController();let instance,closed=false;
  const dispose=()=>{const current=instance;instance=undefined;current?.dispose();};
  const done=Promise.resolve().then(()=>{
@@ -7,7 +7,7 @@ export function startHistoryEditor({load,node,comparison,key,onReady=()=>{},onEr
   return load(controller.signal);
  }).then(module=>{
   if(closed)return;
-  instance=module.createDiff(node);
+  instance=module.createDiff(node,{single});
   instance.setContent(comparison,key);
   if(!closed)onReady(instance);
  }).catch(error=>{

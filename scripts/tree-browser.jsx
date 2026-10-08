@@ -8,6 +8,8 @@ export async function checkTree(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
  const commit='a'.repeat(40),oid='b'.repeat(40);let calls=0,resolveLate,signal;
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Tree UI timeout');};
+ const text=()=>host.textContent.replaceAll('\u00a0',' ');
+ const advanced=()=>host.querySelector('.monaco-editor');
  const button=text=>[...host.querySelectorAll('button')].find(b=>b.textContent===text);
  const entries=[{path:'nested',mode:'040000',type:'tree',oid},...Array.from({length:101},(_,i)=>({path:'nested/file'+i,mode:'100644',type:'blob',oid})),{path:'link',mode:'120000',type:'blob',oid},{path:'submodule',mode:'160000',type:'commit',oid}];
  let fileCalls=0,fileSignal,lateFile;const source='<img src=x onerror=alert(1)>\n中文';
@@ -17,8 +19,8 @@ export async function checkTree(){
  await wait(()=>button('historicalTree'));if(calls)throw Error('Tree queried before opt-in');button('historicalTree').click();await wait(()=>button('nested/'));
  if(host.querySelectorAll('li').length!==3||button('link')||button('submodule'))throw Error('Special objects are navigable');
  button('nested/').click();await wait(()=>button('treeNext'));if(host.querySelectorAll('li').length!==100)throw Error('First page unbounded');
- if(fileCalls)throw Error('Preview read before selection');button('file0').click();await wait(()=>host.querySelector('pre'));if(host.querySelector('pre').textContent!==source||host.querySelector('pre img'))throw Error('Preview did not render literal text');
- button('treeClose').click();await wait(()=>!host.querySelector('pre'));if(!fileSignal.aborted)throw Error('Closed preview still active');
+ if(fileCalls)throw Error('Preview read before selection');button('file0').click();await wait(()=>advanced()&&text().includes('中文'));if(!text().includes('<img src=x onerror=alert(1)>')||host.querySelector('img')||host.querySelector('.monaco-diff-editor'))throw Error('Preview did not render literal text');
+ button('treeClose').click();await wait(()=>!advanced());if(!fileSignal.aborted)throw Error('Closed preview still active');
  button('file1').click();await wait(()=>lateFile);button('treeClose').click();await wait(()=>fileSignal.aborted);lateFile({text:'STALE FILE',oid});await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE FILE'))throw Error('Late preview leaked');
  button('treeNext').click();await wait(()=>button('treePrevious'));if(host.querySelectorAll('li').length!==1||button('treeNext'))throw Error('Last page incorrect');
  const search=host.querySelector('input[aria-label=treeSearch]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(search,'file100');search.dispatchEvent(new Event('input',{bubbles:true}));
@@ -52,9 +54,9 @@ export async function checkTree(){
  };
  const renderPreview=()=>flushSync(()=>root.render(<HistoricalTree {...identity} rpc={previewRpc} t={k=>k} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>));
  renderPreview();await wait(()=>button('historicalTree')?.getAttribute('aria-expanded')==='false');button('historicalTree').click();await wait(()=>button('retry-file'));
- button('retry-file').click();await wait(()=>host.querySelector('[role=alert]'));button('retry').click();await wait(()=>host.querySelector('pre')?.textContent==='recovered');
- button('empty-file').click();await wait(()=>host.textContent.includes('treeEmpty'));if(host.querySelector('pre'))throw Error('Empty preview retained text');
- button('binary-file').click();await wait(()=>host.textContent.includes('Binary fixture notice'));if(host.querySelector('pre')||host.textContent.includes('recovered'))throw Error('Binary preview retained text');
+ button('retry-file').click();await wait(()=>host.querySelector('[role=alert]'));button('retry').click();await wait(()=>advanced()&&text().includes('recovered'));
+ button('empty-file').click();await wait(()=>host.textContent.includes('treeEmpty'));if(advanced())throw Error('Empty preview retained text');
+ button('binary-file').click();await wait(()=>host.textContent.includes('Binary fixture notice'));if(advanced()||host.textContent.includes('recovered'))throw Error('Binary preview retained text');
  for(const patch of [{sessionId:'changed'},{repositoryId:'changed'},{commit:'c'.repeat(40)}]){
   const before=pending.length;button('pending-file').click();await wait(()=>pending.length>before);const old=pending.at(-1),count=requests.length;
   identity={...identity,...patch};renderPreview();await wait(()=>old.signal.aborted&&button('historicalTree')?.getAttribute('aria-expanded')==='false');
@@ -65,7 +67,7 @@ export async function checkTree(){
  const expiredRpc=async()=>{expiredCalls++;throw Object.assign(Error('Expired preview authorization'),{code:'vcs/rediscover-required'});};
  root.render(<HistoricalFile sessionId='expired' repositoryId='r' commit={commit} path='file.txt' rpc={expiredRpc} t={k=>k} onClose={()=>{}} onRediscover={()=>{rediscoveries++;}}/>);
  await wait(()=>host.querySelector('[role=alert]')?.textContent.includes('Expired preview authorization'));
- if(rediscoveries!==1||expiredCalls!==1||host.querySelector('pre'))throw Error('Expired preview failed rediscovery or retained body');
+ if(rediscoveries!==1||expiredCalls!==1||advanced())throw Error('Expired preview failed rediscovery or retained body');
  await new Promise(r=>setTimeout(r,50));if(expiredCalls!==1)throw Error('Expired preview automatically retried');
  let rejectCancelled,cancelledSignal;
  const cancelledRpc=(_endpoint,_payload,s)=>{cancelledSignal=s;return new Promise((_resolve,reject)=>{rejectCancelled=reject;});};
@@ -76,10 +78,10 @@ export async function checkTree(){
  let failNext,transitionCalls=0;
  const transitionRpc=async(_endpoint,p)=>{transitionCalls++;if(p.path==='before.txt')return {text:'PREVIOUS BODY',oid,encoding:'UTF-8'};return new Promise((_resolve,reject)=>{failNext=reject;});};
  const showTransition=path=>root.render(<HistoricalFile key='transition' sessionId='s' repositoryId='r' commit={commit} path={path} rpc={transitionRpc} t={k=>k} onClose={()=>{}} onRediscover={()=>{rediscoveries++;}}/>);
- showTransition('before.txt');await wait(()=>host.querySelector('pre')?.textContent==='PREVIOUS BODY');
+ showTransition('before.txt');await wait(()=>advanced()&&text().includes('PREVIOUS BODY'));
  showTransition('after.txt');await wait(()=>failNext&&host.querySelector('[role=status]'));
- if(host.querySelector('pre')||host.textContent.includes('PREVIOUS BODY'))throw Error('Changed preview retained old body while loading');
+ if(advanced()||host.textContent.includes('PREVIOUS BODY'))throw Error('Changed preview retained old body while loading');
  failNext(Object.assign(Error('Changed path expired'),{code:'vcs/rediscover-required'}));await wait(()=>host.querySelector('[role=alert]'));
- if(rediscoveries!==2||transitionCalls!==2||host.querySelector('pre'))throw Error('Changed preview authorization transition incorrect');
+ if(rediscoveries!==2||transitionCalls!==2||advanced())throw Error('Changed preview authorization transition incorrect');
  }finally{root.unmount();host.remove();}
 }

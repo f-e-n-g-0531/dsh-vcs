@@ -40,7 +40,7 @@ function updateTheme() {
   }).filter(([, value]) => value !== undefined))});
   monaco.editor.setTheme('dsh-vcs');
 }
-export function createDiff(node, { onStats } = {}) {
+export function createDiff(node, { onStats, single = false } = {}) {
   const releaseEnvironment = acquireEnvironment();
   let editor, observer, subscription;
   let models = [], key = '', disposed = false;
@@ -60,10 +60,10 @@ export function createDiff(node, { onStats } = {}) {
   }
   try {
   updateTheme();
-  editor = monaco.editor.createDiffEditor(node, {readOnly:true,originalEditable:false,domReadOnly:true,automaticLayout:true,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,ignoreTrimWhitespace:false,minimap:{enabled:false},fontSize:13,scrollBeyondLastLine:false,renderOverviewRuler:false,hideUnchangedRegions:{enabled:true,contextLineCount:4,minimumLineCount:8},maxComputationTime:3000,accessibilityVerbose:true});
+  editor = (single?monaco.editor.create:monaco.editor.createDiffEditor)(node, {readOnly:true,originalEditable:false,domReadOnly:true,automaticLayout:true,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,ignoreTrimWhitespace:false,minimap:{enabled:false},fontSize:13,scrollBeyondLastLine:false,renderOverviewRuler:false,hideUnchangedRegions:{enabled:true,contextLineCount:4,minimumLineCount:8},maxComputationTime:3000,accessibilityVerbose:true});
   observer = new MutationObserver(updateTheme);
   observer.observe(document.body,{attributes:true,attributeFilter:['data-ds-dark-theme','style','class']});
-  subscription = editor.onDidUpdateDiff(() => {
+  subscription = single ? undefined : editor.onDidUpdateDiff(() => {
     const changes = editor.getLineChanges() || [];
     const stats = changes.reduce((out,c) => {out.added += c.modifiedEndLineNumber ? c.modifiedEndLineNumber-c.modifiedStartLineNumber+1:0; out.deleted += c.originalEndLineNumber ? c.originalEndLineNumber-c.originalStartLineNumber+1:0; return out;},{added:0,deleted:0,count:changes.length});
     onStats?.(stats);
@@ -77,17 +77,17 @@ export function createDiff(node, { onStats } = {}) {
       const language = languages[data.path?.split('.').pop()?.toLowerCase()] || 'plaintext';
       models = [];
       try {
-        models.push(monaco.editor.createModel(data.left.text || '',language));
+        if(!single)models.push(monaco.editor.createModel(data.left.text || '',language));
         models.push(monaco.editor.createModel(data.right.text || '',language));
       } catch (error) {
         models.forEach(model => model.dispose()); models = [];
         throw error;
       }
-      editor.setModel({original:models[0],modified:models[1]}); key=nextKey;
+      editor.setModel(single?models[0]:{original:models[0],modified:models[1]}); key=nextKey;
       if(states.has(key)) editor.restoreViewState(states.get(key));
     },
     options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});},
-    navigate(direction) {editor.goToDiff(direction);},
+    navigate(direction) {if(!single)editor.goToDiff(direction);},
     dispose
   };
   } catch (error) {
