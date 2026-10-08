@@ -14,7 +14,7 @@ export async function checkBranchHistory(){
   await wait(()=>!host.querySelector('fieldset').disabled);button('revisionLoadRefs').click();await wait(()=>refLoads===1&&host.querySelector('[aria-label="'+t('historyBranch')+'"]').options.length===2);
   const select=host.querySelector('[aria-label="'+t('historyBranch')+'"]');select.value=JSON.stringify(['refs/heads/topic',b]);select.dispatchEvent(new Event('change',{bubbles:true}));await wait(()=>calls.filter(x=>x.endpoint==='vcs/history').length===2&&!select.disabled);
   if(calls.at(-1).p.snapshot!==b||calls.at(-1).p.offset!==0)throw Error('Reference tip not pinned');
-  button('historyMore').click();await wait(()=>calls.filter(x=>x.endpoint==='vcs/history').length===3&&!select.disabled);if(calls.at(-1).p.snapshot!==b||calls.at(-1).p.offset!==50)throw Error('Branch page moved');
+  await wait(()=>button('historyMore')&&!button('historyMore').disabled);button('historyMore').click();await wait(()=>calls.filter(x=>x.endpoint==='vcs/history').length===3&&!select.disabled);if(calls.at(-1).p.snapshot!==b||calls.at(-1).p.offset!==50)throw Error('Branch page moved');
   const count=calls.filter(x=>x.endpoint==='vcs/history').length;button('revisionLoadRefs').click();await wait(()=>refLoads===2&&select.options.length===3);
   if(select.value!==JSON.stringify(['refs/heads/topic',b])||calls.filter(x=>x.endpoint==='vcs/history').length!==count)throw Error('Ref refresh moved pinned history');
   select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));await wait(()=>calls.filter(x=>x.endpoint==='vcs/history').length===count+1&&!select.disabled);if(calls.at(-1).p.snapshot!==undefined)throw Error('HEAD navigation reused branch snapshot');
