@@ -4,7 +4,7 @@ import {apply} from '../src/client.jsx';
 import locales from '../src/locales.json';
 export async function checkReviewViews(){
  const host=document.createElement('div');host.style.cssText='height:720px;width:1000px';document.body.appendChild(host);const root=createRoot(host);
- const wait=async fn=>{for(let i=0;i<240;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Top-level review view timeout');};
+ const wait=async fn=>{for(let i=0;i<240;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Top-level review view timeout: '+host.textContent.slice(-1500));};
  try{for(const language of ['zh','en']){
   let Page,pending;const calls=[],a='a'.repeat(40),b='b'.repeat(40),id='d'.repeat(64),t=k=>locales[language][k]||k;
   const value=async(endpoint,p,signal)=>{
