@@ -13,7 +13,7 @@ export async function checkReviewViews(){
    if(endpoint==='vcs/repositories')return {cwd:'/fixture',repositories:[{id:'repo',type:'git',root:'/fixture'}]};
    if(endpoint==='vcs/status')return {changes:[{id:'local',path:'same.txt',status:'modified'}]};
    if(endpoint==='vcs/compare')return new Promise(resolve=>pending={resolve,signal});
-   if(endpoint==='vcs/history')return {snapshot:a,nextOffset:null,commits:[{id:a,subject:'COMMITTED SUBJECT',author:'author',date:'2026-10-08',parents:[b]}]};
+   if(endpoint==='vcs/history')return {snapshot:a,nextOffset:null,commits:Array.from({length:50},(_,i)=>({id:i===0?a:i.toString(16).padStart(40,'0'),subject:i===0?'COMMITTED SUBJECT':'ROW '+i,author:'author',date:'2026-10-08',parents:[b]}))};
    if(endpoint==='vcs/commit')return {id:a,subject:'COMMITTED SUBJECT',parents:[b],parent:b,changes:[{id,path:'same.txt',status:'modified'}]};
    if(endpoint==='vcs/commit-compare')return {path:'same.txt',left:{label:b,text:'COMMITTED BEFORE'},right:{label:a,text:'COMMITTED AFTER'}};
    throw Error('Unexpected top-level RPC '+endpoint);
@@ -26,7 +26,12 @@ export async function checkReviewViews(){
   if(getComputedStyle(host.querySelector('.vcs-body')).display!=='none')throw Error('Local workspace still visible in history mode');
   old.resolve({path:'same.txt',left:{label:'HEAD',text:'LOCAL BEFORE'},right:{label:'WORKING',text:'LOCAL AFTER'}});
   button('COMMITTED SUBJECT').click();await wait(()=>[...host.querySelectorAll('.vcs-history button')].some(node=>node.textContent==='modified · same.txt'));
-  [...host.querySelectorAll('.vcs-history button')].find(node=>node.textContent==='modified · same.txt').click();await wait(()=>host.querySelector('.vcs-history').textContent.includes('COMMITTED AFTER'));
+  const file=[...host.querySelectorAll('.vcs-history button')].find(node=>node.textContent==='modified · same.txt');
+  const bounds=host.querySelector('.vcs-history').getBoundingClientRect(),rect=file.getBoundingClientRect();
+  if(rect.top<bounds.top||rect.bottom>bounds.bottom||rect.left<bounds.left||rect.right>bounds.right)throw Error('Selected commit files are outside history viewport with 50 rows');
+  const list=host.querySelector('.vcs-history-list');list.scrollTop=list.scrollHeight;
+  if(file.getBoundingClientRect().top!==rect.top)throw Error('History list scrolling moves commit files out of view');
+  file.click();await wait(()=>host.querySelector('.vcs-history').textContent.includes('COMMITTED AFTER'));
   if(host.querySelector('.vcs-history').textContent.includes('LOCAL AFTER')||getComputedStyle(host.querySelector('.vcs-history')).maxHeight!=='none')throw Error('History body contaminated or capped');
   const request=calls.find(c=>c.endpoint==='vcs/commit-compare');if(request.p.commit!==a||request.p.parentIndex!==0||request.p.id!==id||calls.filter(c=>c.endpoint==='vcs/compare').length!==1)throw Error('Historical comparison used local identity');
   button(t('workspaceView')).click();await wait(()=>!host.querySelector('.vcs-history')&&getComputedStyle(host.querySelector('.vcs-body')).display!=='none');

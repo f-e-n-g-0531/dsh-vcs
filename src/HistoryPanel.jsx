@@ -25,7 +25,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  },[sessionId,repositoryId,offset,retry]);
  const commits=filterLoadedCommits(page.commits,query);
  return <section className="vcs-history" aria-label={t('history')} aria-busy={busy}>
- <p>{t('historyListOnly')}</p>{references!==null&&<p>{t('historyRefsScope')}</p>}
+ <div className="vcs-history-list"><p>{t('historyListOnly')}</p>{references!==null&&<p>{t('historyRefsScope')}</p>}
  <label>{t('historySearch')} <input aria-label={t('historySearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}}/></label><span> {commits.length} / {page.commits.length}</span>
  {!!page.commits.length&&!commits.length&&<p role="status">{t('historyNoMatch')}</p>}
  <ol>{commits.map(commit=><li key={commit.id}><button aria-pressed={selected===commit.id} onClick={()=>setSelected(commit.id)}>{commit.subject}</button><div><code title={commit.id}>{commit.id.slice(0,10)}</code> · {commit.author} · <time dateTime={commit.date}>{commit.date}</time></div>{referenceIndex.has(commit.id)&&<div aria-label={t('historyRefsLabel')} style={{overflowWrap:'anywhere'}}>{referenceIndex.get(commit.id).names.map(name=><span key={name}><code>{name}</code>{' '}</span>)}{referenceIndex.get(commit.id).hidden>0&&<span>{t('historyRefsMore')}: {referenceIndex.get(commit.id).hidden}</span>}</div>}</li>)}</ol>
@@ -36,6 +36,6 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  {!!page.commits.length&&<HistoryGraph commits={page.commits} selected={selected} onSelect={setSelected} t={t}/>}
  <RevisionPanel onReferencesLoaded={setReferences} commits={page.commits} {...{sessionId,repositoryId,rpc,t,onRediscover}}/>
- {selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
- </section>;
+ </div><div className="vcs-history-details">{selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+ </div></section>;
 }
