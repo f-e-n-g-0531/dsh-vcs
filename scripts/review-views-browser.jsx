@@ -1,5 +1,6 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
 import {apply} from '../src/client.jsx';
 import locales from '../src/locales.json';
 export async function checkReviewViews(){
@@ -18,7 +19,7 @@ export async function checkReviewViews(){
    throw Error('Unexpected top-level RPC '+endpoint);
   };
   apply({effect:fn=>fn(),locale:{register:()=>{},bind:()=>t,subscribe:()=>()=>{},getSnapshot:()=>language},layout:{selectPanel:()=>{}},slots:{inject:(_name,fn)=>fn(),register:(spec,component)=>{if(spec.key==='local-vcs')Page=component;}},connection:{rpc:{call:async(_route,endpoint,p,signal)=>({ok:true,value:await value(endpoint,p,signal)})}}});
-  root.render(<Page key={language} useSessions={select=>select({byId:{s:{id:'s',cwd:'/fixture',retainedBy:{mainView:1}}}})}/>);
+  flushSync(()=>root.render(<Page key={language} useSessions={select=>select({byId:{s:{id:'s',cwd:'/fixture',retainedBy:{mainView:1}}}})}/>));
   await wait(()=>host.querySelector('.vcs-file'));host.querySelector('.vcs-file').click();await wait(()=>pending);
   const old=pending;const button=text=>[...host.querySelectorAll('button')].find(node=>node.textContent===text);
   button(t('history')).click();await wait(()=>button('COMMITTED SUBJECT')&&old.signal.aborted);
