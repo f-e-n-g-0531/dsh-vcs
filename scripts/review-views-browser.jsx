@@ -34,6 +34,13 @@ export async function checkReviewViews(){
   file.click();await wait(()=>host.querySelector('.vcs-history').textContent.replaceAll('\u00a0',' ').includes('COMMITTED AFTER'));
   if(host.querySelector('.vcs-history').textContent.includes('LOCAL AFTER')||getComputedStyle(host.querySelector('.vcs-history')).maxHeight!=='none')throw Error('History body contaminated or capped');
   const request=calls.find(c=>c.endpoint==='vcs/commit-compare');if(request.p.commit!==a||request.p.parentIndex!==0||request.p.id!==id||calls.filter(c=>c.endpoint==='vcs/compare').length!==1)throw Error('Historical comparison used local identity');
+  const detail=host.querySelector('.vcs-history-details'),editor=detail.querySelector('.monaco-diff-editor'),count=calls.length,statusCount=calls.filter(c=>c.endpoint==='vcs/status').length;
+  for(let i=0;i<20;i++)file.dispatchEvent(new FocusEvent('focus',{bubbles:true}));
+  await new Promise(r=>setTimeout(r,100));if(calls.length!==count)throw Error('Descendant focus triggered refresh');
+  window.dispatchEvent(new FocusEvent('focus'));await wait(()=>calls.filter(c=>c.endpoint==='vcs/status').length===statusCount+1);
+  await new Promise(r=>setTimeout(r,100));
+  if(host.querySelector('.vcs-history-details')!==detail||detail.querySelector('.monaco-diff-editor')!==editor||calls.filter(c=>c.endpoint==='vcs/commit-compare').length!==1)throw Error('Window focus remounted historical review');
+  for(const key of ['fileHistory','blame','imageCompare']){const controls=[...detail.querySelectorAll('button')].filter(b=>b.textContent===t(key));if(controls.length>1)throw Error('Duplicate historical controls: '+key);}
   button(t('workspaceView')).click();await wait(()=>!host.querySelector('.vcs-history')&&getComputedStyle(host.querySelector('.vcs-body')).display!=='none');
   if(calls.filter(c=>c.endpoint==='vcs/compare').length!==1)throw Error('Returning to workspace revived old selection');
  }

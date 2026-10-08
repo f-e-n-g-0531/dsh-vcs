@@ -30,7 +30,7 @@ export function apply(ctx){
   function Panel({session}) {
     useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot(),()=>ctx.locale.getSnapshot());
     const sessionId=session?.id;
-    const [mode,setMode]=useState('all'),[refresh,setRefresh]=useState(0),[discovery,setDiscovery]=useState(null),[statuses,setStatuses]=useState({}),[repositoryId,setRepositoryId]=useState(()=>readProject(session?.cwd)),[scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState(''),[selected,setSelected]=useState(null),[comparison,setComparison]=useState(null);
+    const [mode,setMode]=useState('all'),[refresh,setRefresh]=useState(0),[historyRefresh,setHistoryRefresh]=useState(0),[discovery,setDiscovery]=useState(null),[statuses,setStatuses]=useState({}),[repositoryId,setRepositoryId]=useState(()=>readProject(session?.cwd)),[scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState(''),[selected,setSelected]=useState(null),[comparison,setComparison]=useState(null);
     const [scanning,setScanning]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[detailError,setDetailError]=useState(''),[editorError,setEditorError]=useState(''),[copiedPath,setCopiedPath]=useState(false);
     const [query,setQuery]=useState(''),[statusFilter,setStatusFilter]=useState('all'),[tree,setTree]=useState(true),[collapsedDirectories,setCollapsedDirectories]=useState({}),[sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false),[tab,setTab]=useState('content');
     const [editorRetry,setEditorRetry]=useState(0),[historyOpen,setHistoryOpen]=useState(false);
@@ -45,7 +45,7 @@ export function apply(ctx){
     const invalidate=()=>{statusController.current?.abort();compareController.current?.abort();setComparison(null);setSelected(null);setDetailError('');setTab('content');setStats({added:0,deleted:0,count:0});};
     const rescan=()=>{rediscovering.current=false;invalidate();scanController.current?.abort();previousDiscovery.current=discovery;setDiscovery(null);setStatuses({});setScanPath(subdirectory.trim());setScan(x=>x+1);};
     const rediscover=()=>{if(rediscovering.current)return;rediscovering.current=true;invalidate();scanController.current?.abort();previousDiscovery.current=null;setDiscovery(null);setStatuses({});setScanPath('');setScan(x=>x+1);};
-    const refreshStatuses=(preserve=false)=>{preserveStatusRefresh.current=preserve;if(!preserve)invalidate();if(!preserve)setStatuses({});setRefresh(x=>x+1);};
+    const refreshStatuses=(preserve=false)=>{if(!preserve)setHistoryRefresh(x=>x+1);preserveStatusRefresh.current=preserve;if(!preserve)invalidate();if(!preserve)setStatuses({});setRefresh(x=>x+1);};
     useEffect(()=>{
       const controller=new AbortController();scanController.current=controller;setError('');setScanning(!!sessionId);
       if(sessionId)rpc('vcs/repositories',{sessionId,...(scanPath?{subdirectory:scanPath}:{})},controller.signal).then(value=>{
@@ -64,7 +64,7 @@ export function apply(ctx){
       }
       return()=>controller.abort();
     },[sessionId,discovery,repositoryId,mode,refresh]);
-    useEffect(()=>{const focus=()=>{if(sessionId&&repositoryId&&document.visibilityState==='visible')refreshStatuses(true);};window.addEventListener('focus',focus);return()=>window.removeEventListener('focus',focus);},[sessionId,repositoryId,mode]);
+    useEffect(()=>{const focus=e=>{if(e.target===window&&sessionId&&repositoryId&&document.visibilityState==='visible')refreshStatuses(true);};window.addEventListener('focus',focus);return()=>window.removeEventListener('focus',focus);},[sessionId,repositoryId,mode]);
     const selectedRepository=repositories.find(repo=>repo.id===selected?.repositoryId);
     const selectedStatus=selected?statuses[selected.repositoryId]:null;
     useEffect(()=>{
@@ -74,7 +74,7 @@ export function apply(ctx){
     },[selected,selectedStatus,sessionId,mode,historyActive]);
     useEffect(()=>{
       let disposed=false;let instance;const controller=new AbortController();setEditorReady(false);setEditorError('');
-      const link=document.createElement('link');link.rel='stylesheet';link.href=asset('editor.css');editorNode.current.parentNode.appendChild(link);
+      const link=document.createElement('link');link.rel='stylesheet';link.href=asset('editor.css');document.head.appendChild(link);
       loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry='+editorRetry,{signal:controller.signal}).then(module=>{if(disposed)return;instance=module.createDiff(editorNode.current,{onStats:setStats});viewer.current=instance;setEditorReady(true);}).catch(e=>{if(!disposed)setEditorError(e.message);});
       return()=>{disposed=true;controller.abort();instance?.dispose();viewer.current=null;link.remove();};
     },[editorRetry]);
@@ -105,12 +105,12 @@ export function apply(ctx){
       <header className="vcs-top"><Icon/><h1 className="vcs-title">{t('title')}</h1><span className="vcs-badge">{t('readonly')}</span><span className="vcs-spacer"/>
         <select aria-label={t('repositories')} value={repositoryId} disabled={scanning||!repositories.length} onChange={e=>{invalidate();setStatuses({});setRepositoryId(e.target.value);}}>{!repositories.length&&<option value="">{t('repositories')}</option>}{repositories.map(repo=><option key={repo.id} value={repo.id}>{repositoryLabel(repo,t('workspaceRoot'))}</option>)}</select>
         <label className="vcs-mode">{t('gitMode')} <select aria-label={t('gitMode')} value={mode} disabled={historyActive||!visibleRepositories.some(repo=>repo.type==='git')} onChange={e=>{invalidate();setStatuses({});setMode(e.target.value);}}>{['all','unstaged','staged'].map(m=><option key={m} value={m}>{t(m)}</option>)}</select></label>
-        <button onClick={refreshStatuses} disabled={busy||!sessionId}>{t('refresh')}</button><button onClick={()=>ctx.layout.selectPanel(null)}>{t('back')}</button>
+        <button onClick={()=>refreshStatuses(false)} disabled={busy||!sessionId}>{t('refresh')}</button><button onClick={()=>ctx.layout.selectPanel(null)}>{t('back')}</button>
         <div className="vcs-path" title={discovery?.cwd||session?.cwd}>{t('session')}: {discovery?.cwd||session?.cwd||'—'}</div>
         <form className="vcs-discovery" onSubmit={e=>{e.preventDefault();rescan();}}><input aria-label={t('subdirectory')} placeholder={t('subdirectory')} value={subdirectory} onChange={e=>setSubdirectory(e.target.value)}/><button disabled={!sessionId||scanning}>{t('rescan')}</button><span>{t('scanHint')}</span></form>
         {discovery?.truncated&&<div className="vcs-notice">{t('truncated')}</div>}{(discovery?.warnings||[]).map((warning,index)=><div className="vcs-notice" key={index}>{typeof warning==='string'?warning:warning.message||JSON.stringify(warning)}</div>)}
       </header>
-      {visibleRepositories.some(repo=>repo.type==='git')&&<><nav className="vcs-review-views" aria-label={t('reviewView')}><button aria-pressed={!historyActive} onClick={()=>setHistoryOpen(false)}>{t('workspaceView')}</button><button aria-pressed={historyActive} aria-expanded={historyActive} onClick={openHistory}>{t('history')}</button></nav>{historyActive&&<HistoryPanel key={JSON.stringify([sessionId,repositoryId,refresh,scan])} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}</>}
+      {visibleRepositories.some(repo=>repo.type==='git')&&<><nav className="vcs-review-views" aria-label={t('reviewView')}><button aria-pressed={!historyActive} onClick={()=>setHistoryOpen(false)}>{t('workspaceView')}</button><button aria-pressed={historyActive} aria-expanded={historyActive} onClick={openHistory}>{t('history')}</button></nav>{historyActive&&<HistoryPanel key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}</>}
       <div className="vcs-body" hidden={historyActive} aria-label={t('workspaceView')}><aside className="vcs-files"><div className="vcs-filter"><input ref={searchNode} aria-label={t('search')} placeholder={t('search')} title={t('searchShortcut')} value={query} onChange={e=>setQuery(e.target.value)}/>{(query||statusFilter!=='all')&&<button className="vcs-clear-filter" onClick={clearFilters}>{t('clearFilters')}</button>}</div><div className="vcs-status-filter" aria-label={t('filterStatus')}>{['all','modified','added','deleted','renamed','conflicted','untracked'].map(value=><button key={value} aria-pressed={statusFilter===value} onClick={()=>setStatusFilter(value)}>{value==='all'?t('allFiles'):t(statusCodes[value]||'M')} <small>{statusCounts[value]||0}</small></button>)}</div><div className="vcs-count"><span>{changes.length} {t('files')}</span><span className="vcs-auto">{t('autoRefresh')}</span><button aria-pressed={tree} onClick={()=>setTree(!tree)}>{t(tree?'tree':'list')}</button></div>{tree&&<div className="vcs-tree-actions"><button onClick={()=>setTreeExpanded(true)}>{t('expandAll')}</button><button onClick={()=>setTreeExpanded(false)}>{t('collapseAll')}</button><button onClick={revealSelected} disabled={!chosen}>{t('revealSelected')}</button></div>}<nav className="vcs-filelist" aria-label={t('title')} ref={fileListNode} onKeyDown={onFileListKeyDown}>
         {groups.map(group=>{const repo=group.repository;return <section className="vcs-repository" key={repo.id} aria-label={repositoryLabel(repo,t('workspaceRoot'))}><div className="vcs-repository-heading" title={repo.root}><strong>{repositoryLabel(repo,t('workspaceRoot'))}</strong><small>{repo.type==='svn'?t('svnBase'):t(requestMode(repo,mode))}</small></div>
           {group.error?<div className="vcs-message vcs-error" role="status">{group.error}<button onClick={rescan}>{t('rescan')}</button></div>:!statuses[repo.id]?<div className="vcs-message">{t('loading')}</div>:tree?<TreeRows node={buildChangeTree(group.changes)} repository={repo}/>:group.changes.map(entry=><FileRow key={changeKey(repo.id,entry.id)} entry={entry}/>)}
