@@ -20,10 +20,10 @@ export async function checkRevisions(){
   if(endpoint!=='vcs/revision-compare'||p.base!==a||p.target!==b)throw Error('Unexpected comparison pair');
   return {path:'pair.txt',left:{text:'left revision',label:a},right:{text:'right revision',label:b}};
  };
- const choose=(i,value)=>{const select=host.querySelectorAll('select')[i];select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));};
+ const choose=(i,value)=>{const select=host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[i];select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));};
  try{
  root.render(<RevisionPanel commits={[{id:a,subject:'first'},{id:b,subject:'second'}]} sessionId="s" repositoryId="r" rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
- await wait(()=>host.querySelectorAll('select').length===2);choose(0,a);choose(1,b);
+ await wait(()=>host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])').length===2);choose(0,a);choose(1,b);
  await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>button('historyBasic'));button('historyBasic').click();await wait(()=>host.textContent.includes('right revision'));
  const input=host.querySelector('input'),countBefore=calls.length;
  const enter=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));};
@@ -33,7 +33,7 @@ export async function checkRevisions(){
  button('pair.txt').click();await wait(()=>button('historyBasic'));button('historyBasic').click();await wait(()=>host.textContent.includes('right revision'));
  button('revisionSwap').click();await wait(()=>delayed);
  if(host.textContent.includes('right revision'))throw Error('Old Diff remained after swap');
- const selects=host.querySelectorAll('select');if(selects[0].value!==b||selects[1].value!==a)throw Error('Swap failed');
+ const selects=host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])');if(selects[0].value!==b||selects[1].value!==a)throw Error('Swap failed');
  choose(0,a);await wait(()=>host.textContent.includes('revisionEmpty'));
  if(!oldSignal.aborted)throw Error('Superseded request not aborted');
  delayed({changes:[{id:'d'.repeat(64),path:'STALE.txt',status:'modified'}]});
@@ -48,17 +48,17 @@ export async function checkRevisions(){
  choose(0,'e'.repeat(40));await wait(()=>button('pair.txt'));const pinned=calls.at(-1);if(pinned.p.base!=='e'.repeat(40)||pinned.p.target!==a)throw Error('Reference comparison did not pin OID');
  const comparisons=calls.filter(c=>c.endpoint==='vcs/revision-changes').length;
  button('revisionLoadRefs').click();await wait(()=>hasOption('f'.repeat(40)));
- if(host.querySelectorAll('select')[0].value!=='e'.repeat(40)||calls.filter(c=>c.endpoint==='vcs/revision-changes').length!==comparisons)throw Error('Moving reference changed pinned comparison');
- button('revisionLoadRefs').click();await wait(()=>host.textContent.includes('refs unavailable'));if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Reference failure cleared selection');
+ if(host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[0].value!=='e'.repeat(40)||calls.filter(c=>c.endpoint==='vcs/revision-changes').length!==comparisons)throw Error('Moving reference changed pinned comparison');
+ button('revisionLoadRefs').click();await wait(()=>host.textContent.includes('refs unavailable'));if(host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[0].value!=='e'.repeat(40))throw Error('Reference failure cleared selection');
  button('revisionLoadRefs').click();await wait(()=>refLoads===4&&host.textContent.includes('revisionRefsEmpty'));
- if(host.querySelectorAll('select')[0].value!=='e'.repeat(40))throw Error('Empty references cleared pinned selection');
- if(host.querySelector('optgroup[label=revisionLocalRefs]')||host.querySelectorAll('select')[0].selectedOptions[0].parentElement.tagName!=='SELECT')throw Error('Pinned fallback lost after empty reference refresh');
+ if(host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[0].value!=='e'.repeat(40))throw Error('Empty references cleared pinned selection');
+ if(host.querySelector('optgroup[label=revisionLocalRefs]')||host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[0].selectedOptions[0].parentElement.tagName!=='SELECT')throw Error('Pinned fallback lost after empty reference refresh');
  button('revisionLoadRefs').click();await wait(()=>refResolve);
  for(const [sessionId,repositoryId] of [['other','r'],['other','new-repo']]){
   const oldResolve=refResolve,signal=refSignal,count=calls.length;
   root.render(<RevisionPanel commits={[{id:a,subject:'first'}]} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
   await wait(()=>signal.aborted);
-  if([...host.querySelectorAll('select')].some(s=>s.value)||hasOption('f'.repeat(40))||hasOption('e'.repeat(40))||button('pair.txt')||calls.length!==count)throw Error('Scope change retained selections or auto-loaded refs');
+  if([...host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')].some(s=>s.value)||hasOption('f'.repeat(40))||hasOption('e'.repeat(40))||button('pair.txt')||calls.length!==count)throw Error('Scope change retained selections or auto-loaded refs');
   oldResolve({references:[{name:'refs/heads/STALE-REF',commit:'d'.repeat(40)}]});await new Promise(r=>setTimeout(r,50));if(host.textContent.includes('STALE-REF'))throw Error('Late refs survived scope change');
   refResolve=null;button('revisionLoadRefs').click();await wait(()=>refResolve);
  }
@@ -97,7 +97,7 @@ export async function checkRevisions(){
   await wait(()=>host.querySelectorAll('optgroup').length===4);
   const select=host.querySelector('select'),groups=select.querySelectorAll('optgroup');
   if(groups[0].label!==locales[language].revisionLoadedCommits||groups[1].label!==locales[language].revisionLocalRefs||groups[1].children.length!==2)throw Error('Localized groups or duplicate refs lost');
-  const chooseReference=(side,name)=>{const field=host.querySelectorAll('select')[side];const option=[...field.options].find(o=>o.parentElement.tagName==='OPTGROUP'&&o.textContent.startsWith(name+' · '));if(!option)throw Error('Missing named reference option');field.selectedIndex=option.index;field.dispatchEvent(new Event('change',{bubbles:true}));};
+  const chooseReference=(side,name)=>{const field=host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[side];const option=[...field.options].find(o=>o.parentElement.tagName==='OPTGROUP'&&o.textContent.startsWith(name+' · '));if(!option)throw Error('Missing named reference option');field.selectedIndex=option.index;field.dispatchEvent(new Event('change',{bubbles:true}));};
   chooseReference(0,'refs/heads/same');chooseReference(1,'refs/tags/same');await wait(()=>seen.some(c=>c.endpoint==='vcs/revision-changes'));
   const pair=seen.at(-1).p;if(pair.base!==a||pair.target!==a)throw Error('Duplicate OID group changed comparison identity');
  }

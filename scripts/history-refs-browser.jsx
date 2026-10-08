@@ -21,11 +21,11 @@ export async function checkHistoryRefs(){
   await wait(()=>button('subject0'));const labels=()=>[...host.querySelectorAll('[aria-label="'+t('historyRefsLabel')+'"]')];
   if(labels().length||calls.length!==1)throw Error('References appeared or loaded before opt-in');
   button('subject0').click();await wait(()=>host.querySelector('[aria-label="'+t('commitDetails')+'"]'));
-  const choose=(i,value)=>{const s=host.querySelectorAll('select')[i];s.value=value;s.dispatchEvent(new Event('change',{bubbles:true}));};choose(0,a);choose(1,b);await wait(()=>calls.some(c=>c.endpoint==='vcs/revision-changes'));
+  const choose=(i,value)=>{const s=host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[i];s.value=value;s.dispatchEvent(new Event('change',{bubbles:true}));};choose(0,a);choose(1,b);await wait(()=>calls.some(c=>c.endpoint==='vcs/revision-changes'));
   const before=calls.length;button(t('revisionLoadRefs')).click();await wait(()=>labels().length===1);
   if(labels()[0].closest('li').querySelector('button').textContent!=='subject0'||labels()[0].querySelectorAll('code').length!==3||!labels()[0].textContent.includes(t('historyRefsMore')+': 1')||labels()[0].querySelector('img')||!labels()[0].textContent.includes(name)||!host.textContent.includes(t('historyRefsScope')))throw Error('Reference rendering identity limit or escaping failed');
   button(t('revisionLoadRefs')).click();await wait(()=>labels()[0]?.closest('li').querySelector('button').textContent==='subject1');
-  if(button('subject0').getAttribute('aria-pressed')!=='true'||host.querySelectorAll('select')[0].value!==a||host.querySelectorAll('select')[1].value!==b||calls.length!==before+2)throw Error('Reference refresh moved fixed review identity');
+  if(button('subject0').getAttribute('aria-pressed')!=='true'||host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[0].value!==a||host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])')[1].value!==b||calls.length!==before+2)throw Error('Reference refresh moved fixed review identity');
   button(t('revisionLoadRefs')).click();await wait(()=>host.textContent.includes('REFRESH FAILURE'));if(labels().length!==1)throw Error('Failed refresh discarded prior labels');
   button(t('revisionLoadRefs')).click();await wait(()=>loads===4&&!labels().length&&!host.textContent.includes('REFRESH FAILURE'));
   if(calls.filter(c=>c.endpoint==='vcs/history').length!==1)throw Error('Reference refresh reloaded history snapshot');
