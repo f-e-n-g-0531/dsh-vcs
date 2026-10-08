@@ -1,5 +1,7 @@
 {
   "zh": {
+    "reviewView": "审阅视图",
+    "workspaceView": "工作区改动",
     "workspaceRoot": "工作区本身",
     "title": "VCS 变更",
     "readonly": "只读预览",
@@ -145,6 +147,8 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "reviewView": "Review view",
+    "workspaceView": "Working changes",
     "workspaceRoot": "Workspace root",
     "title": "VCS changes",
     "readonly": "Read-only preview",
