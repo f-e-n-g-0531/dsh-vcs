@@ -49,7 +49,7 @@ const button=text=>[...document.querySelectorAll('button')].find(el=>el.textCont
   if(!String(url).includes('vcs-assets/editor.js')||options.credentials!=='same-origin')throw Error('Incorrect editor asset request');
   return new Response('Unauthorized',{status:401});
  };
- button('historyAdvanced').click();await wait(()=>document.querySelector('#root').textContent.includes('HTTP 401'));
+ button('historyBasic').click();await wait(()=>button('historyAdvanced'));button('historyAdvanced').click();await wait(()=>document.querySelector('#root').textContent.includes('HTTP 401'));
  if(!document.querySelector('.vcs-text-comparison')?.textContent.includes('historical content'))throw Error('Asset failure lost text fallback');
  if(assetRequests!==1)throw Error('Unexpected editor resource retry');
  button('historyBasic').click();await wait(()=>button('historyAdvanced'));

@@ -17,7 +17,8 @@ export async function checkViewer(){
  const button=text=>[...host.querySelectorAll('button')].find(b=>b.textContent===text);
  try{
  root.render(<HistoryViewer comparison={{path:'example.ts',left:{text:'const x = 1;'},right:{text:'const x = 2;'}}} identity="fixture" t={key=>key}/>);
- await wait(()=>button('historyAdvanced'));button('historyAdvanced').click();
+ await wait(()=>button('historyBasic'));
+ if(button('historyBasic').getAttribute('aria-pressed')!=='true')throw Error('Advanced diff not enabled by default');
  await wait(()=>button('side')&&host.querySelector('.monaco-diff-editor'));
  if(host.querySelector('.vcs-text-comparison'))throw Error('Fallback remained after editor ready');
  button('side').click();await wait(()=>button('inline'));

@@ -7,7 +7,7 @@ import {version} from '../package.json';
 export default function HistoryViewer({comparison,identity,t}){
  const node=useRef(null),viewer=useRef(null);
  const [sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false);
- const [enabled,setEnabled]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState('');
+ const [enabled,setEnabled]=useState(true),[ready,setReady]=useState(false),[error,setError]=useState('');
  useEffect(()=>{
   setReady(false);setError('');if(!enabled)return;
   const asset=name=>new URL('vcs-assets/'+name,document.baseURI).href;
