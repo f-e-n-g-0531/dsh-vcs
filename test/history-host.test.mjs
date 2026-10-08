@@ -10,6 +10,12 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('history search validates strict query fields and forwards literal search under grants',async()=>{
+ const search={message:'--all .*',author:'作者',path:':(glob)*.txt'};let received;
+ const h=setup({listHistory:async(_r,o)=>{received=o;return {commits:[]};}});await h.discover();
+ for(const search of [null,[],{url:'https://example.com'},{path:'../escape'},{message:'x'.repeat(1025)},{author:4}])assert.equal((await h.call('vcs/history',{...payload,search})).error.code,'vcs/invalid-request');
+ assert.equal(received,undefined);assert.equal((await h.call('vcs/history',{...payload,search})).ok,true);assert.deepEqual(received.search,search);
+});
 test('references RPC requires grants rejects options and discards stale results',async()=>{
  const controller=new AbortController();let calls=0;
  const h=setup({listReferences:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{signal:controller.signal});return {references:[]};}});
