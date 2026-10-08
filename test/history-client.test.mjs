@@ -30,5 +30,5 @@ test('history panel scopes pagination and cancels stale responses',async()=>{
  assert.ok(source.includes('return()=>controller.abort()'));assert.ok(source.includes('if(!controller.signal.aborted)setPage'));
  assert.doesNotMatch(source,/dangerouslySetInnerHTML|setInterval/);
  const client=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
- assert.ok(client.includes('key={JSON.stringify([sessionId,repositoryId,refresh,scan])}'));
+ assert.ok(client.includes('key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])}'));
 });
