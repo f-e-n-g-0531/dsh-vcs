@@ -34,6 +34,7 @@ export async function checkReviewViews(){
   file.click();await wait(()=>host.querySelector('.vcs-history').textContent.replaceAll('\u00a0',' ').includes('COMMITTED AFTER'));
   if(host.querySelector('.vcs-history').textContent.includes('LOCAL AFTER')||getComputedStyle(host.querySelector('.vcs-history')).maxHeight!=='none')throw Error('History body contaminated or capped');
   const request=calls.find(c=>c.endpoint==='vcs/commit-compare');if(request.p.commit!==a||request.p.parentIndex!==0||request.p.id!==id||calls.filter(c=>c.endpoint==='vcs/compare').length!==1)throw Error('Historical comparison used local identity');
+  await wait(()=>host.querySelector('.vcs-history-details .monaco-diff-editor')&&!host.querySelector('.vcs-history-details .vcs-text-comparison'));
   const detail=host.querySelector('.vcs-history-details'),editor=detail.querySelector('.monaco-diff-editor'),count=calls.length,statusCount=calls.filter(c=>c.endpoint==='vcs/status').length;
   for(let i=0;i<20;i++)file.dispatchEvent(new FocusEvent('focus',{bubbles:true}));
   await new Promise(r=>setTimeout(r,100));if(calls.length!==count)throw Error('Descendant focus triggered refresh');
