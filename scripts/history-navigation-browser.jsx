@@ -72,7 +72,7 @@ export async function checkHistoryNavigation(){
    root.render(<CommitDetails key={language} sessionId="s" repositoryId="r" commit={b} t={k=>locales[language][k]} onRediscover={()=>{}} rpc={async(endpoint,p,signal)=>endpoint==='vcs/commit'?{...row(b,'Large body'),parents:[],parent:null,message:'',messageTruncated:true,changes:[{id:'d'.repeat(64),path:'file.txt',status:'modified'}]}:rpc(endpoint,p,signal)}/>);
    await wait(()=>host.textContent.includes(locales[language].commitMessageLimit));
    if(host.querySelector('pre')||!button('modified · file.txt'))throw Error('Omitted message hid files or rendered body');
-   button('modified · file.txt').click();await wait(()=>host.querySelector('.vcs-text-comparison'));
+   button('modified · file.txt').click();await wait(()=>host.querySelector('.monaco-diff-editor')||host.querySelector('.vcs-text-comparison'));
    if(!host.textContent.includes(locales[language].commitMessageLimit))throw Error('Omission notice lost after selecting file');
   }
   let detailIdentity={sessionId:'direct',repositoryId:'r',commit:a};const directCalls=[];
@@ -81,7 +81,7 @@ export async function checkHistoryNavigation(){
   renderDetails();await wait(()=>host.querySelector('select[aria-label="commitParent"]'));
   for(const patch of [{sessionId:'next'},{repositoryId:'next'},{commit:b}]){
    const select=host.querySelector('select[aria-label="commitParent"]');select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));
-   await wait(()=>directCalls.at(-1)?.p.parentIndex===1&&button('modified · file.txt'));button('modified · file.txt').click();await wait(()=>host.querySelector('.vcs-text-comparison'));
+   await wait(()=>directCalls.at(-1)?.p.parentIndex===1&&button('modified · file.txt'));button('modified · file.txt').click();await wait(()=>host.querySelector('.monaco-diff-editor')||host.querySelector('.vcs-text-comparison'));
    const previous=directCalls.slice(),count=directCalls.length;detailIdentity={...detailIdentity,...patch};renderDetails();
    await wait(()=>directCalls.length>count&&button('modified · file.txt'));
    const fresh=directCalls.slice(count);if(fresh.length!==1||fresh[0].endpoint!=='vcs/commit'||fresh[0].p.parentIndex!==0||host.querySelector('.vcs-text-comparison'))throw Error('Direct commit identity retained parent or selection');
