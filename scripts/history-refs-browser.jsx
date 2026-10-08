@@ -30,6 +30,19 @@ export async function checkHistoryRefs(){
   button(t('revisionLoadRefs')).click();await wait(()=>loads===4&&!labels().length&&!host.textContent.includes('REFRESH FAILURE'));
   if(calls.filter(c=>c.endpoint==='vcs/history').length!==1)throw Error('Reference refresh reloaded history snapshot');
  }
+ for(const language of ['zh','en']){
+  const t=k=>locales[language][k];let historyCalls=0,refsCalls=0;
+  const rpc=async endpoint=>{
+   if(endpoint==='vcs/history'){historyCalls++;return {snapshot:a,nextOffset:null,commits:[{id:a,parents:[],subject:'initial-failure',author:'author',date:'2026-09-30T00:00:00Z'}]};}
+   if(endpoint==='vcs/references'){refsCalls++;if(refsCalls===1)throw Error('FIRST REF FAILURE');return {references:[{name:'refs/heads/recovered',commit:a}]};}
+   throw Error('Unexpected retry RPC');
+  };
+  flushSync(()=>root.render(<HistoryPanel key={'retry-'+language} sessionId='retry' repositoryId='r' rpc={rpc} t={t}/>));
+  await wait(()=>button('initial-failure'));button(t('revisionLoadRefs')).click();await wait(()=>host.textContent.includes('FIRST REF FAILURE'));
+  if(host.textContent.includes(t('historyRefsScope'))||host.querySelector('[aria-label="'+t('historyRefsLabel')+'"]')||historyCalls!==1||refsCalls!==1)throw Error('Initial failure fabricated successful reference snapshot');
+  button(t('revisionLoadRefs')).click();await wait(()=>host.textContent.includes('refs/heads/recovered')&&!host.textContent.includes('FIRST REF FAILURE'));
+  if(!host.textContent.includes(t('historyRefsScope'))||historyCalls!==1||refsCalls!==2)throw Error('Explicit reference retry lost history or scope');
+ }
  for(const outcome of ['success','error']){
   const calls=[];let identity={sessionId:'scope',repositoryId:'r'},loads=0,pending,rediscoveries=0;
   const rpc=async(endpoint,p,signal)=>{calls.push({endpoint,p});if(endpoint==='vcs/history')return {snapshot:a,nextOffset:p.offset?null:50,commits:[{id:p.offset?b:a,subject:p.offset?'page-two':'page-one',parents:[],author:'author',date:'2026-09-30T00:00:00Z'}]};if(endpoint==='vcs/references'){loads++;if(loads===1)return {references:[{commit:b,name:'refs/tags/page-two'}]};return new Promise((resolve,reject)=>pending={resolve,reject,signal});}throw Error('Unexpected scoped refs RPC');};
