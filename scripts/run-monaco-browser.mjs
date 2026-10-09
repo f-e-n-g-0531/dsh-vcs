@@ -1,3 +1,4 @@
+import {realSvnBrowserData} from './svn-browser-data.mjs';
 import {spawn,execFileSync} from 'node:child_process';
 import * as vcs from '../vcs.mjs';
 import {createHandler} from '../index.mjs';
@@ -63,6 +64,7 @@ try{
   await writeFile('test-results/webp-repository-report.json',JSON.stringify({pass:true,commit,bytes:result.value.bytes,metadataStripped:result.value.metadataStripped,scope:'real Git Session RPC committed bytes ignoring working changes'}));
  }finally{await rm(repository,{recursive:true,force:true});}
  }
+ const realSvn=await realSvnBrowserData();await evaluate("import('./history-viewer-browser.js').then(m=>m.checkRealSvnHistory("+JSON.stringify(realSvn)+"))");await writeFile('test-results/svn-real-ui-report.json',JSON.stringify({pass:true,scope:'real offline SVN internal RPC values to actual React Monaco, not production network',revision:realSvn.detail.revision}));
  const press=async(key,code,virtualKey,text,modifiers=0)=>{
   await call('Input.dispatchKeyEvent',{type:'keyDown',key,code,modifiers,windowsVirtualKeyCode:virtualKey,...(text?{text}: {})});
   await call('Input.dispatchKeyEvent',{type:'keyUp',key,code,modifiers,windowsVirtualKeyCode:virtualKey});
