@@ -1,5 +1,7 @@
 {
   "zh": {
+    "historyWindow": "已加载历史窗口（序号左闭右开）",
+    "historyWindowScope": "列表及图最多保留200条；继续加载替换较新行，跨窗口边不表示完整图。局部筛选仅当前窗口。",
     "segments": "分段浏览历史正文",
     "segmentBytes": "字节范围（左闭右开）",
     "segmentScope": "仅固定历史 UTF-8 普通文件，最大 16 MiB；每片最多 64 KiB，替换显示不累积。片段行号不是原文件行号，不是全文件 Diff。",
@@ -170,6 +172,8 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "historyWindow": "Loaded history window (start inclusive, end exclusive)",
+    "historyWindowScope": "List and graph retain at most 200 rows; more loads replace newer rows. Boundary edges are not a complete graph. Local filtering covers this window only.",
     "segments": "Browse historical text segments",
     "segmentBytes": "Byte range (start inclusive, end exclusive)",
     "segmentScope": "Committed UTF-8 regular files up to 16 MiB; replaceable 64 KiB segments. Segment line numbers are not original file lines; this is not a full-file Diff.",

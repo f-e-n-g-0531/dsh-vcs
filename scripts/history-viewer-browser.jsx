@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkHistoryWindow} from './history-window-browser.jsx';
 export {checkSegments} from './segments-browser.jsx';
 export {checkJpegDecode,checkPreparedJpeg,checkJpegComparison,checkPreparedWebp} from './jpeg-browser.jsx';
 export {checkBlameLocation} from './blame-location-browser.jsx';

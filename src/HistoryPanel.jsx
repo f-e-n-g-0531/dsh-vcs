@@ -22,7 +22,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
   rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||historyTip||offset)?{snapshot:search?.snapshot||historyTip||page.snapshot}:{})},controller.signal).then(value=>{
-   if(!controller.signal.aborted)setPage(old=>({...value,commits:offset?[...old.commits,...value.commits]:value.commits}));
+   if(!controller.signal.aborted){setPage(old=>({...value,commits:(offset?[...old.commits.filter(row=>!value.commits.some(next=>next.id===row.id)),...value.commits]:value.commits).slice(-200)}));if(offset>=200){setSelected(null);setQuery('');}}
   }).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,offset,retry,search,historyTip]);
@@ -33,6 +33,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  <form aria-label={t('historyServerSearch')} onSubmit={e=>{e.preventDefault();submitSearch({...draft});}}><fieldset disabled={busy}><legend>{t('historyServerSearch')}</legend><p>{t('historyServerScope')}</p>{['message','author','path'].map(field=><label key={field}>{t('historyServer_'+field)} <input maxLength={1024} aria-label={t('historyServer_'+field)} value={draft[field]} onChange={e=>setDraft(old=>({...old,[field]:e.target.value}))}/></label>)}<button type="submit">{t('historyServerApply')}</button><button type="button" onClick={()=>{setDraft({message:'',author:'',path:''});submitSearch({});}}>{t('historyServerClear')}</button></fieldset></form>
  {search&&<p role="status">{t('historyServerActive')}: {JSON.stringify(search.values)} · <code>{search.snapshot||page.snapshot}</code></p>}
  <label>{t('historySearch')} <input aria-label={t('historySearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}}/></label><span> {commits.length} / {page.commits.length}</span>
+ {!!page.commits.length&&<p role="status">{t('historyWindow')}: {Math.max(0,offset+page.commits.slice(-50).length-page.commits.length)}–{offset+page.commits.slice(-50).length} · {t('historyWindowScope')}</p>}
  {!!page.commits.length&&!commits.length&&<p role="status">{t('historyNoMatch')}</p>}
  <ol>{commits.map(commit=><li key={commit.id}><button aria-pressed={selected===commit.id} onClick={()=>setSelected(commit.id)}>{commit.subject}</button><div><code title={commit.id}>{commit.id.slice(0,10)}</code> · {commit.author} · <time dateTime={commit.date}>{commit.date}</time></div>{referenceIndex.has(commit.id)&&<div aria-label={t('historyRefsLabel')} style={{overflowWrap:'anywhere'}}>{referenceIndex.get(commit.id).names.map(name=><span key={name}><code>{name}</code>{' '}</span>)}{referenceIndex.get(commit.id).hidden>0&&<span>{t('historyRefsMore')}: {referenceIndex.get(commit.id).hidden}</span>}</div>}</li>)}</ol>
  {busy&&<p role="status">{t('loading')}</p>}
