@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
 import {decode, MAX_TEXT} from './text-content.mjs';
+import {inside, confined} from './repository-path.mjs';
 const MAX_OUTPUT = 16 * 1024 * 1024;
 const TIMEOUT = 15000;
 const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseTagValue: false, parseAttributeValue: false, trimValues: false, processEntities: true, isArray: name => ['entry', 'target', 'property'].includes(name) });
@@ -39,29 +40,7 @@ function parseXML(buffer) {
   if (/<!DOCTYPE|<!ENTITY/i.test(text) || XMLValidator.validate(text) !== true) throw new Error('Invalid VCS XML');
   return xml.parse(text);
 }
-function inside(root, candidate) { const rel = path.relative(root, candidate); return rel === '' || (!path.isAbsolute(rel) && rel !== '..' && !rel.startsWith('..' + path.sep)); }
-async function confined(root, relative) {
-  if (typeof relative !== 'string' || relative.includes('\0') || path.isAbsolute(relative) || /^[a-z]:/i.test(relative)) throw new Error('Invalid repository path');
-  const target = path.resolve(root, relative);
-  if (!inside(root, target)) throw new Error('Path escapes repository');
-  // Inspect each existing component, including dangling links whose realpath fails.
-  let component = root;
-  for (const part of path.relative(root, target).split(path.sep).filter(Boolean)) {
-    component = path.join(component, part);
-    try {
-      if ((await fs.lstat(component)).isSymbolicLink()) {
-        const destination = path.resolve(path.dirname(component), await fs.readlink(component));
-        if (!inside(root, destination)) throw new Error('Symlink escapes repository');
-      }
-    } catch (e) { if (!['ENOENT', 'ENOTDIR'].includes(e.code)) throw e; }
-  }
-  let current = target;
-  for (;;) {
-    try { const real = await fs.realpath(current); if (!inside(root, real)) throw new Error('Symlink escapes repository'); break; }
-    catch (e) { if (!['ENOENT', 'ENOTDIR'].includes(e.code)) throw e; const parent = path.dirname(current); if (parent === current) throw e; current = parent; }
-  }
-  return target;
-}
+
 
 /** Detect the nearest enclosing Git or SVN working copy; never initializes one. */
 export async function detectRepository(cwd) {

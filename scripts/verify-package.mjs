@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const required = [
-  'package.json', 'index.mjs', 'vcs.mjs', 'git-history.mjs', 'image-preview.mjs', 'text-content.mjs', 'src/svn-identity.mjs', 'src/svn-target.mjs', 'src/svn-path.mjs', 'src/svn-revision.mjs', 'dist/client.js',
+  'package.json', 'index.mjs', 'vcs.mjs', 'git-history.mjs', 'image-preview.mjs', 'text-content.mjs', 'repository-path.mjs', 'src/svn-identity.mjs', 'src/svn-target.mjs', 'src/svn-path.mjs', 'src/svn-revision.mjs', 'dist/client.js',
   'dist/editor.js', 'dist/editor.css', 'dist/editor.worker.js', 'dist/svn-host.mjs',
   'dist/MONACO-LICENSE.txt', 'dist/MONACO-ThirdPartyNotices.txt',
   'locale/en.json', 'locale/zh.json', 'icon.svg', 'cordis.patch.yml',
