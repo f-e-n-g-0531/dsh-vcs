@@ -84,7 +84,8 @@ test('built page renders seven localized status filters with one active selectio
 test('review file tree exposes keyboard navigation and directory expansion semantics',async()=>{
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.match(source,/onFileListKeyDown/);
- assert.match(source,/ArrowDown/);assert.match(source,/ArrowUp/);assert.match(source,/data-vcs-directory/);
+ const keyboard=await readFile(new URL('../src/file-list-keyboard.mjs',import.meta.url),'utf8');
+ assert.match(keyboard,/ArrowDown/);assert.match(keyboard,/ArrowUp/);assert.match(source,/data-vcs-directory/);
  assert.match(source,/aria-expanded/);assert.match(source,/data-vcs-item/);
 });
 
