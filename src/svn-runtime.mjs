@@ -6,7 +6,7 @@ import {createSvnConsent} from './svn-consent.mjs';import {planSvnLog,planSvnDet
 // Internal coordinator only. Production remote transport is deliberately not provided.
 export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeoutMs=15000}={}){
  if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>15000)throw Error('Invalid SVN runtime deadline');
- if(typeof resolveIdentity!=='function')throw Error('Local identity resolver required');const offers=createSvnConsent({now}),grants=createSvnConsent({now});
+ if(typeof resolveIdentity!=='function')throw Error('Local identity resolver required');const offers=createSvnConsent({now}),grants=createSvnConsent({now,onRevoke:token=>cancelToken(token)});
  const resolve=async(address,signal)=>{signal?.throwIfAborted();const local=await resolveIdentity(address,signal);signal?.throwIfAborted();return {...local,sessionId:address.sessionId,cwd:local.cwd,repositoryId:address.repositoryId};};
  const inFlight=new Map();
  const cancelToken=token=>{for(const task of inFlight.get(token)||[])task.controller.abort(new DOMException('SVN consent revoked','AbortError'));};
