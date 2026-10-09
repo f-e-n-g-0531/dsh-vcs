@@ -4,6 +4,7 @@ import CommitDetails from './CommitDetails.jsx';
 import HistoryGraph from './HistoryGraph.jsx';
 import RevisionPanel from './RevisionPanel.jsx';
 import {filterLoadedCommits} from './history-filter.mjs';
+import {mergeHistoryWindow} from './history-window.mjs';
 export default function HistoryPanel(props){
  return <ScopedHistoryPanel key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;
 }
@@ -22,7 +23,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
   rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||historyTip||offset)?{snapshot:search?.snapshot||historyTip||page.snapshot}:{})},controller.signal).then(value=>{
-   if(!controller.signal.aborted){setPage(old=>({...value,windowEnd:offset+value.commits.length,commits:(offset?[...old.commits.filter(row=>!value.commits.some(next=>next.id===row.id)),...value.commits]:value.commits).slice(-200)}));if(offset>=200){setSelected(null);setQuery('');}}
+   if(!controller.signal.aborted){setPage(old=>mergeHistoryWindow(old,value,offset));if(offset>=200){setSelected(null);setQuery('');}}
   }).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,offset,retry,search,historyTip]);
