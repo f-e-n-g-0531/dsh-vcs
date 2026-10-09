@@ -1,4 +1,5 @@
 import React,{useEffect,useState,useMemo} from 'react';
+import HistoricalSegments from './HistoricalSegments.jsx';
 import HistoryViewer from './HistoryViewer.jsx';
 export default function HistoricalFile({sessionId,repositoryId,commit,path,rpc,t,onRediscover,onClose,line=null}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
@@ -8,5 +9,6 @@ export default function HistoricalFile({sessionId,repositoryId,commit,path,rpc,t
  const preview=useMemo(()=>data?{path,left:{label:commit,text:data.text||''},right:{label:commit,text:data.text||''}}:null,[data,path,commit]);
  return <section aria-label={t('treePreview')}><h4>{path}</h4><button onClick={onClose}>{t('treeClose')}</button><p><code>{commit}</code></p>
  {error?<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role="status">{t('loading')}</p>:<><p><code>{data.oid}</code> · {t('encoding')}: {data.encoding||'—'}</p>{line&&<p role="status">{t('blameOriginLine')}: {line}{!data.text||line>data.text.split('\n').length?' · '+t('blameUnmapped'):''}</p>}{data.notice&&<p role="status">{data.notice}</p>}{data.binary?<p>{t('binary')}</p>:data.text===''?<p>{t('treeEmpty')}</p>:<HistoryViewer single line={line} comparison={preview} identity={JSON.stringify([sessionId,repositoryId,commit,path])} t={t}/>}</>}
+ <HistoricalSegments {...{sessionId,repositoryId,commit,path,rpc,t,onRediscover}}/>
  </section>;
 }

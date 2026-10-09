@@ -10,6 +10,11 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('historical segment RPC strictly binds committed path offset and Session grant',async()=>{
+ let seen;const h=setup({getHistoricalSegment:async(_r,o)=>{seen=o;return {text:'part'};}}),p={...payload,commit:'a'.repeat(40),path:'file.txt',offset:65536};assert.equal((await h.call('vcs/tree-segment',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{offset:null},{offset:-1},{offset:16777217},{offset:0.5},{oid:'b'.repeat(40)},{limit:10},{path:'../secret'},{commit:'HEAD'}])assert.equal((await h.call('vcs/tree-segment',{...p,...extra})).error.code,'vcs/invalid-request');assert.equal(seen,undefined);assert.equal((await h.call('vcs/tree-segment',p)).ok,true);assert.equal(seen.offset,65536);
+ const moved=setup({getHistoricalSegment:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree-segment',p)).error.code,'vcs/rediscover-required');const controller=new AbortController(),cancel=setup({getHistoricalSegment:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree-segment',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('workspace image is Git granted opaque selected mode with strict side fields',async()=>{
  let seen;const h=setup({getWorkspaceImage:async(_r,o)=>{seen=o;return {absent:true};}}),p={...payload,mode:'unstaged',id:'a'.repeat(64)};
  assert.equal((await h.call('vcs/workspace-image',p)).error.code,'vcs/rediscover-required');await h.discover();

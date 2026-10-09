@@ -1,0 +1,9 @@
+import React,{useEffect,useMemo,useState} from 'react';
+import HistoryViewer from './HistoryViewer.jsx';
+export default function HistoricalSegments(props){return <Segments key={JSON.stringify([props.sessionId,props.repositoryId,props.commit,props.path])} {...props}/>;}
+function Segments({sessionId,repositoryId,commit,path,rpc,t,onRediscover}){
+ const [open,setOpen]=useState(false),[offsets,setOffsets]=useState([0]),[data,setData]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);const offset=offsets.at(-1);
+ useEffect(()=>{if(!open)return;const controller=new AbortController();setData(null);setError('');rpc('vcs/tree-segment',{sessionId,repositoryId,commit,path,offset},controller.signal).then(value=>{if(!controller.signal.aborted)setData(value);}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();});return()=>controller.abort();},[open,offset,sessionId,repositoryId,commit,path,retry]);
+ const comparison=useMemo(()=>data?{path,left:{label:commit,text:data.text},right:{label:commit,text:data.text}}:null,[data,path,commit]);
+ return <section><button aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{t('segments')}</button>{open&&<><p>{t('segmentScope')}</p>{error?<p role='alert'>{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role='status'>{t('loading')}</p>:<><p>{t('segmentBytes')}: {data.offset}–{data.endOffset} / {data.totalBytes} · <code>{data.oid}</code></p><button disabled={offsets.length===1} onClick={()=>setOffsets(v=>v.slice(0,-1))}>{t('previous')}</button><button disabled={data.nextOffset===null} onClick={()=>setOffsets(v=>[...v,data.nextOffset])}>{t('next')}</button><HistoryViewer single comparison={comparison} identity={JSON.stringify([sessionId,repositoryId,commit,path,offset])} t={t}/></>}</>}</section>;
+}

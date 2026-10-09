@@ -1,5 +1,8 @@
 {
   "zh": {
+    "segments": "分段浏览历史正文",
+    "segmentBytes": "字节范围（左闭右开）",
+    "segmentScope": "仅固定历史 UTF-8 普通文件，最大 16 MiB；每片最多 64 KiB，替换显示不累积。片段行号不是原文件行号，不是全文件 Diff。",
     "blameOriginLine": "查看来源历史行",
     "blameUnmapped": "无法精确定位来源行",
     "blamePrevious": "上一行页",
@@ -167,6 +170,9 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "segments": "Browse historical text segments",
+    "segmentBytes": "Byte range (start inclusive, end exclusive)",
+    "segmentScope": "Committed UTF-8 regular files up to 16 MiB; replaceable 64 KiB segments. Segment line numbers are not original file lines; this is not a full-file Diff.",
     "blameOriginLine": "View origin historical line",
     "blameUnmapped": "Origin line cannot be located precisely",
     "blamePrevious": "Previous line page",
