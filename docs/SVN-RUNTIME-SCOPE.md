@@ -23,7 +23,7 @@
 ## 尚未完成
 
 - Session/cwd 能力与真实 Apache 有界 HTTPS 多步传输贯通，历史正文安全读取与追溯集成。
-- 内部 runtime 已接通显式 DAV 日志／详情传输与成员 ID；10 项专项通过，无同意零请求、cwd 漂移阻止下一请求。[真实 Apache TLS runtime 回归通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37908474824)：显式同意前零请求、日志／详情及成员 ID 正确、cwd 漂移只触发第一步后停止。身份解析器仍为 fixture 注入，不是公开 Session discovery；正文传输接合仍未完成。
+- 内部 runtime 已接通显式 DAV 日志／详情传输与成员 ID；10 项专项通过，无同意零请求、cwd 漂移阻止下一请求。[真实 Apache TLS runtime 回归通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37908474824)：显式同意前零请求、日志／详情及成员 ID 正确、cwd 漂移只触发第一步后停止。身份解析器仍为 fixture 注入，不是公开 Session discovery；内部 DAV 正文传输已接 runtime 比较，固定 r-1/r，每次 GET 再探测 special；注入响应回归验证 before/after 与 special 零 GET。真实 runtime 比较／追溯服务回归仍待完成。
 - 公开同意／撤销／历史 RPC 和界面、完整本地化与失败恢复回归。
 - 全量检查、包校验、固定标签四平台 CI、同标签 Chrome、正式发布和两端工件核验。
 - 外部 SVN 目标必须获得显式网络同意；当前没有获授权目标，不发外部 SVN 请求。
