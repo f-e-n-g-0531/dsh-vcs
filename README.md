@@ -68,6 +68,8 @@ check 构建并运行测试；npm pack 经 prepack 再次执行检查，生成�
 
 ## 项目资料
 
+[文档导航](<docs/README.md>)按使用、架构、验证与历史材料分类。
+
 见 [贡献指南](<CONTRIBUTING.md>)、[发布清单](<docs/RELEASING.md>)、[变更记录](<CHANGELOG.md>) 和 [安全说明](<SECURITY.md>)。
 
 界面交互参考 [Fork](https://fork.dev/)。这仅说明设计灵感，不表示与 Fork 官方有关联、获得背书或继承其代码许可。
