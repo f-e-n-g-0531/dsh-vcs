@@ -1,3 +1,4 @@
+import {validateSvnCommand} from './svn-command-gate.mjs';
 import {previousSvnRevision} from './svn-revision.mjs';
 import {planSvnComparison} from './svn-comparison-plan.mjs';import {parseSvnPropertyNames} from './svn-property-names.mjs';import {svnHistoryTarget} from './svn-target.mjs';
 import {createHash} from 'node:crypto';import {parseSvnDetail} from './svn-detail.mjs';
@@ -10,6 +11,7 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
  const inFlight=new Map();
  const cancelToken=token=>{for(const task of inFlight.get(token)||[])task.controller.abort(new DOMException('SVN consent revoked','AbortError'));};
  const dispatch=async(plan,options)=>{
+  validateSvnCommand(plan,options.identity);
   options.signal?.throwIfAborted();grants.assert(options.token,options.identity);const controller=new AbortController(),abort=()=>controller.abort(options.signal.reason);options.signal?.addEventListener('abort',abort,{once:true});
   const task={controller,sessionId:options.identity.sessionId};if(!inFlight.has(options.token))inFlight.set(options.token,new Set());inFlight.get(options.token).add(task);
   const timer=setTimeout(()=>controller.abort(new DOMException('SVN transport deadline exceeded','TimeoutError')),timeoutMs);
