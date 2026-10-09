@@ -1,6 +1,7 @@
 import React, {useState,useEffect,useRef,useSyncExternalStore} from 'react';
 import css from './style.css';
 import {createClientRpc} from './client-rpc.mjs';
+import {createStatusLimiter} from './status-limiter.mjs';
 import TextComparison from './TextComparison.jsx';
 import ImageComparison from './ImageComparison.jsx';
 import {comparisonLabels} from './comparison-labels.mjs';
@@ -13,7 +14,7 @@ import {reviewShortcut} from './review-keyboard.mjs';
 import {handleFileListKeyDown} from './file-list-keyboard.mjs';
 import {version} from '../package.json';
 import {readProject,saveProject} from './project-preference.mjs';
-import {changeKey,repositoryLabel,requestMode,groupChanges,changePosition,adjacentChange,directoryAncestors,treeDirectoryIds,countChangeStatuses,buildChangeTree,createStatusLimiter,mergeDiscovery,selectProject} from './repositories.mjs';
+import {changeKey,repositoryLabel,requestMode,groupChanges,changePosition,adjacentChange,directoryAncestors,treeDirectoryIds,countChangeStatuses,buildChangeTree,mergeDiscovery,selectProject} from './repositories.mjs';
 const statusCodes={modified:'M',added:'A',deleted:'D',missing:'D',renamed:'R',copied:'C',conflicted:'U',untracked:'?',unversioned:'?',replaced:'M',obstructed:'U',normal:'P'};
 const asset = name => new URL('vcs-assets/'+name,document.baseURI).href;
 function Icon(){return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M12 4v16M6 10h3M7.5 8.5v3M15 14h3"/></svg>}
