@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<S:log-report xmlns:S="svn:" xmlns:D="DAV:">
+<S:log-item>
+<S:modified-path node-kind="file" text-mods="true" prop-mods="false">/file.txt</S:modified-path>
+<D:version-name>2</D:version-name>
+<D:creator-displayname>runner</D:creator-displayname>
+<S:date>2026-10-09T08:25:37.070317Z</S:date>
+<D:comment>second</D:comment>
+</S:log-item>
+</S:log-report>
