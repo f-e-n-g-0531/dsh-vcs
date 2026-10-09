@@ -15,7 +15,7 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
   options.signal?.throwIfAborted();grants.assert(options.token,options.identity);const controller=new AbortController(),abort=()=>controller.abort(options.signal.reason);options.signal?.addEventListener('abort',abort,{once:true});
   const task={controller,sessionId:options.identity.sessionId};if(!inFlight.has(options.token))inFlight.set(options.token,new Set());inFlight.get(options.token).add(task);
   const timer=setTimeout(()=>controller.abort(new DOMException('SVN transport deadline exceeded','TimeoutError')),timeoutMs);
-  try{const value=await transport(plan,{...options,timeoutMs,signal:controller.signal});controller.signal.throwIfAborted();
+  try{const assertAuthorized=async()=>{controller.signal.throwIfAborted();const current=await resolve({sessionId:options.identity.sessionId,repositoryId:options.identity.repositoryId},controller.signal);grants.assert(options.token,current);controller.signal.throwIfAborted();};const value=await transport(plan,{...options,timeoutMs,signal:controller.signal,assertAuthorized});controller.signal.throwIfAborted();
   if(!(typeof value==='string'||Buffer.isBuffer(value))||Buffer.byteLength(value)>options.maxBytes)throw Error('SVN transport output exceeds byte limit or has invalid type');if(Buffer.isBuffer(value)&&plan.args[0]!=='cat')return new TextDecoder('utf-8',{fatal:true}).decode(value);return value;}catch(error){if(controller.signal.aborted)throw controller.signal.reason;throw error;}finally{const tasks=inFlight.get(options.token);tasks?.delete(task);if(!tasks?.size)inFlight.delete(options.token);clearTimeout(timer);options.signal?.removeEventListener('abort',abort);}
  };
  const runtime={
