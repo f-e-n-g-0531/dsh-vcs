@@ -48,6 +48,21 @@ try{
   await evaluate("import('./history-viewer-browser.js').then(m=>m.checkJpegComparison("+JSON.stringify(images)+"))");
   await writeFile('test-results/jpeg-repository-report.json',JSON.stringify({pass:true,commit,bytes:result.value.bytes,metadataStripped:result.value.metadataStripped,scope:'real Git Session RPC committed bytes ignoring working changes'}));
  }finally{await rm(repository,{recursive:true,force:true});}
+ {
+ const repository=await mkdtemp(path.join(os.tmpdir(),'vcs-webp-repo-'));
+ try{
+  const git=(...args)=>execFileSync('git',['-C',repository,...args],{encoding:'utf8'});git('init','-q');git('config','user.name','WebP');git('config','user.email','webp@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.webp'),simpleWebp);git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.webp'),'UNCOMMITTED');
+  const rpc=createHandler({sessions:{get:()=>({header:{cwd:repository}})},sessionPersistence:{stat:async()=>undefined}},vcs);const discovery=await rpc('vcs/repositories',{sessionId:'webp'});if(!discovery.ok)throw Error('WebP discovery failed');const repositoryId=discovery.value.repositories[0].id;const details=await rpc('vcs/commit',{sessionId:'webp',repositoryId,commit});if(!details.ok)throw Error('WebP details failed');const id=details.value.changes[0].id;
+  const result=await rpc('vcs/commit-image',{sessionId:'webp',repositoryId,commit,id});if(!result.ok||result.value.mime!=='image/webp'||result.value.width!==3)throw Error('WebP authorized committed image failed');await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(result.value.base64)+"))");
+  const pair=await rpc('vcs/revision-image',{sessionId:'webp',repositoryId,base:commit,target:commit,id});if(pair.ok)throw Error('Unrelated WebP pair id accepted');
+  await writeFile(path.join(repository,'image.webp'),simpleWebp);git('mv','image.webp','renamed.webp');git('commit','-qm','rename');const target=git('rev-parse','HEAD').trim();const entries=await rpc('vcs/revision-changes',{sessionId:'webp',repositoryId,base:commit,target});if(!entries.ok)throw Error('WebP pair details failed');const pairId=entries.value.changes[0].id,images=[];
+  for(const side of ['left','right']){const image=await rpc('vcs/revision-image',{sessionId:'webp',repositoryId,base:commit,target,id:pairId,side});if(!image.ok||image.value.mime!=='image/webp'||image.value.path!==(side==='left'?'image.webp':'renamed.webp'))throw Error('WebP pair rename paths');images.push(image.value);}
+  await writeFile(path.join(repository,'renamed.webp'),'invalid staged bytes');git('add','.');await writeFile(path.join(repository,'renamed.webp'),simpleWebp);
+  for(const mode of ['all','staged','unstaged']){const status=await rpc('vcs/status',{sessionId:'webp',repositoryId,mode});if(!status.ok)throw Error('WebP workspace status');const selection={sessionId:'webp',repositoryId,mode,id:status.value.changes[0].id};for(const side of ['left','right']){const image=await rpc('vcs/workspace-image',{...selection,side});const invalid=(mode==='staged'&&side==='right')||(mode==='unstaged'&&side==='left');if(invalid?image.ok:!image.ok||image.value.mime!=='image/webp')throw Error('WebP workspace mode incorrect');}}
+  await evaluate("import('./history-viewer-browser.js').then(m=>m.checkJpegComparison("+JSON.stringify(images)+"))");
+  await writeFile('test-results/webp-repository-report.json',JSON.stringify({pass:true,commit,bytes:result.value.bytes,metadataStripped:result.value.metadataStripped,scope:'real Git Session RPC committed bytes ignoring working changes'}));
+ }finally{await rm(repository,{recursive:true,force:true});}
+ }
  const press=async(key,code,virtualKey,text,modifiers=0)=>{
   await call('Input.dispatchKeyEvent',{type:'keyDown',key,code,modifiers,windowsVirtualKeyCode:virtualKey,...(text?{text}: {})});
   await call('Input.dispatchKeyEvent',{type:'keyUp',key,code,modifiers,windowsVirtualKeyCode:virtualKey});

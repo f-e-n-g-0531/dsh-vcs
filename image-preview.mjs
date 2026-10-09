@@ -2,9 +2,10 @@
 export async function prepareRaster(buffer,{signal}={}){
  signal?.throwIfAborted();
  if(Buffer.isBuffer(buffer)&&buffer[0]===255&&buffer[1]===216){const result=prepareBaselineJpeg(buffer);signal?.throwIfAborted();return result;}
+ if(Buffer.isBuffer(buffer)&&buffer.toString('ascii',0,4)==='RIFF'){const result=prepareSimpleWebp(buffer);signal?.throwIfAborted();return result;}
  return preparePng(buffer,{signal});
 }
-// Internal simple WebP gate; not enabled by prepareRaster yet.
+// Simple static WebP only; extended/animated containers remain rejected.
 export function prepareSimpleWebp(buffer){
  if(!Buffer.isBuffer(buffer)||buffer.length<26||buffer.length>2097152||buffer.toString('ascii',0,4)!=='RIFF'||buffer.toString('ascii',8,12)!=='WEBP'||buffer.readUInt32LE(4)!==buffer.length-8)throw Error('Invalid WebP RIFF or byte limit');
  const kind=buffer.toString('ascii',12,16),size=buffer.readUInt32LE(16),end=20+size;if(end+(size&1)!==buffer.length||(size&1&&buffer[end]!==0))throw Error('Invalid WebP single chunk length or padding');
