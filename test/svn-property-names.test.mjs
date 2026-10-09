@@ -1,4 +1,5 @@
 import test from 'node:test';
+test('empty names-only SVN properties has no special property',()=>{assert.deepEqual(parseSvnPropertyNames('<?xml version="1.0"?><properties>\n</properties>',{target:'https://example.test/file',allowEmpty:true}),{target:'https://example.test/file',names:[],special:false});});
 import assert from 'node:assert/strict';
 import {parseSvnPropertyNames} from '../src/svn-property-names.mjs';
 const target='https://example.test/repo/file',wrap=body=>'<properties><target path="'+target+'">'+body+'</target></properties>';
