@@ -15,6 +15,17 @@ export function historySearchArgs(search){
  return {args,paths};
 }
 // Each line-porcelain record carries its own metadata; never interpret filename as an access path.
+export function decodeBlamePath(value){
+ if(!value.startsWith('"'))return value;
+ if(!value.endsWith('"'))throw Error('Invalid quoted blame path');
+ const bytes=[];const escapes={a:7,b:8,t:9,n:10,v:11,f:12,r:13,'"':34,'\\':92};
+ for(let i=1;i<value.length-1;i++){
+  if(value[i]!=='\\'){bytes.push(...Buffer.from(value[i],'utf8'));continue;}
+  const c=value[++i];if(Object.hasOwn(escapes,c)){bytes.push(escapes[c]);continue;}
+  const octal=value.slice(i,i+3);if(!/^[0-3][0-7]{2}$/.test(octal))throw Error('Invalid blame path escape');bytes.push(parseInt(octal,8));i+=2;
+ }
+ return new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(bytes));
+}
 export function parseBlame(text,maxLines=500){
  if(typeof text!=='string'||Buffer.byteLength(text,'utf8')>2*1024*1024)throw new Error('Invalid blame output size');
  if(!Number.isInteger(maxLines)||maxLines<1||maxLines>500)throw new Error('Invalid blame line limit');
@@ -35,7 +46,7 @@ export function parseBlame(text,maxLines=500){
   }
   if(i===fields.length||!['author','author-time','author-tz','summary','filename'].every(k=>Object.hasOwn(metadata,k)))throw new Error('Incomplete blame record');
   if(!/^-?[0-9]+$/.test(metadata['author-time'])||!Number.isSafeInteger(Number(metadata['author-time']))||! /^[+-][0-9]{4}$/.test(metadata['author-tz']))throw new Error('Invalid blame timestamp');
-  rows.push({commit:header[1],originalLine,line,author:metadata.author,authorTime:Number(metadata['author-time']),authorTimezone:metadata['author-tz'],summary:metadata.summary,text:fields[i++].slice(1)});
+  rows.push({commit:header[1],originalLine,line,author:metadata.author,authorTime:Number(metadata['author-time']),authorTimezone:metadata['author-tz'],summary:metadata.summary,path:decodeBlamePath(metadata.filename),text:fields[i++].slice(1)});
   if(rows.length>maxLines)throw new Error('Blame line limit exceeded');
  }
  return rows;

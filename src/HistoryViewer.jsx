@@ -4,7 +4,7 @@ import {comparisonLabels} from './comparison-labels.mjs';
 import {startHistoryEditor} from './history-editor.mjs';
 import {loadEditor} from './editor-loader.mjs';
 import {version} from '../package.json';
-export default function HistoryViewer({comparison,identity,t,single=false}){
+export default function HistoryViewer({comparison,identity,t,single=false,line=null}){
  const node=useRef(null),viewer=useRef(null);
  const [sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false);
  const [enabled,setEnabled]=useState(true),[ready,setReady]=useState(false),[error,setError]=useState('');
@@ -15,6 +15,7 @@ export default function HistoryViewer({comparison,identity,t,single=false}){
   const task=startHistoryEditor({node:node.current,comparison,key:identity,single,load:signal=>loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry=0',{signal}),onReady:instance=>{viewer.current=instance;setReady(true);},onError:e=>setError(e.message)});
   return()=>{viewer.current=null;try{task.dispose();}finally{link.remove();}};
  },[enabled,comparison,identity,single]);
+ useEffect(()=>{if(ready&&single&&line)viewer.current?.revealLine(line);},[ready,single,line]);
  useEffect(()=>{if(ready)viewer.current?.options({sideBySide,ignoreWhitespace,wrap});},[ready,sideBySide,ignoreWhitespace,wrap]);
  return <div>
  <button aria-pressed={enabled} onClick={()=>setEnabled(value=>!value)}>{t(enabled?'historyBasic':'historyAdvanced')}</button>

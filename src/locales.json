@@ -1,5 +1,7 @@
 {
   "zh": {
+    "blameOriginLine": "查看来源历史行",
+    "blameUnmapped": "无法精确定位来源行",
     "blamePrevious": "上一行页",
     "blameNext": "下一行页",
     "fileHistoryMergeBoundary": "身份边界：合并提交，此处停止，不推断多父来源",
@@ -165,6 +167,8 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "blameOriginLine": "View origin historical line",
+    "blameUnmapped": "Origin line cannot be located precisely",
     "blamePrevious": "Previous line page",
     "blameNext": "Next line page",
     "fileHistoryMergeBoundary": "Identity boundary: merge commit; stopped without inferring parent origin",

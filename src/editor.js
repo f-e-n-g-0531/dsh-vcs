@@ -87,6 +87,7 @@ export function createDiff(node, { onStats, single = false } = {}) {
       if(states.has(key)) editor.restoreViewState(states.get(key));
     },
     options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});},
+    revealLine(line) {if(!single||!Number.isInteger(line)||line<1||line>models[0]?.getLineCount())return false;editor.setSelection({startLineNumber:line,startColumn:1,endLineNumber:line,endColumn:models[0].getLineMaxColumn(line)});editor.revealLineInCenter(line);return true;},
     navigate(direction) {if(!single)editor.goToDiff(direction);},
     dispose
   };
