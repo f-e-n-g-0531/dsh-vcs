@@ -24,9 +24,31 @@ export async function resolveSessionCwd(ctx, sessionId, signal) {
 const rediscover = () => Object.assign(new Error('Repository authorization is missing, expired, or changed. Rediscover repositories for this Session and retry.'), { code: 'vcs/rediscover-required' });
 
 import {historySearchArgs} from './git-history.mjs';
+
+// Exact request fields are a protocol contract, independent of dispatch.
+const REQUEST_FIELDS = {
+  'vcs/repositories': ['sessionId', 'subdirectory'],
+  'vcs/svn-identity': ['sessionId', 'repositoryId'],
+  'vcs/references': ['sessionId', 'repositoryId'],
+  'vcs/status': ['sessionId', 'repositoryId', 'mode'],
+  'vcs/compare': ['sessionId', 'repositoryId', 'mode', 'id'],
+  'vcs/history': ['sessionId', 'repositoryId', 'snapshot', 'offset', 'limit', 'search'],
+  'vcs/commit': ['sessionId', 'repositoryId', 'commit', 'parentIndex'],
+  'vcs/commit-compare': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id'],
+  'vcs/file-history': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'offset', 'limit', 'follow'],
+  'vcs/blame': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'startLine', 'lineLimit'],
+  'vcs/revision-changes': ['sessionId', 'repositoryId', 'base', 'target'],
+  'vcs/revision-compare': ['sessionId', 'repositoryId', 'base', 'target', 'id'],
+  'vcs/revision-image': ['sessionId', 'repositoryId', 'base', 'target', 'id', 'side'],
+  'vcs/tree': ['sessionId', 'repositoryId', 'commit'],
+  'vcs/tree-file': ['sessionId', 'repositoryId', 'commit', 'path'],
+  'vcs/tree-segment': ['sessionId', 'repositoryId', 'commit', 'path', 'offset'],
+  'vcs/commit-image': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'side'],
+  'vcs/workspace-image': ['sessionId', 'repositoryId', 'mode', 'id', 'side'],
+};
 function validatePayload(endpoint, payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw invalid('An object payload is required.');
-  const fields = endpoint==='vcs/svn-identity'?['sessionId','repositoryId']:endpoint==='vcs/tree-segment'?['sessionId','repositoryId','commit','path','offset']:endpoint==='vcs/workspace-image'?['sessionId','repositoryId','mode','id','side']:endpoint==='vcs/revision-image'?['sessionId','repositoryId','base','target','id','side'] : endpoint==='vcs/tree-file'?['sessionId','repositoryId','commit','path'] : endpoint==='vcs/references'?['sessionId','repositoryId'] : endpoint==='vcs/commit-image'?['sessionId','repositoryId','commit','parentIndex','id','side'] : endpoint==='vcs/tree'?['sessionId','repositoryId','commit'] : endpoint==='vcs/file-history'?['sessionId','repositoryId','commit','parentIndex','id','offset','limit','follow'] : ['vcs/revision-changes','vcs/revision-compare','vcs/revision-image'].includes(endpoint) ? ['sessionId','repositoryId','base','target',...(endpoint==='vcs/revision-compare'?['id']:[])] : ['vcs/commit-compare','vcs/blame'].includes(endpoint) ? ['sessionId','repositoryId','commit','parentIndex','id',...(endpoint==='vcs/blame'?['startLine','lineLimit']:[])] : endpoint === 'vcs/commit' ? ['sessionId','repositoryId','commit','parentIndex'] : endpoint === 'vcs/history' ? ['sessionId','repositoryId','snapshot','offset','limit','search'] : endpoint === 'vcs/repositories' ? ['sessionId', 'subdirectory'] : ['sessionId', 'repositoryId', 'mode', ...(endpoint === 'vcs/compare' ? ['id'] : [])];
+  const fields = REQUEST_FIELDS[endpoint];
   if (Object.keys(payload).some(key => !fields.includes(key))) throw invalid('Only Session-addressed repository requests are supported; unknown payload field.');
   if (endpoint === 'vcs/repositories') {
     if (payload.subdirectory !== undefined) {
