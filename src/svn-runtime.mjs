@@ -10,12 +10,13 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
  if(!['cli','dav'].includes(transportFormat))throw Error('Invalid SVN transport format');
  if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>15000)throw Error('Invalid SVN runtime deadline');
  if(typeof resolveIdentity!=='function')throw Error('Local identity resolver required');const offers=createSvnConsent({now}),grants=createSvnConsent({now,onRevoke:token=>cancelToken(token)});
- const resolve=async(address,signal)=>{signal?.throwIfAborted();const local=await resolveIdentity(address,signal);signal?.throwIfAborted();return {...local,sessionId:address.sessionId,cwd:local.cwd,repositoryId:address.repositoryId};};
+ let disposed=false;const assertLive=()=>{if(disposed)throw new DOMException('SVN runtime disposed','AbortError');};
+ const resolve=async(address,signal)=>{assertLive();signal?.throwIfAborted();const local=await resolveIdentity(address,signal);assertLive();signal?.throwIfAborted();return {...local,sessionId:address.sessionId,cwd:local.cwd,repositoryId:address.repositoryId};};
  const localSnapshot=identity=>{if(identity.revision===undefined)return {};parseSvnRevision(identity.revision);return {snapshot:identity.revision};};
  const inFlight=new Map();
  const cancelToken=token=>{for(const task of inFlight.get(token)||[])task.controller.abort(new DOMException('SVN consent revoked','AbortError'));};
  const dispatch=async(plan,options)=>{
-  validateSvnCommand(plan,options.identity);
+  assertLive();validateSvnCommand(plan,options.identity);
   options.signal?.throwIfAborted();grants.assert(options.token,options.identity);const controller=new AbortController(),abort=()=>controller.abort(options.signal.reason);options.signal?.addEventListener('abort',abort,{once:true});
   const task={controller,sessionId:options.identity.sessionId};if(!inFlight.has(options.token))inFlight.set(options.token,new Set());inFlight.get(options.token).add(task);
   const timer=setTimeout(()=>controller.abort(new DOMException('SVN transport deadline exceeded','TimeoutError')),timeoutMs);
@@ -40,6 +41,7 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
   const peg=member.action==='D'?previousSvnRevision(revision):revision;const page=await runtime.log(address,{token,snapshot:peg,cursor:cursor??peg,limit,path:member.path,signal});return {...page,selectionSnapshot:snapshot,selectionRevision:revision,path:member.path,pegRevision:peg,stopOnCopy:true,copySourceOutsideScope:!!member.copySourceOutsideScope};
  },
  async revoke(address,{token,signal}={}){const identity=await resolve(address,signal);grants.assert(token,identity);grants.revoke(token);cancelToken(token);return {revoked:true};},
+ dispose(){disposed=true;offers.clear();grants.clear();for(const token of inFlight.keys())cancelToken(token);},
  revokeSession(sessionId){offers.revokeSession(sessionId);grants.revokeSession(sessionId);for(const [token,tasks] of inFlight)if([...tasks].some(task=>task.sessionId===sessionId))cancelToken(token);}
  };return runtime;
 }
