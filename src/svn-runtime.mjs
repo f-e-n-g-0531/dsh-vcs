@@ -30,6 +30,7 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid SVN change ID');const detail=await runtime.detail(address,{token,snapshot,revision,signal}),member=detail.changes.find(change=>change.id===id);if(!member||member.kind!=='file')throw Error('SVN tracing requires selected file member');
   const peg=member.action==='D'?previousSvnRevision(revision):revision;const page=await runtime.log(address,{token,snapshot:peg,cursor:cursor??peg,limit,path:member.path,signal});return {...page,selectionSnapshot:snapshot,selectionRevision:revision,path:member.path,pegRevision:peg,stopOnCopy:true,copySourceOutsideScope:!!member.copySourceOutsideScope};
  },
+ async revoke(address,{token,signal}={}){const identity=await resolve(address,signal);grants.assert(token,identity);grants.revoke(token);return {revoked:true};},
  revokeSession(sessionId){offers.revokeSession(sessionId);grants.revokeSession(sessionId);}
  };return runtime;
 }
