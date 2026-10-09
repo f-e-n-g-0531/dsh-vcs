@@ -1,4 +1,12 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';import ImageComparison from '../src/ImageComparison.jsx';
 import {loadPreviewImage} from '../src/image-resource.mjs';
+export async function checkJpegComparison(images){
+ const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host),calls=[];const urls=new Set(),create=URL.createObjectURL,revoke=URL.revokeObjectURL;
+ URL.createObjectURL=b=>{const u=create.call(URL,b);urls.add(u);return u;};URL.revokeObjectURL=u=>{if(!urls.delete(u))throw Error('JPEG UI double release');revoke.call(URL,u);};
+ const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('JPEG comparison timeout');};
+ try{flushSync(()=>root.render(<ImageComparison base={'a'.repeat(40)} target={'b'.repeat(40)} sessionId='jpeg' repositoryId='fixture' id={'c'.repeat(64)} t={k=>k} onRediscover={()=>{}} rpc={async(e,p,s)=>{if(e!=='vcs/revision-image')throw Error('JPEG UI endpoint');calls.push(s);return images[p.side==='left'?0:1];}}/>));host.querySelector('button').click();await wait(()=>host.querySelectorAll('img').length===2);if(urls.size!==2||!host.textContent.includes('renamed.jpg'))throw Error('JPEG UI images missing');host.querySelector('button').click();await wait(()=>urls.size===0);if(calls.some(s=>!s.aborted))throw Error('JPEG UI close did not cancel');}
+ finally{root.unmount();host.remove();URL.createObjectURL=create;URL.revokeObjectURL=revoke;for(const u of urls)revoke.call(URL,u);}
+}
 export async function checkPreparedJpeg(base64){
  const blob=new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:'image/jpeg'});const image=await loadPreviewImage(blob,{width:3,height:2});image.dispose();
 }
