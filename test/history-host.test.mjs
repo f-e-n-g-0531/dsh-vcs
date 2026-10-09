@@ -10,6 +10,9 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('heavy segment admission leaves history available and recovers after failure',async()=>{
+ let finish,entered;const ready=new Promise(r=>entered=r),h=setup({getHistoricalSegment:async()=>{entered();return new Promise((_r,reject)=>finish=()=>reject(Error('read failed')));},listHistory:async()=>({commits:[]})});await h.discover();const p={...payload,commit:'a'.repeat(40),path:'file.txt'},first=h.call('vcs/tree-segment',p);await ready;assert.equal((await h.call('vcs/tree-segment',p)).error.code,'vcs/busy');assert.equal((await h.call('vcs/history',payload)).ok,true);finish();assert.equal((await first).ok,false);const second=h.call('vcs/tree-segment',p);await new Promise(r=>setImmediate(r));finish();assert.equal((await second).error.code,'vcs/operation-failed');
+});
 test('historical segment RPC strictly binds committed path offset and Session grant',async()=>{
  let seen;const h=setup({getHistoricalSegment:async(_r,o)=>{seen=o;return {text:'part'};}}),p={...payload,commit:'a'.repeat(40),path:'file.txt',offset:65536};assert.equal((await h.call('vcs/tree-segment',p)).error.code,'vcs/rediscover-required');await h.discover();
  for(const extra of [{offset:null},{offset:-1},{offset:16777217},{offset:0.5},{oid:'b'.repeat(40)},{limit:10},{path:'../secret'},{commit:'HEAD'}])assert.equal((await h.call('vcs/tree-segment',{...p,...extra})).error.code,'vcs/invalid-request');assert.equal(seen,undefined);assert.equal((await h.call('vcs/tree-segment',p)).ok,true);assert.equal(seen.offset,65536);

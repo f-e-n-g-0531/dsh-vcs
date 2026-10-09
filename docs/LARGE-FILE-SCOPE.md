@@ -2,6 +2,6 @@
 
 基线0.3.61。首个交付以固定commit/tree路径的UTF8普通文件单版本分段为限；最大对象16MiB，每页64KiB（UTF8边界对齐）、byte offset显式展示、前后片段替换不累积，高级只读编辑器默认。不是全文件Diff或真实全仓库扫描；超16MiB仍拒绝，PNG/Blame原2MiB边界不变。对象size先探测再读取，输出/时间/取消继续受限；首实现最多读取16MiB完整blob后切片，不声称流式IO。路径commit/tree归属验证，不接受浏览器oid/文件系统路径。仅UTF8、拒绝NUL/控制字节/BOM UTF16/错误编码，特殊文件不跟随。
 
-片段UI自动Chrome37895435055通过：实际single Monaco前后替换不累积、关闭取消、失败retry、授权过期提示、切库取消与late结果隔离；真实多MiB UTF8重组/EOF/16MiB超界拒绝/binary/preabort验证通过。新功能实机未验，不安装不重启。
+片段UI自动Chrome37895435055通过：实际single Monaco前后替换不累积、关闭取消、失败retry、授权过期提示、切库取消与late结果隔离；真实多MiB UTF8重组/EOF/16MiB超界拒绝/binary/preabort验证通过。历史窗口Chrome37895973927六页固定snapshot最多200DOM/graph与覆盖范围通过。真实多MiB重组经实际createHandler Session discovery/grant/tree-segment完成；segment单独重读并发1，history留槽/失败释放测试通过。281/281全量通过；旧source lexical取消断言因大括号block失配，按实际guard更新，未削弱取消。新功能实机未验，不安装不重启。
 
 历史加载窗口冻结：保留现有每页50/服务端offset10000上限，不伪造全仓库无限浏览；列表与graph最多保留最近加载200条，继续翻页时淘汰较新的旧窗口行，明确覆盖区间，窗口移动清理选中详情/局部筛选。固定snapshot/search/ref不变，跨窗口边只显示现有边界说明。此批解决长DOM及graph只显示最早200条问题，不直接提高服务端skip上限。工作区大文件分段暂不直接放开：可变文件需要额外快照/安全句柄一致性设计。SVN独立授权批次保持未授权不网络。

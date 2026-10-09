@@ -62,7 +62,7 @@ function validatePayload(endpoint, payload) {
 
 /** Limit active adapter operations and retain only bounded, short-lived discovery grants. */
 export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512 } = {}) {
-  let active = 0, activeImages = 0;
+  let active = 0, activeImages = 0, activeSegments = 0;
   const sessions = new Map();
   function current(sessionId, cwd) {
     for (const [id, entry] of sessions) if (entry.expiresAt <= now()) sessions.delete(id);
@@ -79,7 +79,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
     if (!['vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
-    let imageSlot=false;
+    let imageSlot=false,segmentSlot=false;
     try {
       signal?.throwIfAborted();
       validatePayload(endpoint, payload);
@@ -123,6 +123,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
       if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
+      if(endpoint==='vcs/tree-segment'){if(activeSegments>=1)return failure('vcs/busy','A text segment is already loading. Please retry.');activeSegments++;segmentSlot=true;}
       if(['vcs/commit-image','vcs/revision-image','vcs/workspace-image'].includes(endpoint)){
         if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');
         activeImages++;imageSlot=true;
@@ -164,7 +165,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') return failure('vcs/cancelled', 'The request was cancelled.');
       return failure(typeof error?.code === 'string' && error.code.startsWith('vcs/') ? error.code : 'vcs/operation-failed', error instanceof Error ? error.message : String(error));
-    } finally { active--; if(imageSlot)activeImages--; }
+    } finally { active--; if(imageSlot)activeImages--;if(segmentSlot)activeSegments--; }
   };
 }
 
