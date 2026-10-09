@@ -1,26 +1,21 @@
-# 本地 A/B 版本比较草案（未实现）
+# 本地 A/B 版本比较协议
 
-## 第一批范围
+已实现的只读能力；模块分工见[架构说明](<ARCHITECTURE.md>)，新增功能实机证据见[实机结论](<LIVE-ACCEPTANCE.md>)。
 
-- 从已加载提交列表选择 A（左）和 B（右），只接受完整 SHA-1/SHA-256 commit OID；先不支持任意 revision 表达式、远程引用或工作区混合比较。
-- 方向明确为 A → B，而非隐含 merge-base；交换两端重新获取文件列表和 ID。A=B 返回空列表。
-- 跨分支但本地已存在的 commit 可比较；不执行 checkout/fetch，不修改索引和工作树。
+## 版本身份
 
-## 服务端协议建议
+两端是本地已存在的完整SHA-1／SHA-256 commit OID，不接受任意revision表达式。方向为A→B，不隐式使用merge-base；交换后重新加载成员和Diff，A=B为空。引用只是选择入口，读取固定OID，不checkout或fetch。
 
-- 新增专用端点（名称待实现时确认），仅接受 sessionId、repositoryId、base、target 以及逐文件比较所需的 opaque id；拒绝客户端 root/path/任意 Git 参数。
-- 每次复用 Session cwd 重解析、发现授权、TTL、容量限制、canonical root 校验、取消信号及读取后失效检查。
-- 用固定参数验证两端确为 commit，关闭 replace refs、lazy fetch、外部 diff 和 textconv。对象缺失返回可操作错误，不联网。
-- 文件清单复用 NUL 分隔 name-status 解析，覆盖 A/M/D/T/R/C；ID 必须绑定仓库作用域、A、B、状态及旧/新路径，禁止把单提交父比较的 ID 当成 A/B ID。
-- 保持 2 MiB 命令/文本上限和 10000 文件上限。逐文件比较再次验证清单归属；不能把收到的 path 直接传给 Git。
-- 新增左空、删除右空、重命名左右读旧/新路径；symlink 只显示目标文本，gitlink 只显示 OID；二进制或超限明确提示。
+## Host与适配器
 
-## 实现顺序及测试门槛
+- `vcs/revision-changes`接受Session／repositoryId／base／target；`vcs/revision-compare`再要求不透明成员id；图片端点另有固定side字段。
+- 请求复用Session cwd重解析、发现授权、过期和容量控制，读取后复验；未知字段、任意root/path/命令参数拒绝。
+- 两端验证为commit，禁用replace refs、lazy fetch、外部diff和textconv；缺失对象报错，不联网补齐。
+- NUL清单解析及成员ID绑定固定两端、状态和新旧路径；逐文件读取重新确认归属，不能复用父提交比较ID。
+- 新增左空、删除右空、重命名读取各侧路径；链接只显示目标文字、gitlink显示OID，二进制／超限明确提示。
 
-1. 提取共享变更清单解析与对象读取，保持现有根/合并父提交测试不退化。
-2. 适配器测试：A=B、方向交换、非祖先提交、重命名/删除/新增、Unicode 路径、伪造 OID/ID、非 commit 对象、缺失 promisor blob、取消及只读前后状态。
-3. RPC 测试：陌生 Session/仓库、cwd 变化、过期授权、字段注入、读取期间取消/撤销授权。
-4. UI：两端完整身份可见、交换操作、加载/失败状态，变更 A/B 立即取消旧请求且清除旧文件与 Diff；不增加定时刷新。
-5. 浏览器模拟延迟响应回归 + 真实 Git RPC 集成 + 四平台候选 CI + 真实 DSH GUI 验收，之后才正式发布。
+## 前端边界
 
-文件历史与 Blame 依赖这些不可变版本边界；它们不属于本批已实现范围。
+变更两端取消旧请求、清除旧清单和Diff；显示明确版本身份。默认高级只读Diff，基础可选／失败回退。图片复用严格格式准备和浏览器解码；大文件分段是单版本正文，不声称完整A/B Diff。无周期刷新。
+
+测试覆盖方向交换、相同及非祖先提交、重命名／删除、Unicode、伪造身份、对象缺失、取消、授权和工作区不变。自动浏览器／隔离安装不等于当前DSH实机验收。

@@ -6,4 +6,4 @@
 
 svn:special 节点可能仍显示 kind=file；正文读取前必须检查固定版本属性，不能解析或跟随链接目标。数字快照固定修订上界，不保证服务器日志元数据不可修改。
 
-离线测试不构成网络授权或 HTTPS 验收。当前实现与剩余边界以[SVN 当前结论](<docs/SVN-RUNTIME-SCOPE.md>)为准。
+离线测试不构成网络授权或 HTTPS 验收。当前实现与剩余边界以[SVN 当前结论](<SVN-RUNTIME-SCOPE.md>)为准。
