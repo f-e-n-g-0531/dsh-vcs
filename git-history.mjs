@@ -81,10 +81,12 @@ export function parseFollowHistory(text,path,maxRecords){
   if(rows.length===maxRecords||i+6>=fields.length)throw Error('Invalid follow history framing');
   const row=parseHistory(fields.slice(i,i+5).join('\0')+'\0',1)[0];i+=5;
   const status=fields[i++];
-  if(!/^\n(?:[AMDT]|R100)$/.test(status))throw Error('Unsupported follow history status');
-  const oldPath=fields[i++],newPath=status==='\nR100'?fields[i++]:oldPath;
+  if(!/^\n(?:[AMDT]|[RC][0-9]{1,3})$/.test(status))throw Error('Unsupported follow history status');
+  const oldPath=fields[i++],newPath=/^\n[RC]/.test(status)?fields[i++]:oldPath;
   if(!oldPath||!newPath||newPath!==current)throw Error('Ambiguous follow history path');
-  rows.push({...row,path:current,...(status==='\nR100'?{oldPath}:{})});
+  const boundary=/^\nC/.test(status)||(/^\nR/.test(status)&&status!=='\nR100');
+  rows.push({...row,path:current,...(boundary?{boundary:'copy-or-inexact-rename'}:status==='\nR100'?{oldPath}:{})});
+  if(boundary)break;
   if(status==='\nR100')current=oldPath;
   if(status==='\nA')break; // Stop at creation; never cross an older unrelated same-name file.
  }

@@ -1,6 +1,18 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import path from 'node:path';import {execFileSync} from 'node:child_process';
 import {detectRepository,listFileHistory,getCommitDetails} from '../vcs.mjs';
+test('follow stops at copy creation similarity rename and deleted path recreation',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-boundary-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
+ try{
+ git('init','-q');git('config','user.name','Follow');git('config','user.email','f@example.test');
+ const content=Array.from({length:100},(_,i)=>'line '+i).join('\n');await writeFile(path.join(root,'source.txt'),content);git('add','.');git('commit','-qm','source');
+ const history=async name=>{const commit=git('rev-parse','HEAD').trim(),repo=await detectRepository(root),details=await getCommitDetails(repo,{commit}),entry=details.changes.find(c=>c.path===name);return listFileHistory(repo,{commit,id:entry.id,follow:true});};
+ await writeFile(path.join(root,'copy.txt'),content);git('add','.');git('commit','-qm','copy creation');assert.deepEqual((await history('copy.txt')).commits.map(c=>c.subject),['copy creation']);
+ git('mv','copy.txt','edited.txt');await writeFile(path.join(root,'edited.txt'),content+'\nchanged');git('add','.');git('commit','-qm','similarity rename');assert.deepEqual((await history('edited.txt')).commits.map(c=>c.subject),['similarity rename']);
+ git('rm','-q','edited.txt');git('commit','-qm','delete');assert.equal((await history('edited.txt')).commits[0].subject,'delete');
+ await writeFile(path.join(root,'edited.txt'),'unrelated');git('add','.');git('commit','-qm','recreated');assert.deepEqual((await history('edited.txt')).commits.map(c=>c.subject),['recreated']);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
 test('exact rename chain has historical paths and pagination crosses earlier rename',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
  try{

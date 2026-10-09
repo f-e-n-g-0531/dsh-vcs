@@ -7,7 +7,7 @@ function FileHistoryPages({sessionId,repositoryId,commit,parentIndex,id,follow,r
   return()=>controller.abort();
  },[sessionId,repositoryId,commit,parentIndex,id,offset,retry]);
  return <section aria-label={t('fileHistory')} aria-busy={busy}><p>{t('fileHistoryScope')}</p><p style={{overflowWrap:'anywhere'}}>{page.path} · <code>{commit}</code></p>
- <ol>{page.commits.map(row=><li key={row.id}><code title={row.id}>{row.id.slice(0,10)}</code> · {onSelectCommit?<button onClick={()=>onSelectCommit(row.id,row.path||page.path)}>{row.subject}</button>:row.subject}<div>{row.path&&<code>{row.oldPath?row.oldPath+' → ':''}{row.path}</code>} {row.author} · <time dateTime={row.date}>{row.date}</time></div></li>)}</ol>
+ <ol>{page.commits.map(row=><li key={row.id}><code title={row.id}>{row.id.slice(0,10)}</code> · {onSelectCommit?<button onClick={()=>onSelectCommit(row.id,row.path||page.path)}>{row.subject}</button>:row.subject}<div>{row.boundary&&<span>{t('fileHistoryBoundary')} </span>}{row.path&&<code>{row.oldPath?row.oldPath+' → ':''}{row.path}</code>} {row.author} · <time dateTime={row.date}>{row.date}</time></div></li>)}</ol>
  {busy&&<p role="status">{t('loading')}</p>}
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
