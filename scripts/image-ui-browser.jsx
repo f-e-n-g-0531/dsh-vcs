@@ -1,5 +1,6 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
 import ImageComparison from '../src/ImageComparison.jsx';
 export async function checkImageUI(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
@@ -33,6 +34,6 @@ export async function checkImageUI(){
  root.render(<ImageComparison key='pair' sessionId='s' repositoryId='r' {...{base,target}} id={'b'.repeat(64)} rpc={pairRpc} t={k=>k} onRediscover={()=>{}}/>);await wait(()=>button('imageCompare'));button('imageCompare').click();await wait(()=>host.querySelectorAll('img').length===2);if(pairCalls.length!==2||active.size!==2)throw Error('A/B images did not decode');
  button('imageCompare').click();await wait(()=>active.size===0);if(pairCalls.some(c=>!c.signal.aborted))throw Error('A/B close did not cancel');
  const workCalls=[],workRpc=async(endpoint,p,signal)=>{if(endpoint!=='vcs/workspace-image'||p.mode!=='unstaged'||p.commit!==undefined||p.base!==undefined)throw Error('Workspace image identity wrong');workCalls.push({p,signal});return value(p.side);};
- root.render(<ImageComparison key='workspace' workspace mode='unstaged' sessionId='s' repositoryId='r' id={'b'.repeat(64)} rpc={workRpc} t={k=>k} onRediscover={()=>{}}/>);await wait(()=>button('imageCompare'));button('imageCompare').click();await wait(()=>host.querySelectorAll('img').length===2);if(active.size!==2||workCalls.length!==2)throw Error('Workspace PNG decode failed');root.render(null);await wait(()=>active.size===0);if(workCalls.some(c=>!c.signal.aborted))throw Error('Workspace image unmount did not cancel');
+ flushSync(()=>root.render(<ImageComparison key='workspace' workspace mode='unstaged' sessionId='s' repositoryId='r' id={'b'.repeat(64)} rpc={workRpc} t={k=>k} onRediscover={()=>{}}/>));await wait(()=>button('imageCompare'));button('imageCompare').click();await wait(()=>host.querySelectorAll('img').length===2);if(active.size!==2||workCalls.length!==2)throw Error('Workspace PNG decode failed');root.render(null);await wait(()=>active.size===0);if(workCalls.some(c=>!c.signal.aborted))throw Error('Workspace image unmount did not cancel');
  }finally{root.unmount();host.remove();URL.createObjectURL=create;URL.revokeObjectURL=revoke;for(const u of active)revoke.call(URL,u);}
 }
