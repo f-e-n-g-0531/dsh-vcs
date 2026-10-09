@@ -28,5 +28,9 @@ export async function checkImageUI(){
  if(calls.length!==count||active.size||host.querySelector('img'))throw Error('File switch revived old images or fetched automatically');
  mode='normal';button('imageCompare').click();await wait(()=>host.querySelectorAll('img').length===2);if(calls.slice(-2).some(c=>c.p.id!=='c'.repeat(64)))throw Error('New file used old image identity');
  root.render(null);await wait(()=>active.size===0&&!host.querySelector('img'));if(calls.slice(-2).some(c=>!c.signal.aborted))throw Error('Unmount did not cancel new image requests');
+ const pairCalls=[],base='d'.repeat(40),target='e'.repeat(40);
+ const pairRpc=async(endpoint,p,signal)=>{if(endpoint!=='vcs/revision-image'||p.base!==base||p.target!==target||p.commit!==undefined||p.parentIndex!==undefined)throw Error('A/B image request wrong');pairCalls.push({p,signal});return value(p.side);};
+ root.render(<ImageComparison key='pair' sessionId='s' repositoryId='r' {...{base,target}} id={'b'.repeat(64)} rpc={pairRpc} t={k=>k} onRediscover={()=>{}}/>);await wait(()=>button('imageCompare'));button('imageCompare').click();await wait(()=>host.querySelectorAll('img').length===2);if(pairCalls.length!==2||active.size!==2)throw Error('A/B images did not decode');
+ button('imageCompare').click();await wait(()=>active.size===0);if(pairCalls.some(c=>!c.signal.aborted))throw Error('A/B close did not cancel');
  }finally{root.unmount();host.remove();URL.createObjectURL=create;URL.revokeObjectURL=revoke;for(const u of active)revoke.call(URL,u);}
 }

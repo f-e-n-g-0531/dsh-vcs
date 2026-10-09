@@ -10,6 +10,14 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('commit and revision image requests share two slots and recover after failure',async()=>{
+ let ready;const both=new Promise(resolve=>ready=resolve),finish=[];
+ const read=async()=>{const promise=new Promise((resolve,reject)=>finish.push({resolve,reject}));if(finish.length===2)ready();return promise;};
+ const h=setup({getCommitImage:read,getRevisionImage:read});await h.discover();const commit={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)},pair={...payload,base:'a'.repeat(40),target:'c'.repeat(40),id:'d'.repeat(64)};
+ const one=h.call('vcs/commit-image',commit),two=h.call('vcs/revision-image',pair);await both;assert.equal((await h.call('vcs/revision-image',pair)).error.code,'vcs/busy');assert.equal((await h.call('vcs/commit-image',commit)).error.code,'vcs/busy');
+ finish[0].reject(Error('failed'));finish[1].resolve({absent:true});assert.equal((await one).ok,false);assert.equal((await two).ok,true);
+ const next=h.call('vcs/revision-image',pair);while(finish.length<3)await new Promise(resolve=>setImmediate(resolve));finish[2].resolve({absent:true});assert.equal((await next).ok,true);
+});
 test('revision image requires fixed pair grants strict side and shares image slots',async()=>{
  const p={...payload,base:'a'.repeat(40),target:'b'.repeat(40),id:'c'.repeat(64)};let seen;
  const h=setup({getRevisionImage:async(_r,o)=>{seen=o;return {absent:true};}});assert.equal((await h.call('vcs/revision-image',p)).error.code,'vcs/rediscover-required');await h.discover();
