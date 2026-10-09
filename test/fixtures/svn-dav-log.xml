@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<S:log-report xmlns:S="svn:" xmlns:D="DAV:">
+<S:log-item>
+<D:version-name>2</D:version-name>
+<D:comment>second</D:comment>
+<D:creator-displayname>runner</D:creator-displayname>
+<S:date>2026-10-09T08:21:24.440012Z</S:date>
+</S:log-item>
+<S:log-item>
+<D:version-name>1</D:version-name>
+<S:date>2026-10-09T08:21:24.413807Z</S:date>
+<D:comment>first</D:comment>
+<D:creator-displayname>runner</D:creator-displayname>
+</S:log-item>
+<S:log-item>
+<D:version-name>0</D:version-name>
+<S:date>2026-10-09T08:21:24.369239Z</S:date>
+</S:log-item>
+</S:log-report>
