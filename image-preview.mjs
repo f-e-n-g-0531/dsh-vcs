@@ -4,6 +4,21 @@ export async function prepareRaster(buffer,{signal}={}){
  if(Buffer.isBuffer(buffer)&&buffer[0]===255&&buffer[1]===216){const result=prepareBaselineJpeg(buffer);signal?.throwIfAborted();return result;}
  return preparePng(buffer,{signal});
 }
+// Internal simple WebP gate; not enabled by prepareRaster yet.
+export function prepareSimpleWebp(buffer){
+ if(!Buffer.isBuffer(buffer)||buffer.length<26||buffer.length>2097152||buffer.toString('ascii',0,4)!=='RIFF'||buffer.toString('ascii',8,12)!=='WEBP'||buffer.readUInt32LE(4)!==buffer.length-8)throw Error('Invalid WebP RIFF or byte limit');
+ const kind=buffer.toString('ascii',12,16),size=buffer.readUInt32LE(16),end=20+size;if(end+(size&1)!==buffer.length||(size&1&&buffer[end]!==0))throw Error('Invalid WebP single chunk length or padding');
+ let width,height;
+ if(kind==='VP8 '){
+  if(size<10)throw Error('Truncated WebP VP8 header');const tag=buffer.readUIntLE(20,3),partition=tag>>>5;
+  if((tag&1)||((tag>>>1)&7)>3||!(tag&16)||!partition||partition>size-3||!buffer.subarray(23,26).equals(Buffer.from([157,1,42])))throw Error('Unsupported WebP VP8 frame');
+  const w=buffer.readUInt16LE(26),h=buffer.readUInt16LE(28);if(w>>>14||h>>>14)throw Error('WebP scaled frame unsupported');width=w&16383;height=h&16383;
+ }else if(kind==='VP8L'){
+  if(size<6||buffer[20]!==47)throw Error('Invalid WebP lossless header');const bits=buffer.readUInt32LE(21);if(bits>>>29)throw Error('Unsupported WebP lossless version');width=(bits&16383)+1;height=((bits>>>14)&16383)+1;
+ }else throw Error('Only simple static WebP is supported');
+ if(!width||!height||width>8192||height>8192||width*height>16000000)throw Error('WebP dimensions exceed limit');
+ return {mime:'image/webp',width,height,bytes:buffer.length,originalBytes:buffer.length,data:Buffer.from(buffer),metadataStripped:false};
+}
 export function prepareBaselineJpeg(buffer){
  if(!Buffer.isBuffer(buffer)||buffer.length<4||buffer.length>2097152||buffer[0]!==255||buffer[1]!==216)throw Error('Invalid JPEG input or byte limit');
  let offset=2,segments=0,width,height,components,seenFrame=false,seenScan=false;const quant=new Set(),huffman=new Set(),frame=new Map();const parts=[buffer.subarray(0,2)];
