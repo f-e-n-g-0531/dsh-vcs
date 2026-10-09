@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, rm, realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {inside, confined} from '../repository-path.mjs';
@@ -14,7 +14,8 @@ test('lexical containment distinguishes siblings from descendants', () => {
 });
 
 test('confinement permits missing children but rejects unsafe addresses', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'vcs-path-'));
+  // Production receives canonical discovery roots; Windows runner TEMP may use RUNNER~1.
+  const root = await realpath(await mkdtemp(path.join(tmpdir(), 'vcs-path-')));
   try {
     await mkdir(path.join(root, 'nested'));
     assert.equal(await confined(root, 'nested/missing/file'), path.join(root, 'nested', 'missing', 'file'));
