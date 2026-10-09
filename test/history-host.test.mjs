@@ -10,6 +10,13 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('file history follow is boolean authorized and forwards unchanged cancellation',async()=>{
+ const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64),follow:true};let received;
+ const h=setup({listFileHistory:async(_r,o)=>{received=o;return {commits:[]};}});assert.equal((await h.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const follow of [null,1,'true',{},[]])assert.equal((await h.call('vcs/file-history',{...p,follow})).error.code,'vcs/invalid-request');assert.equal(received,undefined);
+ const controller=new AbortController();assert.equal((await h.call('vcs/file-history',p,controller.signal)).ok,true);assert.equal(received.follow,true);assert.equal(received.signal,controller.signal);
+ const moved=setup({listFileHistory:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');
+});
 test('history search validates strict query fields and forwards literal search under grants',async()=>{
  const search={message:'--all .*',author:'作者',path:':(glob)*.txt'};let received;
  const h=setup({listHistory:async(_r,o)=>{received=o;return {commits:[]};}});await h.discover();

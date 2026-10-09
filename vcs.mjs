@@ -356,7 +356,7 @@ export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,lim
   if(!entry)throw new Error('Change is not part of selected commit');
   if(follow){
    const count=offset+limit+1;
-   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--find-renames=100%','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
+   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--diff-merges=first-parent','--find-renames=100%','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
    const rows=parseFollowHistory(output.toString('utf8'),entry.path,count).slice(offset);
    return {...historyPage(rows,commit,offset,limit),path:entry.path,followsRenames:true,followPolicy:'exact-first-parent'};
   }

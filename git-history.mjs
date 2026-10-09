@@ -84,8 +84,9 @@ export function parseFollowHistory(text,path,maxRecords){
   if(!/^\n(?:[AMDT]|[RC][0-9]{1,3})$/.test(status))throw Error('Unsupported follow history status');
   const oldPath=fields[i++],newPath=/^\n[RC]/.test(status)?fields[i++]:oldPath;
   if(!oldPath||!newPath||newPath!==current)throw Error('Ambiguous follow history path');
-  const boundary=/^\nC/.test(status)||(/^\nR/.test(status)&&status!=='\nR100');
-  rows.push({...row,path:current,...(boundary?{boundary:'copy-or-inexact-rename'}:status==='\nR100'?{oldPath}:{})});
+  if(/^\n[RC]/.test(status)&&Number(status.slice(2))>100)throw Error('Invalid follow similarity score');
+  const boundary=row.parents.length>1?'merge-first-parent':(/^\nC/.test(status)||(/^\nR/.test(status)&&status!=='\nR100'))?'copy-or-inexact-rename':null;
+  rows.push({...row,path:current,...(boundary?{boundary}:status==='\nR100'?{oldPath}:{})});
   if(boundary)break;
   if(status==='\nR100')current=oldPath;
   if(status==='\nA')break; // Stop at creation; never cross an older unrelated same-name file.

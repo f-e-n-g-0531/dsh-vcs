@@ -1,5 +1,6 @@
 {
   "zh": {
+    "fileHistoryMergeBoundary": "身份边界：合并提交，此处停止，不推断多父来源",
     "fileHistoryBoundary": "身份边界：复制或非精确重命名，此处停止",
     "fileHistoryFollow": "跟随内容相同的重命名（第一父链）",
     "fileHistoryFollowScope": "仅跟随Git检出的100%重命名；不推断相似内容、复制或合并多父来源。新增文件处停止，受输出/时间限制；每条记录按当时路径定位。",
@@ -162,6 +163,7 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "fileHistoryMergeBoundary": "Identity boundary: merge commit; stopped without inferring parent origin",
     "fileHistoryBoundary": "Identity boundary: copy or inexact rename; stopped here",
     "fileHistoryFollow": "Follow exact renames (first-parent)",
     "fileHistoryFollowScope": "Only Git-detected 100% renames. No identity inference for similarity, copies or merge-parent origins. Stops at creation; output/runtime bounded. Each row uses its historical path.",

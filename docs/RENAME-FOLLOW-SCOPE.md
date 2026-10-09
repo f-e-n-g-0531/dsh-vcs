@@ -2,4 +2,4 @@
 
 以0.3.55为基线，显式可选follow模式，默认保留原路径历史。仅跟随Git --follow --first-parent --find-renames=100%识别的精确重命名，不为相似内容/复制/多父merge来源宣称唯一身份。每条提交携带当时路径，重命名携带oldPath；点击按当时路径定位。遇创建停止避免跨越同名旧文件。
 
-固定起始commit与opaque change ID重新验证、100页项/10000offset、2MiB输出、既有超时/取消授权。为复现此前路径，后续页从起点重放有界记录而非直接skip。过限/异常framing拒绝，不返回伪完整结果。待复制/修改/删除重建/merge边界与RPC/浏览器回归后冻结新版本，不安装不重启。
+固定起始commit与opaque change ID重新验证、100页项/10000offset、2MiB输出、既有超时/取消授权。为复现此前路径，后续页从起点重放有界记录而非直接skip。过限/异常framing拒绝，不返回伪完整结果。已补复制/相似度/删除重建与merge边界：遇有路径变更的merge记录显式停止，不推断父来源；异常framing/score严格拒绝。RPC布尔校验、grant/cwd/cancel及真实仓库通过，待最终浏览器及全量门禁后冻结新版本，不安装不重启。
