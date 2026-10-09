@@ -1,6 +1,6 @@
 import {preparePng} from './image-preview.mjs';
 import { spawn } from 'node:child_process';
-import {parseHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT} from './git-history.mjs';
+import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -347,12 +347,19 @@ export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
  const output=await git(repo.root,['--literal-pathspecs','blame','--ignore-revs-file=','--line-porcelain','--no-textconv','--encoding=UTF-8','-L','1,'+limit,commit,'--',entry.path],MAX_TEXT,{signal});
  return {...result,lines:parseBlame(output.toString('utf8'),limit),truncated:count>limit};
 }
-export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,signal}={}){
+export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,follow=false,signal}={}){
   if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid history pagination');
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+  if(typeof follow!=='boolean')throw Error('Invalid rename follow mode');
   const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected commit');
+  if(follow){
+   const count=offset+limit+1;
+   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--find-renames=100%','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
+   const rows=parseFollowHistory(output.toString('utf8'),entry.path,count).slice(offset);
+   return {...historyPage(rows,commit,offset,limit),path:entry.path,followsRenames:true,followPolicy:'exact-first-parent'};
+  }
   const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
   return {...historyPage(parseHistory(text.toString('utf8'),limit+1),commit,offset,limit),path:entry.path,followsRenames:false};
 }

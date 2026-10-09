@@ -72,6 +72,24 @@ export function historyPage(rows,snapshot,offset,limit){
  const truncated=hasMore&&offset+limit>10000;
  return {snapshot,commits:rows.slice(0,limit),nextOffset:hasMore&&!truncated?offset+limit:null,truncated};
 }
+// --follow emits one selected-path name-status record per commit. Fail closed on unexpected framing.
+export function parseFollowHistory(text,path,maxRecords){
+ if(typeof text!=='string'||Buffer.byteLength(text,'utf8')>2*1024*1024||!Number.isInteger(maxRecords)||maxRecords<1||maxRecords>10101)throw Error('Invalid follow history bounds');
+ if(!text)return [];if(!text.endsWith('\0'))throw Error('Truncated follow history');
+ const fields=text.slice(0,-1).split('\0'),rows=[];let current=path;
+ for(let i=0;i<fields.length;){
+  if(rows.length===maxRecords||i+6>=fields.length)throw Error('Invalid follow history framing');
+  const row=parseHistory(fields.slice(i,i+5).join('\0')+'\0',1)[0];i+=5;
+  const status=fields[i++];
+  if(!/^\n(?:[AMDT]|R100)$/.test(status))throw Error('Unsupported follow history status');
+  const oldPath=fields[i++],newPath=status==='\nR100'?fields[i++]:oldPath;
+  if(!oldPath||!newPath||newPath!==current)throw Error('Ambiguous follow history path');
+  rows.push({...row,path:current,...(status==='\nR100'?{oldPath}:{})});
+  if(status==='\nR100')current=oldPath;
+  if(status==='\nA')break; // Stop at creation; never cross an older unrelated same-name file.
+ }
+ return rows;
+}
 export function parseHistory(text, maxRecords = 101) {
   if(typeof text !== 'string' || Buffer.byteLength(text,'utf8') > 2*1024*1024) throw new Error('History output exceeds limit or is invalid');
   if(!Number.isInteger(maxRecords)||maxRecords<1||maxRecords>101) throw new Error('Invalid history record limit');
