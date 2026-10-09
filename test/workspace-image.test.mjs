@@ -10,6 +10,6 @@ test('workspace PNG modes bind HEAD index and working bytes without text convers
  await assert.rejects(getWorkspaceImage(repo,{id:'f'.repeat(64)}),/no longer exists/);const abort=new AbortController();abort.abort();await assert.rejects(getWorkspaceImage(repo,{id:added.id,signal:abort.signal}),{name:'AbortError'});
  await writeFile(path.join(root,'large.png'),Buffer.alloc(2097153));const large=(await listChanges(repo)).find(r=>r.path==='large.png');await assert.rejects(getWorkspaceImage(repo,{id:large.id}),/2 MiB/);
  git('rm','-f','image.png');const deleted=(await listChanges(repo,'staged')).find(r=>r.path==='image.png');assert.equal((await getWorkspaceImage(repo,{mode:'staged',id:deleted.id})).absent,true);assert.equal((await getWorkspaceImage(repo,{mode:'staged',id:deleted.id,side:'left'})).mime,'image/png');
- await symlink(path.join(root,'new.png'),path.join(root,'link.png'),'file');const link=(await listChanges(repo)).find(r=>r.path==='link.png');await assert.rejects(getWorkspaceImage(repo,{id:link.id}),/links|regular file/);
+ await symlink(path.join(root,'new.png'),path.join(root,'link.png'),'file');const link=(await listChanges(repo)).find(r=>r.path==='link.png');await assert.rejects(getWorkspaceImage(repo,{id:link.id}),/links|regular file|Symlink escapes repository/);
  }finally{await rm(root,{recursive:true,force:true});}
 });
