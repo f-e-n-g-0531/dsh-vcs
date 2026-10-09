@@ -15,4 +15,4 @@
 
 独立只读全仓库审计未确认抽取引入运行时回归；唯一确认问题为分发文档链接，已修复并增加测试。审计建议停止零散化妆式改动并冻结。重新构建后356项测试零失败零跳过，27文件包闭包和隔离生产安装通过。
 
-[分支Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37932967650)通过；分支证据不能代替新版同标签门禁。实际运行DSH未升级，SVN及编辑器的新自动证据不冒称实机通过。0.3.66标签Windows新增路径fixture失败，未发布且不移动；fixture现使用与生产发现相同的canonical root。统一发布0.3.67须另行完成[发布门禁](<RELEASING.md>)；版本／工件最终状态以[变更记录](<../CHANGELOG.md>)为准。
+正式发布 **0.3.67** 已完成。[四组合CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37934552767)、[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37934580549)、[联合发布](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37935229896)第二次执行成功；首次npm接受上传后公开下载延迟，确认已有实际包相同再恢复，未重复上传。四候选、npm实际包、GitHub实际包全部807587字节，SHA256 f552115e19d803b1d0875b77fb65724180e64571c2ba9cf371c5bf25f906d668，latest=0.3.67。正式Release非草稿非预发布。不可移动标签1e404a49595ad3aab25db24faa41ae0899621e55；失败0.3.66标签不移动未发布。当前DSH未升级或重启，自动浏览器与隔离安装不是当前GUI实机验收。

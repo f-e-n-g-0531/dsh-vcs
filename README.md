@@ -1,6 +1,6 @@
 # DSH VCS
 
-DeepSeek Harness（DSH）Web 的只读 Git / SVN 审阅插件，包名 **@feng0531/dsh-vcs**。最新正式版本 **0.3.65**；第七批 SVN HTTPS 历史已正式发布至 npm／GitHub，两端实际工件与候选摘要一致，范围与证据见 [SVN 冻结结论](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/SVN-RUNTIME-SCOPE.md>)。自动验证不等于当前 DSH GUI 实机验收；非商业许可证不变。
+DeepSeek Harness（DSH）Web 的只读 Git / SVN 审阅插件，包名 **@feng0531/dsh-vcs**。最新正式版本 **0.3.67**；本轮全仓库行为保持整理已发布至 npm／GitHub，模块、测试、构建和MD整理结论见[整理结论](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/REFACTOR-SCOPE.md>)。SVN能力范围保持，见[SVN冻结结论](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/SVN-RUNTIME-SCOPE.md>)。自动验证不等于当前 DSH GUI 实机验收；非商业许可证不变。
 
 > 项目仓库：https://github.com/f-e-n-g-0531/dsh-vcs 。采用 [DSH VCS 非商业源码公开许可证 1.0](<LICENSE>)：允许非商业使用、修改与分发，禁止商业使用（包括公司内部用于商业项目的开发、测试与维护），商业用途须另行书面授权。分发须保留许可证和版权，修改版须注明修改。第三方组件保持原许可。这是源码公开项目，不是 OSI 认可的开源软件。
 
