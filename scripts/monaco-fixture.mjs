@@ -34,6 +34,7 @@ try{
  phase='file-history';await (await import('./history-viewer-browser.js')).checkFileHistory();
  phase='blame';await (await import('./history-viewer-browser.js')).checkBlame();
  phase='tree';await (await import('./history-viewer-browser.js')).checkTree();
+ phase='svn-identity';await (await import('./history-viewer-browser.js')).checkSvnIdentity();
  phase='history-window';await (await import('./history-viewer-browser.js')).checkHistoryWindow();
  phase='segments';await (await import('./history-viewer-browser.js')).checkSegments();
  phase='jpeg-decode';await (await import('./history-viewer-browser.js')).checkJpegDecode();

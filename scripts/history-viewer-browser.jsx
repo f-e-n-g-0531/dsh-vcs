@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkSvnIdentity} from './svn-identity-browser.jsx';
 export {checkHistoryWindow} from './history-window-browser.jsx';
 export {checkSegments} from './segments-browser.jsx';
 export {checkJpegDecode,checkPreparedJpeg,checkJpegComparison,checkPreparedWebp} from './jpeg-browser.jsx';
