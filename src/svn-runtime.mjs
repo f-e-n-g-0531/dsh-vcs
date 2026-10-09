@@ -1,5 +1,6 @@
 import {parseSvnDavLogPage} from './svn-dav-log.mjs';import {parseSvnDavDetail} from './svn-dav-detail.mjs';
 import {validateSvnCommand} from './svn-command-gate.mjs';
+import {parseSvnRevision} from './svn-revision.mjs';
 import {previousSvnRevision} from './svn-revision.mjs';
 import {planSvnComparison} from './svn-comparison-plan.mjs';import {parseSvnPropertyNames} from './svn-property-names.mjs';import {svnHistoryTarget} from './svn-target.mjs';
 import {createHash} from 'node:crypto';import {parseSvnDetail} from './svn-detail.mjs';
@@ -10,6 +11,7 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
  if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>15000)throw Error('Invalid SVN runtime deadline');
  if(typeof resolveIdentity!=='function')throw Error('Local identity resolver required');const offers=createSvnConsent({now}),grants=createSvnConsent({now,onRevoke:token=>cancelToken(token)});
  const resolve=async(address,signal)=>{signal?.throwIfAborted();const local=await resolveIdentity(address,signal);signal?.throwIfAborted();return {...local,sessionId:address.sessionId,cwd:local.cwd,repositoryId:address.repositoryId};};
+ const localSnapshot=identity=>{if(identity.revision===undefined)return {};parseSvnRevision(identity.revision);return {snapshot:identity.revision};};
  const inFlight=new Map();
  const cancelToken=token=>{for(const task of inFlight.get(token)||[])task.controller.abort(new DOMException('SVN consent revoked','AbortError'));};
  const dispatch=async(plan,options)=>{
@@ -21,8 +23,8 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
   if(!(typeof value==='string'||Buffer.isBuffer(value))||Buffer.byteLength(value)>options.maxBytes)throw Error('SVN transport output exceeds byte limit or has invalid type');if(Buffer.isBuffer(value)&&plan.args[0]!=='cat')return new TextDecoder('utf-8',{fatal:true}).decode(value);return value;}catch(error){if(controller.signal.aborted)throw controller.signal.reason;throw error;}finally{const tasks=inFlight.get(options.token);tasks?.delete(task);if(!tasks?.size)inFlight.delete(options.token);clearTimeout(timer);options.signal?.removeEventListener('abort',abort);}
  };
  const runtime={
- async describe(address,{signal}={}){const identity=await resolve(address,signal),offer=offers.grant(identity,{explicit:true});return {offer,root:identity.root,uuid:identity.uuid,scope:identity.scope,origin:new URL(identity.root).origin,expiresAt:now()+300000,remoteEnabled:typeof transport==='function'};},
- async approve(address,{offer,explicit=false,signal}={}){if(explicit!==true)throw Error('Explicit SVN network consent required');const identity=await resolve(address,signal);offers.assert(offer,identity);if(typeof transport!=='function')throw Error('SVN remote transport disabled');const token=grants.grant(identity,{explicit:true});offers.revoke(offer);return {token,expiresAt:now()+300000};},
+ async describe(address,{signal}={}){const identity=await resolve(address,signal),snapshot=localSnapshot(identity),offer=offers.grant(identity,{explicit:true});return {...snapshot,offer,root:identity.root,uuid:identity.uuid,scope:identity.scope,origin:new URL(identity.root).origin,expiresAt:now()+300000,remoteEnabled:typeof transport==='function'};},
+ async approve(address,{offer,explicit=false,signal}={}){if(explicit!==true)throw Error('Explicit SVN network consent required');const identity=await resolve(address,signal);offers.assert(offer,identity);if(typeof transport!=='function')throw Error('SVN remote transport disabled');const snapshot=localSnapshot(identity),token=grants.grant(identity,{explicit:true});offers.revoke(offer);return {...snapshot,token,expiresAt:now()+300000};},
  async log(address,{token,snapshot,cursor,limit,path,signal}={}){const identity=await resolve(address,signal);grants.assert(token,identity);if(typeof transport!=='function')throw Error('SVN remote transport disabled');const plan=planSvnLog({...identity,snapshot,cursor,limit,path});signal?.throwIfAborted();const xml=await dispatch(plan,{identity,token,signal,maxBytes:2097152,timeoutMs:15000});signal?.throwIfAborted();const after=await resolve(address,signal);grants.assert(token,after);return (transportFormat==='dav'?parseSvnDavLogPage:parseSvnLogPage)(xml,plan);},
  async detail(address,{token,snapshot,revision,signal}={}){const identity=await resolve(address,signal);grants.assert(token,identity);if(typeof transport!=='function')throw Error('SVN remote transport disabled');const plan=planSvnDetail({...identity,snapshot,revision});const xml=await dispatch(plan,{identity,token,signal,maxBytes:2097152,timeoutMs:15000});signal?.throwIfAborted();grants.assert(token,await resolve(address,signal));const detail=transportFormat==='dav'?{...parseSvnDavDetail(xml,plan),pathsAvailable:true}:parseSvnDetail(xml,plan);return {...detail,snapshot,changes:detail.changes.map(change=>({...change,id:createHash('sha256').update(JSON.stringify([identity.root,identity.uuid,identity.scope,snapshot,revision,change])).digest('hex')}))};},
  async compare(address,{token,snapshot,revision,id,signal}={}){
