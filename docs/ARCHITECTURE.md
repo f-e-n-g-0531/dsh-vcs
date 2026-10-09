@@ -1,37 +1,40 @@
-# 架构与维护边界
+# 架构与模块边界
 
-## 文件分工
+## 依赖方向
 
-- `index.mjs`：Host 插件入口、会话目录解析、仓库授权缓存、RPC 与带认证的静态资源路由。
-- `vcs.mjs`：Git/SVN 只读命令适配、仓库发现、文件安全边界、UTF-8/GBK/UTF-16 解码。保留 `detectRepository` 兼容接口供测试和现有调用方使用。
-- `src/client.jsx`：单项目选择、文件列表、比较模式、请求状态和错误恢复。
-- `src/editor.js`：Monaco 差异视图与 Worker 生命周期。
-- `src/editor-loader.mjs`：资源 HTTP/MIME 检查与加载。
-- `src/TextComparison.jsx`、`src/text-comparison.mjs`：高级编辑器失败时的只读基础比较。
-- `src/repositories.mjs`：项目选择、分组、扫描合并与并发控制。
-- `src/locales.json`：界面中英文；`locale/`：插件元信息。
-- `test/`：临时 Git/SVN 仓库、Host 协议、客户端构建产物与算法测试。
+浏览器视图 → 认证RPC → Session／仓库授权 → 只读适配器 → 有界本地命令或已同意HTTPS。视图不能直接读取文件系统；解析和展示模型不负责发起网络或授予权限。
 
-## 协议
+## 宿主与本地读取
 
-自有认证 RPC 通道 `/vcs-rpc`，端点为 `vcs/repositories`、`vcs/status`、`vcs/compare`。浏览器只提交 sessionId、已发现的 repositoryId 和变更 ID，不允许直接指定任意文件系统根目录。
+- [宿主入口](<../index.mjs>)负责DSH注册、固定资源路由、请求字段白名单、Session目录解析、发现授权、并发准入及读取后复验。适配器分发与授权流程分开。
+- [仓库适配器](<../vcs.mjs>)负责发现、Git／SVN本地状态、对象读取及比较语义；公开导出保持兼容。
+- [历史解析](<../git-history.mjs>)负责Git输出协议及分页／搜索参数；[路径边界](<../repository-path.mjs>)负责词法包含、现存链接和真实祖先校验；[文本解码](<../text-content.mjs>)负责有界字节解码。
+- [图片准备](<../image-preview.mjs>)与浏览器解码共同把关格式和尺寸，不绕过路径或选中ID验证。
 
-项目发现由 Host 强制限制为当前目标目录及一级子目录；适配器仍支持显式深度参数供测试。Git 和 SVN 独立识别；会话目录处于仓库内部时也识别所属仓库。只有选中项目读取状态和差异。
+## SVN HTTPS组合
 
-当前资源走 `/vcs-assets/` 固定精确路由，调用 DSH Connection 的认证检查。旧 `/api/vcs-assets/` 注册保留兼容，但客户端不依赖它。RPC 注册显式传入插件上下文，避免 Connection getter 上下文导致 webServer 注入错误。
+[固定工厂](<../src/svn-https-host.mjs>)组合[共享Host](<../src/svn-host.mjs>)、[严格RPC](<../src/svn-rpc.mjs>)、[运行时](<../src/svn-runtime.mjs>)与有界DAV／TLS传输。生产工厂不接受请求实现、CLI、认证缓存或自定义CA注入。
 
-## 历史读取边界（开发中）
+本地身份解析复用发现授权。用户先审阅提议并明确勾选同意，才生成绑定Session、cwd、root、UUID和scope的短期能力。运行时逐步骤复验；撤销、过期、Session变化及插件卸载使能力失效。日志固定本地工作副本修订，不隐式读远端HEAD。功能及认证限制见[SVN结论](<SVN-RUNTIME-SCOPE.md>)。
 
-- Git 历史 RPC 复用 Session 仓库授权，提交及父提交绑定的变更 ID 不能作为任意工作区路径使用。
-- 历史内容从对象库读取，不 checkout；符号链接仅显示目标文本，子模块仅显示对象引用。
-- Git 子进程设置 `GIT_NO_REPLACE_OBJECTS=1`，避免 replace refs 改写指定 SHA 的内容；真实替换对象回归已覆盖。
-- 设置 `GIT_NO_LAZY_FETCH=1` 并以空 `GIT_ALLOW_PROTOCOL` 禁止传输协议，防止缺失对象触发隐式远程获取；缺失对象应报错，不自动补齐。真实 `--filter=blob:none --no-checkout` 临时部分克隆回归已覆盖：插件读取缺失 blob 失败且对象保持缺失；显式允许 file 协议的正向对照可从同一临时源补齐对象。该测试不访问外部服务器。
+## 前端组合
 
-## 后续优先项
+- [客户端入口](<../src/client.jsx>)负责DSH页面注册、工作区选择与交互状态；[RPC适配器](<../src/client-rpc.mjs>)仅转换认证响应，保留错误码和取消信号。
+- 历史面板组合提交详情、目录、文件历史、Blame和比较视图；[历史窗口模型](<../src/history-window.mjs>)独立维护最多200行的加载窗口。
+- [历史审阅视图](<../src/HistoryViewer.jsx>)负责展示；[生命周期Hook](<../src/useHistoryEditor.mjs>)管理编辑器与样式资源；[编辑器任务](<../src/history-editor.mjs>)处理异步加载和释放。
+- [Monaco入口](<../src/editor.js>)负责只读模型、Worker与主题；[加载器](<../src/editor-loader.mjs>)负责HTTP／MIME诊断。基础比较是手动选项或失败回退，不是默认审阅。
 
-1. 在实际 DSH 登录浏览器验证模块、Worker、主题和页面刷新。
-2. 状态/比较的 AbortSignal 贯穿底层命令（目前命令有超时，但取消不会立即终止全部底层工作）。
-3. 授权缓存过期后自动重扫一次；目前需要手动重新扫描。
-4. 编码手动覆盖，解决无 BOM UTF-8/GBK 自动检测歧义。
+## 安全和容量契约
 
-不要在整理提交材料时顺手重写这些运行时行为；应单独改动、回归和发布。
+- 发现默认检查Session目录及一级子目录；定向扫描仍限于Session内。发现的包含仓库可能大于Session目录。
+- 授权最多32个Session、约5分钟；每次请求重新解析cwd，拒绝旧扫描覆盖新状态。过期需手动重新发现。
+- 历史绑定不可变OID和选中ID；Git禁止replace refs、lazy fetch、提示及外部diff／textconv。不checkout、不自动获取对象。
+- 本地子进程无shell、有限输出和超时。历史／SVN取消传递到底层；工作区状态／比较取消仍不保证立即终止子进程，不能在重构中冒称已解决。
+- 文本每侧2MiB；历史UTF8分段最大16MiB、每片64KiB。历史图最多200节点／1000关系／32泳道，不等于完整无限图。
+- 刷新仅手动或可见window聚焦，无周期刷新。资源路由是固定认证白名单，URL不能成为任意磁盘路径。
+
+## 构建与验证
+
+[构建目标](<../build.mjs>)分别产出客户端、编辑器、Worker和SVN Host；Host bundle保留宿主入口外部依赖。新增运行时文件必须同步打包白名单与[包闭包检查](<../scripts/verify-package.mjs>)。
+
+测试分为纯协议／模型、真实临时Git／SVN仓库、Host授权和隔离Chrome／真实Apache TLS链。测试辅助模块只服务fixture，不进入生产包。隔离安装和浏览器证据不等于当前DSH实机验收；见[实机结论](<LIVE-ACCEPTANCE.md>)。
