@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<D:multistatus xmlns:D="DAV:" xmlns:ns1="http://subversion.tigris.org/xmlns/dav/" xmlns:ns0="DAV:">
+<D:response xmlns:lp1="DAV:" xmlns:lp2="http://subversion.tigris.org/xmlns/dav/">
+<D:href>/repo/</D:href>
+<D:propstat>
+<D:prop>
+<lp2:repository-uuid>d524e65f-a581-4edd-8084-716aaa8cf531</lp2:repository-uuid>
+<lp1:version-controlled-configuration><D:href>/repo/!svn/vcc/default</D:href></lp1:version-controlled-configuration>
+</D:prop>
+<D:status>HTTP/1.1 200 OK</D:status>
+</D:propstat>
+</D:response>
+</D:multistatus>
