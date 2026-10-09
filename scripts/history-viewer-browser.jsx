@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkSvnConsent} from './svn-consent-browser.jsx';
 export {checkSvnIdentity} from './svn-identity-browser.jsx';
 export {checkHistoryWindow} from './history-window-browser.jsx';
 export {checkSegments} from './segments-browser.jsx';
