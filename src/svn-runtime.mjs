@@ -1,3 +1,4 @@
+import {previousSvnRevision} from './svn-revision.mjs';
 import {planSvnComparison} from './svn-comparison-plan.mjs';import {parseSvnPropertyNames} from './svn-property-names.mjs';import {svnHistoryTarget} from './svn-target.mjs';
 import {createHash} from 'node:crypto';import {parseSvnDetail} from './svn-detail.mjs';
 import {createSvnConsent} from './svn-consent.mjs';import {planSvnLog,planSvnDetail} from './svn-log-plan.mjs';import {parseSvnLogPage} from './svn-log.mjs';
@@ -17,6 +18,10 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now}={}){
    const properties=await transport({args:['proplist','--xml','--non-interactive','--no-auth-cache','-r',side.revision,'--',target]},options);signal?.throwIfAborted();grants.assert(token,await resolve(address,signal));if(parseSvnPropertyNames(properties,{target:target.slice(0,target.lastIndexOf('@')),allowEmpty:true}).special)throw Error('SVN special files cannot be compared');
    const bytes=await transport({args:['cat','--non-interactive','--no-auth-cache','-r',side.revision,'--',target]},options);signal?.throwIfAborted();grants.assert(token,await resolve(address,signal));const buffer=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes);if(buffer.length>2097152)throw Error('SVN text exceeds 2 MiB');if(buffer.includes(0))return {label:'r'+side.revision,text:'',binary:true};let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buffer);}catch{return {label:'r'+side.revision,text:'',binary:true};}return {label:'r'+side.revision,text};};
   const left=await read(plan.left),right=await read(plan.right);return {path:member.path,revision,snapshot,left,right,binary:!!(left.binary||right.binary)};
+ },
+ async trace(address,{token,snapshot,revision,id,cursor,limit=50,signal}={}){
+  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid SVN change ID');const detail=await runtime.detail(address,{token,snapshot,revision,signal}),member=detail.changes.find(change=>change.id===id);if(!member||member.kind!=='file')throw Error('SVN tracing requires selected file member');
+  const peg=member.action==='D'?previousSvnRevision(revision):revision;const page=await runtime.log(address,{token,snapshot:peg,cursor:cursor??peg,limit,path:member.path,signal});return {...page,selectionSnapshot:snapshot,selectionRevision:revision,path:member.path,pegRevision:peg,stopOnCopy:true,copySourceOutsideScope:!!member.copySourceOutsideScope};
  },
  revokeSession(sessionId){offers.revokeSession(sessionId);grants.revokeSession(sessionId);}
  };return runtime;
