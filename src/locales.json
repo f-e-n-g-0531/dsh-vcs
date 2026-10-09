@@ -1,5 +1,6 @@
 {
   "zh": {
+    "svnExpired": "SVN 网络授权已过期，历史请求已停止；请重新审阅并同意。",
     "svnConsentReview": "审阅 SVN 网络访问范围",
     "svnConsentScope": "同意前仅读取本地身份。授权只适用于所列仓库、Session 与目录，五分钟有效；不授权重定向或写操作。",
     "svnConsentExplicit": "我同意访问以上 HTTPS SVN 仓库",
@@ -184,6 +185,7 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "svnExpired": "SVN network consent expired; history requests stopped. Review and consent again.",
     "svnConsentReview": "Review SVN network access",
     "svnConsentScope": "Before consent, read local identity only. Access binds this repository, Session and cwd for five minutes; redirects and writes are not authorized.",
     "svnConsentExplicit": "I consent to access the HTTPS SVN repository above",
