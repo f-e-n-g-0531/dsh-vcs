@@ -2,7 +2,7 @@
 
 ## 发布状态
 
-正式版仍为 **0.3.62**；第七批候选尚未发布。0.3.63固定标签的[Chrome通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37917253091)，[CI Windows两组合失败](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37917216512)：离线测试URL替换未覆盖SVN返回的盘符大小写；已窄化修正测试适配器，本地专项通过，生产属性目标严格匹配未放宽。旧标签保持不动，不发布该失败候选；下一候选使用新版本。开发源码已挂载固定 HTTPS 后端与显式同意 UI，当前安装 DSH 未变更。候选须完成固定标签四组合 CI、同标签 Chrome、候选包校验、npm／GitHub 正式发布及实际工件摘要核验。
+正式版仍为 **0.3.62**；第七批候选尚未发布。0.3.63固定标签的[Chrome通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37917253091)，[CI Windows两组合失败](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37917216512)：离线测试URL替换未覆盖Windows RUNNER~1与Node %7E编码差异。0.3.64同标签Chrome通过但Windows仍失败；诊断确认根因后改为校验解码后的精确本地目标再映射，生产严格属性匹配未放宽。[修复后的四组合分支CI全绿](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37918817204)。两个旧标签保持不动且不发布，下一候选使用新版本。开发源码已挂载固定 HTTPS 后端与显式同意 UI，当前安装 DSH 未变更。候选须完成固定标签四组合 CI、同标签 Chrome、候选包校验、npm／GitHub 正式发布及实际工件摘要核验。
 
 ## 第七批冻结范围
 
