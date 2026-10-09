@@ -1,0 +1,12 @@
+import {createSvnConsent} from './svn-consent.mjs';import {planSvnLog} from './svn-log-plan.mjs';import {parseSvnLogPage} from './svn-log.mjs';
+// Internal coordinator only. Production remote transport is deliberately not provided.
+export function createSvnRuntime({resolveIdentity,transport,now=Date.now}={}){
+ if(typeof resolveIdentity!=='function')throw Error('Local identity resolver required');const offers=createSvnConsent({now}),grants=createSvnConsent({now});
+ const resolve=async(address,signal)=>{signal?.throwIfAborted();const local=await resolveIdentity(address,signal);signal?.throwIfAborted();return {...local,sessionId:address.sessionId,cwd:local.cwd,repositoryId:address.repositoryId};};
+ return {
+ async describe(address,{signal}={}){const identity=await resolve(address,signal),offer=offers.grant(identity,{explicit:true});return {offer,root:identity.root,uuid:identity.uuid,scope:identity.scope,origin:new URL(identity.root).origin,expiresAt:now()+300000,remoteEnabled:typeof transport==='function'};},
+ async approve(address,{offer,explicit=false,signal}={}){if(explicit!==true)throw Error('Explicit SVN network consent required');const identity=await resolve(address,signal);offers.assert(offer,identity);if(typeof transport!=='function')throw Error('SVN remote transport disabled');const token=grants.grant(identity,{explicit:true});offers.revoke(offer);return {token,expiresAt:now()+300000};},
+ async log(address,{token,snapshot,cursor,limit,path,signal}={}){const identity=await resolve(address,signal);grants.assert(token,identity);if(typeof transport!=='function')throw Error('SVN remote transport disabled');const plan=planSvnLog({...identity,snapshot,cursor,limit,path});signal?.throwIfAborted();const xml=await transport(plan,{identity,signal,maxBytes:2097152,timeoutMs:15000});signal?.throwIfAborted();const after=await resolve(address,signal);grants.assert(token,after);return parseSvnLogPage(xml,plan);},
+ revokeSession(sessionId){offers.revokeSession(sessionId);grants.revokeSession(sessionId);}
+ };
+}
