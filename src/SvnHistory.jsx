@@ -1,0 +1,18 @@
+import React,{useEffect,useState} from 'react';import HistoryViewer from './HistoryViewer.jsx';
+// Internal UI; production mounting awaits verified transport and authorization integration.
+export default function SvnHistory(props){return <Scoped key={JSON.stringify([props.sessionId,props.repositoryId,props.token,props.snapshot])} {...props}/>;}
+function Scoped({sessionId,repositoryId,token,snapshot,rpc,t,onRediscover}){
+ const [cursor,setCursor]=useState(snapshot),[page,setPage]=useState(null),[selected,setSelected]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ useEffect(()=>{const c=new AbortController();setPage(null);setSelected(null);setError('');rpc('vcs/svn-log',{sessionId,repositoryId,token,snapshot,cursor,limit:50},c.signal).then(v=>{if(!c.signal.aborted)setPage(v);}).catch(e=>{if(!c.signal.aborted){setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}});return()=>c.abort();},[cursor,retry]);
+ return <section><p>{t('svnHistoryScope')} · r{snapshot}</p>{error?<p role='alert'>{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!page?<p role='status'>{t('loading')}</p>:<><ol>{page.entries.map(e=><li key={e.revision}><button onClick={()=>setSelected(e.revision)}>r{e.revision} · {e.message}</button></li>)}</ol>{page.nextRevision!==null&&<button onClick={()=>setCursor(page.nextRevision)}>{t('historyMore')}</button>}</>}{selected&&<Detail key={selected} {...{sessionId,repositoryId,token,snapshot,rpc,t,onRediscover}} revision={selected}/>}</section>;
+}
+function Detail({sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscover}){
+ const [data,setData]=useState(null),[selection,setSelection]=useState(null),[error,setError]=useState('');
+ useEffect(()=>{const c=new AbortController();rpc('vcs/svn-detail',{sessionId,repositoryId,token,snapshot,revision},c.signal).then(v=>{if(!c.signal.aborted)setData(v);}).catch(e=>{if(!c.signal.aborted){setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}});return()=>c.abort();},[]);
+ return <section>{error?<p role='alert'>{error}</p>:!data?<p role='status'>{t('loading')}</p>:<><p>{data.message}</p>{data.changes.map(change=><div key={change.id}><span>{change.action} {change.path}</span>{change.kind==='file'&&<><button onClick={()=>setSelection({id:change.id,mode:'compare'})}>{t('svnHistoricalDiff')}</button><button onClick={()=>setSelection({id:change.id,mode:'trace'})}>{t('fileHistory')}</button></>}</div>)}</>}{selection&&<Selected key={JSON.stringify(selection)} {...{sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscover}} {...selection}/>}</section>;
+}
+function Selected({sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscover,id,mode}){
+ const [data,setData]=useState(null),[cursor,setCursor]=useState(null),[error,setError]=useState('');
+ useEffect(()=>{const c=new AbortController();setData(null);setError('');rpc('vcs/svn-'+mode,{sessionId,repositoryId,token,snapshot,revision,id,...(cursor===null?{}:{cursor})},c.signal).then(v=>{if(!c.signal.aborted)setData(v);}).catch(e=>{if(!c.signal.aborted){setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}});return()=>c.abort();},[cursor]);
+ return error?<p role='alert'>{error}</p>:!data?<p role='status'>{t('loading')}</p>:mode==='compare'?(data.binary?<p>{t('binary')}</p>:<HistoryViewer comparison={data} identity={JSON.stringify([sessionId,repositoryId,snapshot,revision,id])} t={t}/>):<section><p>{t('svnTraceScope')} · {data.path} · peg r{data.pegRevision}</p><ol>{data.entries.map(e=><li key={e.revision}>r{e.revision} · {e.message}</li>)}</ol>{data.nextRevision!==null&&<button onClick={()=>setCursor(data.nextRevision)}>{t('historyMore')}</button>}</section>;
+}
