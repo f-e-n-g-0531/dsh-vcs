@@ -1,6 +1,6 @@
 # DSH VCS
 
-DeepSeek Harness（DSH）Web 的只读 Git / SVN 审阅插件，包名 **@feng0531/dsh-vcs**。最新正式版本 **0.3.65**；第七批 SVN HTTPS 历史已正式发布至 npm／GitHub，两端实际工件与候选摘要一致，范围与证据见 [SVN 冻结结论](<docs/SVN-RUNTIME-SCOPE.md>)。自动验证不等于当前 DSH GUI 实机验收；非商业许可证不变。
+DeepSeek Harness（DSH）Web 的只读 Git / SVN 审阅插件，包名 **@feng0531/dsh-vcs**。最新正式版本 **0.3.65**；第七批 SVN HTTPS 历史已正式发布至 npm／GitHub，两端实际工件与候选摘要一致，范围与证据见 [SVN 冻结结论](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/SVN-RUNTIME-SCOPE.md>)。自动验证不等于当前 DSH GUI 实机验收；非商业许可证不变。
 
 > 项目仓库：https://github.com/f-e-n-g-0531/dsh-vcs 。采用 [DSH VCS 非商业源码公开许可证 1.0](<LICENSE>)：允许非商业使用、修改与分发，禁止商业使用（包括公司内部用于商业项目的开发、测试与维护），商业用途须另行书面授权。分发须保留许可证和版权，修改版须注明修改。第三方组件保持原许可。这是源码公开项目，不是 OSI 认可的开源软件。
 
@@ -64,12 +64,12 @@ check 构建并运行测试；npm pack 经 prepack 再次执行检查，生成�
 
 ## 发布与安装验收
 
-见 [安装、升级与回滚](<docs/INSTALL.md>) 和 [兼容性与验收矩阵](<docs/COMPATIBILITY.md>)。发布包必须通过 `npm run verify:package` 和 `npm run test:install`；后者验证生产依赖安装，不代表真实 DSH 浏览器验收。正式发布统一从 GitHub Actions 手动触发，使用 NPM_AUTOMATION_TOKEN 先发布 npm，再公开 GitHub Release；普通提交和标签 CI 不自动发布。
+见 [安装、升级与回滚](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/INSTALL.md>) 和 [兼容性与验收矩阵](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/COMPATIBILITY.md>)。发布包必须通过 `npm run verify:package` 和 `npm run test:install`；后者验证生产依赖安装，不代表真实 DSH 浏览器验收。正式发布统一从 GitHub Actions 手动触发，使用 NPM_AUTOMATION_TOKEN 先发布 npm，再公开 GitHub Release；普通提交和标签 CI 不自动发布。
 
 ## 项目资料
 
-[文档导航](<docs/README.md>)按使用、架构、验证与历史材料分类。
+[文档导航](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/README.md>)按使用、架构、验证与历史材料分类。
 
-见 [贡献指南](<CONTRIBUTING.md>)、[发布清单](<docs/RELEASING.md>)、[变更记录](<CHANGELOG.md>) 和 [安全说明](<SECURITY.md>)。
+见 [贡献指南](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CONTRIBUTING.md>)、[发布清单](<docs/RELEASING.md>)、[变更记录](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md>) 和 [安全说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/SECURITY.md>)。
 
 界面交互参考 [Fork](https://fork.dev/)。这仅说明设计灵感，不表示与 Fork 官方有关联、获得背书或继承其代码许可。

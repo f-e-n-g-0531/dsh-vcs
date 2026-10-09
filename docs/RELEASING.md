@@ -62,4 +62,4 @@ CI 会严格校验标签为 `vX.Y.Z` 且与包版本相同。联合发布检查�
 
 确认完整附带许可证及第三方声明，不把本项目标记为标准开源软件。在已确认的仓库中按实际验证结果编写发布说明，附审核过的 tgz 和校验值，注明兼容环境与未验证事项。是否打 tag / 创建 GitHub Release 由维护者决定；不为本次整理虚构日期、历史版本或功能变更。
 
-相关约定见 [README](<../README.md>)、[贡献指南](<../CONTRIBUTING.md>)、[变更记录](<../CHANGELOG.md>) 和 [安全说明](<../SECURITY.md>)。
+相关约定见 [README](<../README.md>)、[贡献指南](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CONTRIBUTING.md>)、[变更记录](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md>) 和 [安全说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/SECURITY.md>)。
