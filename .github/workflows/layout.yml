@@ -42,7 +42,7 @@ jobs:
       - name: Install SVN for isolated local repository evidence
         run: sudo apt-get update && sudo apt-get install -y subversion apache2 libapache2-mod-svn
       - name: Capture isolated Apache SVN discovery wire
-        run: node scripts/svn-dav-fixture.mjs
+        run: npm run build && node scripts/svn-dav-fixture.mjs
       - name: Exercise actual Monaco modules and concurrent editors
         shell: bash
         run: |
