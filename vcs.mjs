@@ -345,7 +345,7 @@ export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}
  const head=async()=>{try{return (await git(repo.root,['rev-parse','--verify','HEAD'],MAX_TEXT,{signal})).toString('utf8').trim();}catch(e){if(e.code==='VCS_COMMAND')return null;throw e;}};
  const revision=await head();const index=await git(repo.root,['--literal-pathspecs','ls-files','--stage','-z','--',entry.path],MAX_TEXT,{signal});
  const file=side==='left'&&mode!=='unstaged'?(entry.oldPath||entry.path):entry.path;
- let result;
+ let result,verifyWorking;
  const absent=()=>({path:file,commit:null,absent:true});
  const readIndex=async()=>{
   const rows=index.toString('utf8').split('\0').filter(Boolean);if(!rows.length)return absent();
@@ -365,13 +365,13 @@ export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}
     const buffer=Buffer.alloc(MAX_TEXT+1);const {bytesRead}=await handle.read(buffer,0,buffer.length,0);signal?.throwIfAborted();const after=await handle.stat(),named=await fs.lstat(target);await confined(repo.root,file);
     if(named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before)||bytesRead!==before.size)throw Error('Working image changed during read');
     result={path:file,commit:'Working tree',...await workspacePng(buffer.subarray(0,bytesRead),signal)};
-    const validated=await fs.lstat(target);if(validated.isSymbolicLink()||fingerprint(validated)!==fingerprint(before))throw Error('Working image changed during validation');
+    verifyWorking=async()=>{await confined(repo.root,file);const validated=await fs.lstat(target);if(validated.isSymbolicLink()||fingerprint(validated)!==fingerprint(before))throw Error('Working image changed during validation');};await verifyWorking();
    }finally{await handle.close();}
   }
  }
  signal?.throwIfAborted();const afterIndex=await git(repo.root,['--literal-pathspecs','ls-files','--stage','-z','--',entry.path],MAX_TEXT,{signal});
  if(!index.equals(afterIndex)||revision!==await head()||!(await changes(repo,mode)).some(row=>row.id===id))throw Error('Workspace image selection changed; refresh repository status.');
- signal?.throwIfAborted();return result;
+ await verifyWorking?.();signal?.throwIfAborted();return result;
 }
 export async function getRevisionImage(repo,{base,target,id,side='right',signal}={}){
  if(!['left','right'].includes(side))throw Error('Invalid image side');
