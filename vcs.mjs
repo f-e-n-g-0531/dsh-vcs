@@ -357,7 +357,7 @@ export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}
   else result=mode==='unstaged'?await readIndex():await historicalImage(repo,revision,file,signal);
  }else if(mode==='staged')result=entry.indexStatus==='D'?absent():await readIndex();
  else{
-  const target=await confined(repo.root,file);let before;try{before=await fs.lstat(target);}catch(e){if(e.code!=='ENOENT')throw e;}
+  const target=await confined(repo.root,file);let component=repo.root;for(const part of path.relative(repo.root,target).split(path.sep)){component=path.join(component,part);try{if((await fs.lstat(component)).isSymbolicLink())throw Error('Workspace image links are not supported');}catch(e){if(e.code!=='ENOENT')throw e;}}let before;try{before=await fs.lstat(target);}catch(e){if(e.code!=='ENOENT')throw e;}
   if(!before)result=absent();else{
    if(!before.isFile()||before.isSymbolicLink())throw Error('Image preview requires a regular file');if(before.size>MAX_TEXT)throw Error('Image exceeds 2 MiB limit');
    const handle=await fs.open(target,fileFlags.O_RDONLY|(fileFlags.O_NOFOLLOW||0));try{
@@ -365,6 +365,7 @@ export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}
     const buffer=Buffer.alloc(MAX_TEXT+1);const {bytesRead}=await handle.read(buffer,0,buffer.length,0);signal?.throwIfAborted();const after=await handle.stat(),named=await fs.lstat(target);await confined(repo.root,file);
     if(named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before)||bytesRead!==before.size)throw Error('Working image changed during read');
     result={path:file,commit:'Working tree',...await workspacePng(buffer.subarray(0,bytesRead),signal)};
+    const validated=await fs.lstat(target);if(validated.isSymbolicLink()||fingerprint(validated)!==fingerprint(before))throw Error('Working image changed during validation');
    }finally{await handle.close();}
   }
  }
