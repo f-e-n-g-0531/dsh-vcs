@@ -1,3 +1,4 @@
+import {parseSvnIdentity} from './src/svn-identity.mjs';
 import {prepareRaster} from './image-preview.mjs';
 import { spawn } from 'node:child_process';
 import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT} from './git-history.mjs';
@@ -221,6 +222,11 @@ async function checkedRepo(repo, signal) {
   signal?.throwIfAborted();
   if (!found || found.type !== repo.type || path.resolve(found.root) !== path.resolve(repo.root)) throw new Error('Repository root changed or is invalid');
   return found;
+}
+export async function getSvnIdentity(repo,{signal}={}){
+ repo=await checkedRepo(repo,signal);if(repo.type!=='svn')throw Error('SVN working copy required');
+ const result=parseSvnIdentity((await svn(repo.root,['info','--xml','--', '.'],MAX_TEXT,{signal})).toString('utf8'));
+ if(await fs.realpath(result.wcRoot)!==repo.root)throw Error('SVN working copy root changed');signal?.throwIfAborted();return result;
 }
 export async function listHistory(repo, {snapshot,offset=0,limit=50,search,signal} = {}) {
   const query=historySearchArgs(search);
