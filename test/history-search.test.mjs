@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {execFileSync} from 'node:child_process';
+import {gitCommand} from './helpers/git-command.mjs';
 import {buildHistoryGraph} from '../src/history-graph.mjs';
 import {assignGraphLanes} from '../src/graph-lanes.mjs';
 import {listReferences,listHistory,detectRepository} from '../vcs.mjs';
 test('local branch snapshots include branch-only commits and merge lanes without workspace mutations',async()=>{
- const root=await mkdtemp(path.join(tmpdir(),'vcs-branch-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-branch-')),git=gitCommand(root);
  try{
   git('init','-q','-b','main');git('config','user.name','Branches');git('config','user.email','branch@example.test');
   await writeFile(path.join(root,'root.txt'),'root');git('add','.');git('commit','-q','-m','root');git('checkout','-q','-b','topic');
@@ -29,7 +29,7 @@ test('local branch snapshots include branch-only commits and merge lanes without
 });
 test('server history search matches full messages literal paths and paginates a pinned snapshot',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'vcs-search-'));
- const git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
+ const git=gitCommand(root);
  try{
   git('init','-q');git('config','user.name','Search Author');git('config','user.email','search@example.test');
   for(let i=0;i<4;i++){await writeFile(path.join(root,'literal[1].txt'),String(i));git('add','--','literal[1].txt');git('commit','-q','-m','subject '+i,'-m',i%2?'Body NEEDLE .*':'other');}

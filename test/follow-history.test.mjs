@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import path from 'node:path';import {execFileSync} from 'node:child_process';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import path from 'node:path';import {gitCommand} from './helpers/git-command.mjs';
 import {parseFollowHistory} from '../git-history.mjs';
 import {detectRepository,listFileHistory,getCommitDetails} from '../vcs.mjs';
 test('follow parser refuses malformed framing mismatched paths and invalid scores',()=>{
@@ -8,7 +8,7 @@ test('follow parser refuses malformed framing mismatched paths and invalid score
  for(const data of [output.slice(0,-1),header+'\nR101\0old\0path\0',header+'\nR100\0old\0',header+'\nM\0wrong\0',output+output])assert.throws(()=>parseFollowHistory(data,'path',1));
 });
 test('merge introduction stops at explicit first-parent identity boundary',async()=>{
- const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-merge-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-merge-')),git=gitCommand(root);
  try{
  git('init','-q','-b','main');git('config','user.name','Follow');git('config','user.email','f@example.test');await writeFile(path.join(root,'root.txt'),'root');git('add','.');git('commit','-qm','root');
  git('checkout','-qb','topic');await writeFile(path.join(root,'file.txt'),'topic');git('add','.');git('commit','-qm','topic file');git('checkout','-q','main');await writeFile(path.join(root,'main.txt'),'main');git('add','.');git('commit','-qm','main');git('merge','--no-ff','-q','topic','-m','merge');
@@ -17,7 +17,7 @@ test('merge introduction stops at explicit first-parent identity boundary',async
  }finally{await rm(root,{recursive:true,force:true});}
 });
 test('follow stops at copy creation similarity rename and deleted path recreation',async()=>{
- const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-boundary-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-boundary-')),git=gitCommand(root);
  try{
  git('init','-q');git('config','user.name','Follow');git('config','user.email','f@example.test');
  const content=Array.from({length:100},(_,i)=>'line '+i).join('\n');await writeFile(path.join(root,'source.txt'),content);git('add','.');git('commit','-qm','source');
@@ -29,7 +29,7 @@ test('follow stops at copy creation similarity rename and deleted path recreatio
  }finally{await rm(root,{recursive:true,force:true});}
 });
 test('exact rename chain has historical paths and pagination crosses earlier rename',async()=>{
- const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-')),git=gitCommand(root);
  try{
  git('init','-q');git('config','user.name','Follow');git('config','user.email','f@example.test');await writeFile(path.join(root,'old.txt'),'same');git('add','.');git('commit','-qm','create');
  git('mv','old.txt','middle.txt');git('commit','-qm','rename1');git('mv','middle.txt','new.txt');git('commit','-qm','rename2');
