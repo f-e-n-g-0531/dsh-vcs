@@ -16,6 +16,7 @@
     "vcs.mjs",
     "git-history.mjs",
     "image-preview.mjs",
+    "text-content.mjs",
     "src/svn-identity.mjs",
     "src/svn-target.mjs",
     "src/svn-path.mjs",

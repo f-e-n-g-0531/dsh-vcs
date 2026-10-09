@@ -8,7 +8,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
-const MAX_TEXT = 2 * 1024 * 1024;
+import {decode, MAX_TEXT} from './text-content.mjs';
 const MAX_OUTPUT = 16 * 1024 * 1024;
 const TIMEOUT = 15000;
 const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseTagValue: false, parseAttributeValue: false, trimValues: false, processEntities: true, isArray: name => ['entry', 'target', 'property'].includes(name) });
@@ -485,24 +485,8 @@ async function changes(repo, mode) {
 }
 /** Changes have opaque IDs, status words, and repo-relative paths. */
 export async function listChanges(repo, mode = 'all') { repo = await checkedRepo(repo); modeFor(repo, mode); return changes(repo, mode); }
-export function decode(buffer) {
-  if (buffer.length > MAX_TEXT) return { text: '', notice: 'File exceeds the 2 MiB preview limit.' };
-  let text, encoding = 'UTF-8';
-  if (buffer[0] === 0xff && buffer[1] === 0xfe) { if (buffer.length % 2) return { text: '', binary: true, notice: 'Invalid UTF-16 file.' }; text = buffer.subarray(2).toString('utf16le'); encoding = 'UTF-16LE'; }
-  else if (buffer[0] === 0xfe && buffer[1] === 0xff) { const b = Buffer.from(buffer.subarray(2)); if (b.length % 2) return { text: '', binary: true, notice: 'Invalid UTF-16 file.' }; b.swap16(); text = b.toString('utf16le'); encoding = 'UTF-16BE'; }
-  else {
-    if (buffer.includes(0)) return { text: '', binary: true, notice: 'Binary file; text preview unavailable.' };
-    if (buffer.some(byte => byte < 32 && ![9,10,12,13].includes(byte))) return { text: '', binary: true, notice: 'Binary control bytes; text preview unavailable.' };
-    try { text = new TextDecoder('utf-8', { fatal: true }).decode(buffer); }
-    catch {
-      // A UTF-8 BOM is authoritative; do not reinterpret malformed UTF-8 as GBK.
-      if (buffer.subarray(0,3).equals(Buffer.from([0xef,0xbb,0xbf]))) return {text:'',binary:true,notice:'Invalid UTF-8 file.'};
-      try { text = new TextDecoder('gbk', {fatal:true}).decode(buffer); encoding = 'GBK'; }
-      catch { return {text:'',binary:true,notice:'Unsupported encoding or binary file; preview unavailable.'}; }
-    }
-  }
-  return { text, encoding };
-}
+// Keep the public adapter decoding export compatible with existing consumers.
+export {decode} from './text-content.mjs';
 async function content(fn) { try { return decode(await fn()); } catch (e) { if (e.code === 'TOO_LARGE') return { text: '', notice: 'File exceeds the 2 MiB preview limit.' }; throw e; } }
 async function working(root, relative, svnLink = false) {
   const target = await confined(root, relative);
