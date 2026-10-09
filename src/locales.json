@@ -1,5 +1,8 @@
 {
   "zh": {
+    "svnIdentity": "查看 SVN 本地历史访问身份",
+    "svnOfflineIdentity": "仅从授权工作副本读取本地元数据，不发起远程请求。",
+    "svnRemoteDisabled": "远程 SVN 历史传输尚未启用；没有网络授权或可用访问凭据。本页不是已授权历史入口。",
     "historyWindow": "已加载历史窗口（序号左闭右开）",
     "historyWindowScope": "列表及图最多保留200条；继续加载替换较新行，跨窗口边不表示完整图。局部筛选仅当前窗口。",
     "segments": "分段浏览历史正文",
@@ -172,6 +175,9 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "svnIdentity": "Inspect local SVN history identity",
+    "svnOfflineIdentity": "Read local metadata from the authorized working copy only; no remote request.",
+    "svnRemoteDisabled": "Remote SVN history transport is not enabled; no network grant or usable access token. This is not an authorized history entry point.",
     "historyWindow": "Loaded history window (start inclusive, end exclusive)",
     "historyWindowScope": "List and graph retain at most 200 rows; more loads replace newer rows. Boundary edges are not a complete graph. Local filtering covers this window only.",
     "segments": "Browse historical text segments",
