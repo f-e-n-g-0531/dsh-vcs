@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {parsePackReport} from './pack-report.mjs';
+import {PACKAGE_FILES} from './package-contract.mjs';
 import {pathToFileURL} from 'node:url';
 const npm=process.env.npm_execpath;
 if(!npm) throw new Error('Run via npm run test:install');
@@ -25,7 +26,7 @@ try {
  const expected=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
  assert.equal(manifest.name,'@feng0531/dsh-vcs','Unexpected installed package');
  assert.equal(manifest.version,expected.version,'Candidate version differs from checkout');
- for(const file of ['index.mjs','vcs.mjs','dist/client.js','dist/editor.js','dist/editor.css','dist/editor.worker.js','LICENSE','dist/MONACO-LICENSE.txt','dist/MONACO-ThirdPartyNotices.txt','cordis.patch.yml'])await access(path.join(installed,file));
+ for(const file of PACKAGE_FILES)await access(path.join(installed,file));
  const plugin=await import(pathToFileURL(path.join(installed,'index.mjs')).href);
  assert.equal(typeof plugin.apply,'function');assert.ok(plugin.inject.includes('webServer'));
  const routes=[];let handler;let owner;
