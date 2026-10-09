@@ -1,6 +1,7 @@
 import React, {useState,useEffect,useRef,useSyncExternalStore} from 'react';
 import css from './style.css';
 import TextComparison from './TextComparison.jsx';
+import ImageComparison from './ImageComparison.jsx';
 import {comparisonLabels} from './comparison-labels.mjs';
 import HistoryPanel from './HistoryPanel.jsx';
 import {loadEditor} from './editor-loader.mjs';
@@ -120,6 +121,7 @@ export function apply(ctx){
       <main className="vcs-detail"><div className="vcs-filehead"><strong title={comparison?.path||chosen?.path}>{selectedRepository?repositoryLabel(selectedRepository,t('workspaceRoot'))+' / ':''}{comparison?.path||chosen?.path||t('pick')}</strong><button className="vcs-copy-path" disabled={!(comparison?.path||chosen?.path)} onClick={copyPath}>{t(copiedPath?'copied':'copyPath')}</button>{copiedPath&&<span className="vcs-sr-only" role="status">{t('pathCopied')}</span>}<span className="vcs-spacer"/>{comparison&&!comparison.binary&&editorReady&&<><span className="vcs-add">+{stats.added}</span><span className="vcs-del">−{stats.deleted}</span></>}</div>
         {editorError&&<div className="vcs-notice" role="status">{t('fallback')} <button onClick={()=>setEditorRetry(x=>x+1)}>{t('retry')}</button><details><summary>{t('diagnostics')}</summary>{editorError}</details></div>}
         {comparison&&<div className="vcs-context" aria-label={t('comparisonContext')}><span className="vcs-context-status" data-status={code(comparison)}>{t(code(comparison))}</span>{comparison.oldPath&&<span className="vcs-context-rename" title={comparison.oldPath+' → '+comparison.path}>{comparison.oldPath} <b>→</b> {comparison.path}</span>}<span>{comparison.left.label||'—'} <b>↔</b> {comparison.right.label||'—'}</span>{(comparison.left.encoding||comparison.right.encoding)&&<span>{t('encoding')}: {comparison.left.encoding||'—'} / {comparison.right.encoding||'—'}</span>}</div>}
+        {comparison&&selectedRepository?.type==='git'&&<ImageComparison key={JSON.stringify([sessionId,discovery?.cwd,selected.repositoryId,mode,selected.id,refresh,selectedStatus])} workspace sessionId={sessionId} repositoryId={selected.repositoryId} mode={mode} id={selected.id} rpc={rpc} t={t} onRediscover={rediscover}/>}
         {comparison?.notice&&<div className="vcs-notice">{comparison.notice}</div>}
         {propertyNames.length>0&&<div className="vcs-tabs">{['content','properties'].map(value=><button key={value} aria-pressed={tab===value} onClick={()=>setTab(value)}>{t(value)}{value==='properties'?' ('+propertyNames.length+')':''}</button>)}</div>}
         <div className="vcs-labels"><span>{comparison?.left.label||'—'}{comparison?.left.encoding?' · '+comparison.left.encoding:''}</span><span>{comparison?.right.label||'—'}{comparison?.right.encoding?' · '+comparison.right.encoding:''}</span></div>

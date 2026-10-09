@@ -10,6 +10,12 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('workspace image is Git granted opaque selected mode with strict side fields',async()=>{
+ let seen;const h=setup({getWorkspaceImage:async(_r,o)=>{seen=o;return {absent:true};}}),p={...payload,mode:'unstaged',id:'a'.repeat(64)};
+ assert.equal((await h.call('vcs/workspace-image',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{id:null},{id:'x'},{mode:'wrong'},{side:'both'},{path:'secret'},{base:'a'.repeat(40)},{url:'file:///secret'}])assert.equal((await h.call('vcs/workspace-image',{...p,...extra})).error.code,'vcs/invalid-request');assert.equal(seen,undefined);
+ assert.equal((await h.call('vcs/workspace-image',p)).ok,true);assert.equal(seen.mode,'unstaged');assert.equal(seen.side,'right');h.expire();assert.equal((await h.call('vcs/workspace-image',p)).error.code,'vcs/rediscover-required');
+});
 test('commit and revision image requests share two slots and recover after failure',async()=>{
  let ready;const both=new Promise(resolve=>ready=resolve),finish=[];
  const read=async()=>{const promise=new Promise((resolve,reject)=>finish.push({resolve,reject}));if(finish.length===2)ready();return promise;};
