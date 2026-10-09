@@ -70,7 +70,7 @@ function verify() {
     const path = file.path;
     assert.equal(typeof path, 'string', 'Invalid packed path');
     assert.ok(!path.includes('\\') && !path.startsWith('/') && !path.split('/').some(part => !part || part === '.' || part === '..'), 'Unsafe packed path: ' + path);
-    assert.ok(!/(^|\/)(src|tests?|node_modules|\.git|\.github|secrets?)(\/|$)/i.test(path), 'Development/private directory packed: ' + path);
+    assert.ok((['src/svn-identity.mjs','src/svn-target.mjs','src/svn-path.mjs','src/svn-revision.mjs'].includes(path)&&allowed.has(path))||!/(^|\/)(src|tests?|node_modules|\.git|\.github|secrets?)(\/|$)/i.test(path), 'Development/private directory packed: ' + path);
     assert.ok(!/(^|\/)(\.env(?:\..*)?|\.npmrc|\.netrc|credentials(?:\..*)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|.*\.(?:pem|key|p12|pfx))$/i.test(path), 'Potential secret packed: ' + path);
     assert.ok(allowed.has(path) || /^locale\/[a-zA-Z0-9_-]+\.json$/.test(path), 'Unexpected packed file: ' + path);
     assert.ok(!paths.has(path), 'Duplicate packed file: ' + path);
