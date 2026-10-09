@@ -10,6 +10,12 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('revision image requires fixed pair grants strict side and shares image slots',async()=>{
+ const p={...payload,base:'a'.repeat(40),target:'b'.repeat(40),id:'c'.repeat(64)};let seen;
+ const h=setup({getRevisionImage:async(_r,o)=>{seen=o;return {absent:true};}});assert.equal((await h.call('vcs/revision-image',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{side:'bad'},{base:'HEAD'},{id:'no'},{path:'secret'},{root:'/evil'},{commit:'a'.repeat(40)}])assert.equal((await h.call('vcs/revision-image',{...p,...extra})).error.code,'vcs/invalid-request');assert.equal(seen,undefined);assert.equal((await h.call('vcs/revision-image',p)).ok,true);assert.equal(seen.side,'right');assert.equal(seen.base,p.base);
+ const controller=new AbortController(),moved=setup({getRevisionImage:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/revision-image',p)).error.code,'vcs/rediscover-required');controller.abort();assert.equal((await h.call('vcs/revision-image',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('Blame line window validates bounds and forwards only authorized selection',async()=>{
  let received;const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64),startLine:501,lineLimit:100};const h=setup({getFileBlame:async(_r,o)=>{received=o;return {lines:[]};}});await h.discover();
  for(const fields of [{startLine:null},{startLine:0},{startLine:100002},{startLine:1.5},{lineLimit:501},{lineLimit:0},{lineLimit:null},{path:'secret'}])assert.equal((await h.call('vcs/blame',{...p,...fields})).error.code,'vcs/invalid-request');assert.equal(received,undefined);assert.equal((await h.call('vcs/blame',p)).ok,true);assert.equal(received.startLine,501);assert.equal(received.lineLimit,100);
