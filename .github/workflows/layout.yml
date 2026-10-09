@@ -39,6 +39,8 @@ jobs:
           node scripts/history-fixture.mjs
           google-chrome --headless --no-sandbox --disable-gpu --virtual-time-budget=10000 --dump-dom "file://$PWD/test-results/history-fixture.html" > test-results/history-dom.html
           node scripts/verify-history-result.mjs
+      - name: Install SVN for isolated local repository evidence
+        run: sudo apt-get update && sudo apt-get install -y subversion
       - name: Exercise actual Monaco modules and concurrent editors
         shell: bash
         run: |
