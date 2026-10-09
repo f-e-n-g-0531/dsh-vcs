@@ -2,7 +2,7 @@
 
 ## 发布状态
 
-正式版仍为 **0.3.62**；第七批候选尚未发布。0.3.63固定标签的[Chrome通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37917253091)，[CI Windows两组合失败](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37917216512)：离线测试URL替换未覆盖Windows RUNNER~1与Node %7E编码差异。0.3.64同标签Chrome通过但Windows仍失败；诊断确认根因后改为校验解码后的精确本地目标再映射，生产严格属性匹配未放宽。[修复后的四组合分支CI全绿](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37918817204)。两个旧标签保持不动且不发布，下一候选使用新版本。开发源码已挂载固定 HTTPS 后端与显式同意 UI，当前安装 DSH 未变更。0.3.65已通过[固定标签四组合CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37919692670)、[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37919725030)、346项本地测试、24文件闭包、隔离安装和四份候选包同摘要核验（806020字节，SHA256 127a7ebf26bb50a7989b6df48aadd8b36f24b64e60e1a243fae78c773cb9a49a）。[正式发布流程](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37920374654)中npm接受上传，但公开版本metadata仍404、latest仍0.3.62；公开工件门禁正确失败，GitHub Release未创建。不得盲目重传或宣称发布完成；需继续只读检查registry实际状态后决定同工件恢复。
+正式版为 **0.3.65**，第七批已交付。[四组合CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37919692670)、[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37919725030)、346项本地测试与包闭包通过。[正式发布](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37920374654)第二次执行核验已公开npm工件后跳过上传，完成[GitHub Release](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.65)。四候选包、实际npm和GitHub下载包均806020字节，SHA256 127a7ebf26bb50a7989b6df48aadd8b36f24b64e60e1a243fae78c773cb9a49a；latest=0.3.65。不可移动标签69b2854509127dd632501c309f62e511d8adbbd4；0.3.63／0.3.64失败标签未移动未发布。当前安装DSH未变更，新功能仍非当前GUI实机验收。
 
 ## 第七批冻结范围
 
