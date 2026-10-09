@@ -2,6 +2,7 @@ import {preparePng} from './image-preview.mjs';
 import { spawn } from 'node:child_process';
 import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
+import {constants as fileFlags} from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
@@ -359,7 +360,7 @@ export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}
   const target=await confined(repo.root,file);let before;try{before=await fs.lstat(target);}catch(e){if(e.code!=='ENOENT')throw e;}
   if(!before)result=absent();else{
    if(!before.isFile()||before.isSymbolicLink())throw Error('Image preview requires a regular file');if(before.size>MAX_TEXT)throw Error('Image exceeds 2 MiB limit');
-   const handle=await fs.open(target,'r');try{
+   const handle=await fs.open(target,fileFlags.O_RDONLY|(fileFlags.O_NOFOLLOW||0));try{
     const fingerprint=s=>JSON.stringify([s.dev,s.ino,s.size,s.mtimeMs,s.ctimeMs]);const opened=await handle.stat();if(!opened.isFile()||fingerprint(opened)!==fingerprint(before))throw Error('Working image changed during read');
     const buffer=Buffer.alloc(MAX_TEXT+1);const {bytesRead}=await handle.read(buffer,0,buffer.length,0);signal?.throwIfAborted();const after=await handle.stat(),named=await fs.lstat(target);await confined(repo.root,file);
     if(named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before)||bytesRead!==before.size)throw Error('Working image changed during read');
