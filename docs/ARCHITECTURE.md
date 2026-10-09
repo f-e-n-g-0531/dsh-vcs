@@ -7,7 +7,7 @@
 ## 宿主与本地读取
 
 - [宿主入口](<../index.mjs>)负责DSH注册、固定资源路由、请求字段白名单、Session目录解析、发现授权、并发准入及读取后复验。适配器分发与授权流程分开。
-- [仓库适配器](<../vcs.mjs>)负责发现、Git／SVN本地状态、对象读取及比较语义；公开导出保持兼容。
+- [仓库适配器](<../vcs.mjs>)负责发现、Git／SVN本地状态、对象读取及比较语义；公开导出保持兼容。[本地命令](<../local-command.mjs>)集中环境防护、无shell进程、合并输出预算、取消和15秒默认超时，不与远程DAV传输混用。
 - [历史解析](<../git-history.mjs>)负责Git输出协议及分页／搜索参数；[路径边界](<../repository-path.mjs>)负责词法包含、现存链接和真实祖先校验；[文本解码](<../text-content.mjs>)负责有界字节解码。
 - [图片准备](<../image-preview.mjs>)与浏览器解码共同把关格式和尺寸，不绕过路径或选中ID验证。
 
@@ -19,7 +19,7 @@
 
 ## 前端组合
 
-- [客户端入口](<../src/client.jsx>)负责DSH页面注册、工作区选择与交互状态；[RPC适配器](<../src/client-rpc.mjs>)仅转换认证响应，保留错误码和取消信号。
+- [客户端入口](<../src/client.jsx>)负责DSH页面注册、工作区选择与交互状态；[RPC适配器](<../src/client-rpc.mjs>)仅转换认证响应，保留错误码和取消信号。[状态调度器](<../src/status-limiter.mjs>)跨请求代次限制两项并发，取消在途请求直到结束才释放槽；[列表键盘处理](<../src/file-list-keyboard.mjs>)只管理焦点和目录开合，不自动选择文件。
 - 历史面板组合提交详情、目录、文件历史、Blame和比较视图；[历史窗口模型](<../src/history-window.mjs>)独立维护最多200行的加载窗口。
 - [历史审阅视图](<../src/HistoryViewer.jsx>)负责展示；[生命周期Hook](<../src/useHistoryEditor.mjs>)管理编辑器与样式资源；[编辑器任务](<../src/history-editor.mjs>)处理异步加载和释放。
 - [Monaco入口](<../src/editor.js>)负责只读模型、Worker与主题；[加载器](<../src/editor-loader.mjs>)负责HTTP／MIME诊断。基础比较是手动选项或失败回退，不是默认审阅。
