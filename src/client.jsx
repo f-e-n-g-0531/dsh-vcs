@@ -1,5 +1,6 @@
 import React, {useState,useEffect,useRef,useSyncExternalStore} from 'react';
 import css from './style.css';
+import {createClientRpc} from './client-rpc.mjs';
 import TextComparison from './TextComparison.jsx';
 import ImageComparison from './ImageComparison.jsx';
 import {comparisonLabels} from './comparison-labels.mjs';
@@ -20,7 +21,7 @@ export function apply(ctx){
   ctx.effect(()=>ctx.locale.register('local.vcs',dictionaries));
   const t=ctx.locale.bind('local.vcs');
   const scheduleStatus=createStatusLimiter(2);
-  async function rpc(endpoint,payload,signal){const result=await ctx.connection.rpc.call('/vcs-rpc',endpoint,payload,signal);if(!result.ok){const error=new Error(result.error?.message||String(result.error||t('error')));error.code=result.error?.code;throw error;}return result.value;}
+  const rpc=createClientRpc(ctx.connection,()=>t('error'));
   function Page(props){
     const session=props.useSessions(s=>Object.values(s.byId).find(row=>(row.retainedBy.mainView??0)>0));
     return <PanelBoundary key={JSON.stringify([session?.id,session?.cwd])}><Panel session={session}/></PanelBoundary>;
