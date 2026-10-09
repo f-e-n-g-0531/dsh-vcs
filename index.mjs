@@ -83,6 +83,48 @@ function validatePayload(endpoint, payload) {
   }
 }
 
+/** Dispatch only after grants and capacity have been checked by createHandler. */
+async function readRepository(api, endpoint, repository, payload, {cwd, mode, signal}) {
+  switch (endpoint) {
+    case 'vcs/tree-segment':
+      return api.getHistoricalSegment({...repository}, {commit: payload.commit, path: payload.path, offset: payload.offset ?? 0, signal});
+    case 'vcs/workspace-image':
+      return api.getWorkspaceImage({...repository}, {mode, id: payload.id, side: payload.side ?? 'right', signal});
+    case 'vcs/revision-image':
+      return api.getRevisionImage({...repository}, {base: payload.base, target: payload.target, id: payload.id, side: payload.side ?? 'right', signal});
+    case 'vcs/references':
+      return api.listReferences({...repository}, {signal});
+    case 'vcs/commit-image':
+      return api.getCommitImage({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id, side: payload.side ?? 'right', signal});
+    case 'vcs/tree-file':
+      return api.getHistoricalFile({...repository}, {commit: payload.commit, path: payload.path, signal});
+    case 'vcs/tree':
+      return api.getHistoricalTree({...repository}, {commit: payload.commit, signal});
+    case 'vcs/blame':
+      return api.getFileBlame({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id,
+        ...(payload.startLine !== undefined ? {startLine: payload.startLine} : {}),
+        ...(payload.lineLimit !== undefined ? {lineLimit: payload.lineLimit} : {}), signal});
+    case 'vcs/file-history':
+      return api.listFileHistory({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id,
+        offset: payload.offset ?? 0, limit: payload.limit ?? 50,
+        ...(payload.follow !== undefined ? {follow: payload.follow} : {}), signal});
+    case 'vcs/revision-changes':
+      return api.getRevisionChanges({...repository}, {base: payload.base, target: payload.target, signal});
+    case 'vcs/revision-compare':
+      return api.getRevisionComparison({...repository}, {base: payload.base, target: payload.target, id: payload.id, signal});
+    case 'vcs/commit-compare':
+      return api.getCommitComparison({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id, signal});
+    case 'vcs/commit':
+      return api.getCommitDetails({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, signal});
+    case 'vcs/history':
+      return api.listHistory({...repository}, {snapshot: payload.snapshot, search: payload.search, offset: payload.offset ?? 0, limit: payload.limit ?? 50, signal});
+    case 'vcs/status':
+      return {cwd, repository: {...repository}, changes: await api.listChanges({...repository}, mode), mode};
+    case 'vcs/compare':
+      return api.getComparison({...repository}, {mode, id: payload.id});
+  }
+}
+
 /** Limit active adapter operations and retain only bounded, short-lived discovery grants. */
 export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, bindSvnIdentityResolver } = {}) {
   let active = 0, activeImages = 0, activeSegments = 0;
@@ -157,37 +199,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
         if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');
         activeImages++;imageSlot=true;
       }
-      const value = endpoint === 'vcs/tree-segment'
-        ? await api.getHistoricalSegment({...repository},{commit:payload.commit,path:payload.path,offset:payload.offset??0,signal})
-        : endpoint === 'vcs/workspace-image'
-        ? await api.getWorkspaceImage({...repository},{mode,id:payload.id,side:payload.side??'right',signal})
-        : endpoint === 'vcs/revision-image'
-        ? await api.getRevisionImage({...repository},{base:payload.base,target:payload.target,id:payload.id,side:payload.side??'right',signal})
-        : endpoint === 'vcs/references'
-        ? await api.listReferences({...repository},{signal})
-        : endpoint === 'vcs/commit-image'
-        ? await api.getCommitImage({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,side:payload.side??'right',signal})
-        : endpoint === 'vcs/tree-file'
-        ? await api.getHistoricalFile({...repository},{commit:payload.commit,path:payload.path,signal})
-        : endpoint === 'vcs/tree'
-        ? await api.getHistoricalTree({...repository},{commit:payload.commit,signal})
-        : endpoint === 'vcs/blame'
-        ? await api.getFileBlame({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,...(payload.startLine!==undefined?{startLine:payload.startLine}:{}),...(payload.lineLimit!==undefined?{lineLimit:payload.lineLimit}:{}),signal})
-        : endpoint === 'vcs/file-history'
-        ? await api.listFileHistory({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,offset:payload.offset??0,limit:payload.limit??50,...(payload.follow!==undefined?{follow:payload.follow}:{}),signal})
-        : endpoint === 'vcs/revision-changes'
-        ? await api.getRevisionChanges({...repository},{base:payload.base,target:payload.target,signal})
-        : endpoint === 'vcs/revision-compare'
-        ? await api.getRevisionComparison({...repository},{base:payload.base,target:payload.target,id:payload.id,signal})
-        : endpoint === 'vcs/commit-compare'
-        ? await api.getCommitComparison({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,signal})
-        : endpoint === 'vcs/commit'
-        ? await api.getCommitDetails({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,signal})
-        : endpoint === 'vcs/history'
-        ? await api.listHistory({...repository},{snapshot:payload.snapshot,search:payload.search,offset:payload.offset??0,limit:payload.limit??50,signal})
-        : endpoint === 'vcs/status'
-        ? { cwd, repository: { ...repository }, changes: await api.listChanges({ ...repository }, mode), mode }
-        : await api.getComparison({ ...repository }, { mode, id: payload.id });
+      const value = await readRepository(api, endpoint, repository, payload, {cwd, mode, signal});
       await assertCurrent(payload.sessionId, cwd, entry, signal);
       if (entry.repositories.get(payload.repositoryId) !== repository) throw rediscover();
       return { ok: true, value };
