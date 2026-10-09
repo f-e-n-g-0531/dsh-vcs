@@ -289,6 +289,20 @@ function parseCommitChanges(text,scope){
   }
   return changes;
 }
+export async function getHistoricalSegment(repo,{commit,path:file,offset=0,signal}={}){
+ if(!Number.isInteger(offset)||offset<0||offset>16777216)throw Error('Invalid segment offset');
+ if(typeof file!=='string'||!file||file.includes('\0'))throw Error('Invalid historical path');
+ repo=await checkedRepo(repo,signal);const tree=await getHistoricalTree(repo,{commit,signal}),entry=tree.entries.find(row=>row.path===file);
+ if(!entry||entry.type!=='blob'||!['100644','100755'].includes(entry.mode))throw Error('Segment requires a selected committed regular file');
+ const sizeText=(await git(repo.root,['cat-file','-s',entry.oid],MAX_TEXT,{signal})).toString('utf8').trim();if(!/^\d+$/.test(sizeText))throw Error('Invalid object size');const size=Number(sizeText);
+ if(size>16777216)throw Error('Segmented file exceeds 16 MiB limit');if(offset>size)throw Error('Segment offset exceeds file size');
+ const buffer=await git(repo.root,['cat-file','blob',entry.oid],16777216,{signal});if(buffer.length!==size)throw Error('Historical blob size mismatch');
+ if(buffer.includes(0)||buffer.some(byte=>byte<32&&![9,10,12,13].includes(byte)))throw Error('Segments support UTF-8 text only');
+ new TextDecoder('utf-8',{fatal:true}).decode(buffer);if(offset<size&&(buffer[offset]&192)===128)throw Error('Segment offset splits UTF-8 character');
+ let end=Math.min(size,offset+65536);while(end<size&&(buffer[end]&192)===128)end--;
+ const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer.subarray(offset,end));signal?.throwIfAborted();
+ return {commit,path:file,oid:entry.oid,encoding:'UTF-8',offset,endOffset:end,totalBytes:size,nextOffset:end<size?end:null,text};
+}
 export async function getHistoricalFile(repo,{commit,path:file,signal}={}){
  if(typeof file!=='string'||!file||file.includes('\0'))throw new Error('Invalid historical path');
  repo=await checkedRepo(repo,signal);

@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import path from 'node:path';import {execFileSync} from 'node:child_process';import {detectRepository,getHistoricalSegment} from '../vcs.mjs';
+test('historical segments cover multi MiB UTF8 without workspace reads or split characters',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-segment-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
+ try{git('init','-q');git('config','user.name','Segments');git('config','user.email','s@example.test');git('config','core.autocrlf','false');const text='中文line\n'.repeat(220000);await writeFile(path.join(root,'file.txt'),text);git('add','.');git('commit','-qm','large');const commit=git('rev-parse','HEAD').trim(),repo=await detectRepository(root);await writeFile(path.join(root,'file.txt'),'WORKING');let offset=0,parts=[];
+ do{const result=await getHistoricalSegment(repo,{commit,path:'file.txt',offset});assert.ok(Buffer.byteLength(result.text)<=65536);assert.equal(result.offset,offset);parts.push(result.text);offset=result.nextOffset;}while(offset!==null);assert.equal(parts.join(''),text);assert.ok(parts.length>32);
+ await assert.rejects(getHistoricalSegment(repo,{commit,path:'file.txt',offset:1}),/UTF-8/);await assert.rejects(getHistoricalSegment(repo,{commit,path:'missing'}),/regular file/);await assert.rejects(getHistoricalSegment(repo,{commit,path:'file.txt',offset:-1}),/offset/);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
