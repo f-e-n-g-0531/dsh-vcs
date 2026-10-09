@@ -1,4 +1,9 @@
-// JPEG structural preparation is not yet enabled by product adapters.
+// JPEG gets a bounded structural gate; display additionally requires browser decode.
+export async function prepareRaster(buffer,{signal}={}){
+ signal?.throwIfAborted();
+ if(Buffer.isBuffer(buffer)&&buffer[0]===255&&buffer[1]===216){const result=prepareBaselineJpeg(buffer);signal?.throwIfAborted();return result;}
+ return preparePng(buffer,{signal});
+}
 export function prepareBaselineJpeg(buffer){
  if(!Buffer.isBuffer(buffer)||buffer.length<4||buffer.length>2097152||buffer[0]!==255||buffer[1]!==216)throw Error('Invalid JPEG input or byte limit');
  let offset=2,segments=0,width,height,components,seenFrame=false,seenScan=false;const quant=new Set(),huffman=new Set(),frame=new Map();const parts=[buffer.subarray(0,2)];

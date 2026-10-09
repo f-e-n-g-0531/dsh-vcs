@@ -1,4 +1,6 @@
-import {spawn} from 'node:child_process';
+import {spawn,execFileSync} from 'node:child_process';
+import * as vcs from '../vcs.mjs';
+import {createHandler} from '../index.mjs';
 import {prepareBaselineJpeg} from '../image-preview.mjs';
 import {writeFile,mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -26,6 +28,14 @@ try{
  const jpeg=await evaluate("new Promise(resolve=>{const c=document.createElement('canvas');c.width=3;c.height=2;c.getContext('2d').fillRect(0,0,3,2);c.toBlob(b=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.readAsDataURL(b);},'image/jpeg',0.8);})");
  const prepared=prepareBaselineJpeg(Buffer.from(jpeg,'base64'));if(prepared.width!==3||prepared.height!==2)throw Error('Prepared JPEG geometry');
  await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedJpeg("+JSON.stringify(prepared.data.toString('base64'))+"))");await writeFile('test-results/jpeg-prepared-report.json',JSON.stringify({pass:true,width:prepared.width,height:prepared.height,bytes:prepared.bytes,metadataStripped:prepared.metadataStripped}));
+ const repository=await mkdtemp(path.join(os.tmpdir(),'vcs-jpeg-repo-'));
+ try{
+  const git=(...args)=>execFileSync('git',['-C',repository,...args],{encoding:'utf8'});git('init','-q');git('config','user.name','JPEG');git('config','user.email','jpeg@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.jpg'),Buffer.from(jpeg,'base64'));git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.jpg'),'UNCOMMITTED');
+  const rpc=createHandler({sessions:{get:()=>({header:{cwd:repository}})},sessionPersistence:{stat:async()=>undefined}},vcs);const discovery=await rpc('vcs/repositories',{sessionId:'jpeg'});if(!discovery.ok)throw Error('JPEG discovery failed');const repositoryId=discovery.value.repositories[0].id;const details=await rpc('vcs/commit',{sessionId:'jpeg',repositoryId,commit});if(!details.ok)throw Error('JPEG details failed');const id=details.value.changes[0].id;
+  const result=await rpc('vcs/commit-image',{sessionId:'jpeg',repositoryId,commit,id});if(!result.ok||result.value.mime!=='image/jpeg'||result.value.width!==3)throw Error('JPEG authorized committed image failed');await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedJpeg("+JSON.stringify(result.value.base64)+"))");
+  const pair=await rpc('vcs/revision-image',{sessionId:'jpeg',repositoryId,base:commit,target:commit,id});if(pair.ok)throw Error('Unrelated JPEG pair id accepted');
+  await writeFile('test-results/jpeg-repository-report.json',JSON.stringify({pass:true,commit,bytes:result.value.bytes,metadataStripped:result.value.metadataStripped,scope:'real Git Session RPC committed bytes ignoring working changes'}));
+ }finally{await rm(repository,{recursive:true,force:true});}
  const press=async(key,code,virtualKey,text,modifiers=0)=>{
   await call('Input.dispatchKeyEvent',{type:'keyDown',key,code,modifiers,windowsVirtualKeyCode:virtualKey,...(text?{text}: {})});
   await call('Input.dispatchKeyEvent',{type:'keyUp',key,code,modifiers,windowsVirtualKeyCode:virtualKey});

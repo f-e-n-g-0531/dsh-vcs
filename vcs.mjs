@@ -1,4 +1,4 @@
-import {preparePng} from './image-preview.mjs';
+import {prepareRaster} from './image-preview.mjs';
 import { spawn } from 'node:child_process';
 import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
@@ -332,10 +332,10 @@ async function historicalImage(repo,revision,file,signal){
  const [mode,type,oid]=record.slice(0,record.indexOf('\t')).split(' ');
  if(type!=='blob'||!['100644','100755'].includes(mode))throw new Error('Image preview requires a regular file');
  const raw=await git(repo.root,['cat-file','blob',oid],MAX_TEXT,{signal});
- const {data,...metadata}=await preparePng(raw,{signal});
+ const {data,...metadata}=await prepareRaster(raw,{signal});
  return {commit:revision,path:file,oid,...metadata,base64:data.toString('base64')};
 }
-async function workspacePng(buffer,signal){const {data,...metadata}=await preparePng(buffer,{signal});return {...metadata,base64:data.toString('base64')};}
+async function workspacePng(buffer,signal){const {data,...metadata}=await prepareRaster(buffer,{signal});return {...metadata,base64:data.toString('base64')};}
 // Workspace image reads use immutable HEAD/index blobs and a checked regular-file handle.
 export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}={}){
  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id)||!['left','right'].includes(side))throw Error('Invalid workspace image selection');

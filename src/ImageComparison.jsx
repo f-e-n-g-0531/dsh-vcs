@@ -8,7 +8,7 @@ function ImageSide({side,sessionId,repositoryId,commit,parentIndex,base,target,w
    const value=await rpc(workspace?'vcs/workspace-image':base?'vcs/revision-image':'vcs/commit-image',workspace?{sessionId,repositoryId,mode,id,side}:base?{sessionId,repositoryId,base,target,id,side}:{sessionId,repositoryId,commit,parentIndex,id,side},controller.signal);
    if(controller.signal.aborted)return;
    if(value.absent){setData(value);return;}
-   if(value.mime!=='image/png'||typeof value.base64!=='string'||value.base64.length>2796204||!Number.isInteger(value.bytes)||value.bytes<1||value.bytes>2097152)throw Error(t('imageInvalid'));
+   if(!['image/png','image/jpeg'].includes(value.mime)||typeof value.base64!=='string'||value.base64.length>2796204||!Number.isInteger(value.bytes)||value.bytes<1||value.bytes>2097152)throw Error(t('imageInvalid'));
    const binary=atob(value.base64);if(binary.length!==value.bytes)throw Error(t('imageInvalid'));
    const blob=new Blob([Uint8Array.from(binary,c=>c.charCodeAt(0))],{type:value.mime});
    resource=await loadPreviewImage(blob,{width:value.width,height:value.height,signal:controller.signal});
