@@ -44,5 +44,11 @@ export async function checkGraph(){
  root.render(<HistoryGraph commits={[merge[3],merge[0],merge[1],merge[2]]} onSelect={value=>selected=value} t={key=>key}/>);
  await wait(()=>host.querySelector('[role=alert]'));if(host.querySelector('svg')||!host.textContent.includes('graphInvalid'))throw Error('Invalid topology did not fall back');
  host.querySelector('button').click();await wait(()=>!host.querySelector('[role=alert]'));
+ const fork=[{id:id(1),parents:[id(2),id(3)]},{id:id(2),parents:[id(4)]},{id:id(3),parents:[id(4)]},{id:id(4),parents:[]}].map(c=>({...c,subject:'fork'}));
+ root.render(<HistoryGraph commits={fork} onSelect={value=>selected=value} t={key=>key}/>);await wait(()=>host.querySelectorAll('circle').length===4);
+ if(new Set([...host.querySelectorAll('circle')].map(n=>n.getAttribute('cx'))).size!==2||host.querySelectorAll('path').length!==4)throw Error('Fork does not use distinct node lanes');
+ const octopus=[{id:id(1),parents:Array.from({length:40},(_,i)=>id(i+2)),subject:'octopus'},...Array.from({length:40},(_,i)=>({id:id(i+2),parents:[],subject:'branch'}))];
+ root.render(<HistoryGraph commits={octopus} onSelect={value=>selected=value} t={key=>key}/>);await wait(()=>host.textContent.includes('graphLaneLimit'));
+ if(Number(host.querySelector('svg').getAttribute('width'))>600||host.querySelectorAll('ol button').length!==41||host.querySelectorAll('details li').length!==40)throw Error('Overflow lanes lose bounds or textual coverage');
  }finally{root.unmount();host.remove();}
 }

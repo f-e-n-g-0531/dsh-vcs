@@ -1,5 +1,6 @@
 {
   "zh": {
+    "graphLaneLimit": "泳道最多32条；超出部分省略图形，完整已加载节点与关系仍可在文字中查看。",
     "historyBranch": "历史起点（本地引用）",
     "historyPinned": "固定快照",
     "historyBranchScope": "引用由下方手动加载；选择后固定该次OID，刷新引用不会移动历史起点。选择HEAD重新读取当前HEAD，不切换工作区。",
@@ -158,6 +159,7 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "graphLaneLimit": "At most 32 lanes. Overflow geometry is omitted; loaded nodes and relations remain available as text.",
     "historyBranch": "History tip (local reference)",
     "historyPinned": "Pinned snapshot",
     "historyBranchScope": "Load references manually below. Selection pins that OID; refreshing references does not move the history tip. Selecting HEAD reads current HEAD without checking out.",
