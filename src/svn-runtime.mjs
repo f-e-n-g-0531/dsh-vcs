@@ -3,12 +3,15 @@ import {planSvnComparison} from './svn-comparison-plan.mjs';import {parseSvnProp
 import {createHash} from 'node:crypto';import {parseSvnDetail} from './svn-detail.mjs';
 import {createSvnConsent} from './svn-consent.mjs';import {planSvnLog,planSvnDetail} from './svn-log-plan.mjs';import {parseSvnLogPage} from './svn-log.mjs';
 // Internal coordinator only. Production remote transport is deliberately not provided.
-export function createSvnRuntime({resolveIdentity,transport,now=Date.now}={}){
+export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeoutMs=15000}={}){
+ if(!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>15000)throw Error('Invalid SVN runtime deadline');
  if(typeof resolveIdentity!=='function')throw Error('Local identity resolver required');const offers=createSvnConsent({now}),grants=createSvnConsent({now});
  const resolve=async(address,signal)=>{signal?.throwIfAborted();const local=await resolveIdentity(address,signal);signal?.throwIfAborted();return {...local,sessionId:address.sessionId,cwd:local.cwd,repositoryId:address.repositoryId};};
  const dispatch=async(plan,options)=>{
-  options.signal?.throwIfAborted();const value=await transport(plan,options);options.signal?.throwIfAborted();
-  if(!(typeof value==='string'||Buffer.isBuffer(value))||Buffer.byteLength(value)>options.maxBytes)throw Error('SVN transport output exceeds byte limit or has invalid type');return value;
+  options.signal?.throwIfAborted();const controller=new AbortController(),abort=()=>controller.abort(options.signal.reason);options.signal?.addEventListener('abort',abort,{once:true});
+  const timer=setTimeout(()=>controller.abort(new DOMException('SVN transport deadline exceeded','TimeoutError')),timeoutMs);
+  try{const value=await transport(plan,{...options,timeoutMs,signal:controller.signal});controller.signal.throwIfAborted();
+  if(!(typeof value==='string'||Buffer.isBuffer(value))||Buffer.byteLength(value)>options.maxBytes)throw Error('SVN transport output exceeds byte limit or has invalid type');return value;}catch(error){if(controller.signal.aborted)throw controller.signal.reason;throw error;}finally{clearTimeout(timer);options.signal?.removeEventListener('abort',abort);}
  };
  const runtime={
  async describe(address,{signal}={}){const identity=await resolve(address,signal),offer=offers.grant(identity,{explicit:true});return {offer,root:identity.root,uuid:identity.uuid,scope:identity.scope,origin:new URL(identity.root).origin,expiresAt:now()+300000,remoteEnabled:typeof transport==='function'};},
