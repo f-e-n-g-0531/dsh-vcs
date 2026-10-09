@@ -6,7 +6,7 @@
 
 生产客户端已挂载显式同意入口及历史 UI，卸载／刷新／切换时撤销 grant；完整本地 check 与[Chrome及实时TLS整链](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37916159637)通过。清理 revoke 属于取消授权，不是自动历史刷新。当前安装版未变更。
 
-服务端同意能力失效已保留 svn-consent-required，history wrapper 清除旧 grant 并返回手动审阅，不自动续权；8 项授权／RPC／UI专项通过。
+服务端同意能力失效保留 svn-consent-required，history wrapper 清除旧 grant 并返回手动审阅，不自动续权；已取消请求的晚到错误被忽略。[Chrome恢复与实时TLS整链通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37916561100)：无 describe／approve／log 重放，旧 history 清除、信号释放；该恢复场景使用注入错误，不等同外部 SVN 实机验收。
 
 ## 已实现
 
