@@ -322,6 +322,9 @@ export async function getCommitImage(repo,{commit,parentIndex=0,id,side='right',
  if(!entry)throw new Error('Change is not part of selected commit');
  const revision=side==='left'?details.parent:commit,file=side==='left'?(entry.oldPath||entry.path):entry.path;
  if(!revision||(side==='left'&&entry.status==='added')||(side==='right'&&entry.status==='deleted'))return {commit:revision,path:file,absent:true};
+ return historicalImage(repo,revision,file,signal);
+}
+async function historicalImage(repo,revision,file,signal){
  const listing=(await git(repo.root,['--literal-pathspecs','ls-tree','-z',revision,'--',file],MAX_TEXT,{signal})).toString('utf8');
  const record=listing.split(String.fromCharCode(0)).find(row=>row.slice(row.indexOf('\t')+1)===file);
  if(!record)throw new Error('Historical path missing');
@@ -330,6 +333,15 @@ export async function getCommitImage(repo,{commit,parentIndex=0,id,side='right',
  const raw=await git(repo.root,['cat-file','blob',oid],MAX_TEXT,{signal});
  const {data,...metadata}=await preparePng(raw,{signal});
  return {commit:revision,path:file,oid,...metadata,base64:data.toString('base64')};
+}
+export async function getRevisionImage(repo,{base,target,id,side='right',signal}={}){
+ if(!['left','right'].includes(side))throw Error('Invalid image side');
+ if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid revision change id');
+ const details=await getRevisionChanges(repo,{base,target,signal}),entry=details.changes.find(row=>row.id===id);
+ if(!entry)throw Error('Change is not part of selected revision pair');
+ const revision=side==='left'?base:target,file=side==='left'?(entry.oldPath||entry.path):entry.path;
+ if((side==='left'&&entry.status==='added')||(side==='right'&&entry.status==='deleted'))return {commit:revision,path:file,absent:true};
+ repo=await checkedRepo(repo,signal);return historicalImage(repo,revision,file,signal);
 }
 export async function getFileBlame(repo,{commit,parentIndex=0,id,startLine=1,lineLimit=500,signal}={}){
  if(!Number.isInteger(startLine)||startLine<1||startLine>100001||!Number.isInteger(lineLimit)||lineLimit<1||lineLimit>500)throw Error('Invalid blame line window');
