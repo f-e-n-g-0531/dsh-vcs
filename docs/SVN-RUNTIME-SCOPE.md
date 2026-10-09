@@ -6,6 +6,8 @@
 
 生产客户端已挂载显式同意入口及历史 UI，卸载／刷新／切换时撤销 grant；完整本地 check 与[Chrome及实时TLS整链](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37916159637)通过。清理 revoke 属于取消授权，不是自动历史刷新。当前安装版未变更。
 
+服务端同意能力失效已保留 svn-consent-required，history wrapper 清除旧 grant 并返回手动审阅，不自动续权；8 项授权／RPC／UI专项通过。
+
 ## 已实现
 
 - 内部传输获得逐步授权回调，每次重新解析 Session/cwd 身份并校验能力；cwd 漂移或撤销阻止下一 IO（专项回归通过）。内部授权绑定 Session、cwd、仓库、HTTPS root、UUID 与 scope；显式同意、5 分钟 TTL、最多 32 项。撤销、身份变化和容量淘汰使能力失效并取消活动请求。

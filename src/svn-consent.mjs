@@ -11,7 +11,7 @@ export function createSvnConsent({now=Date.now,ttlMs=300000,maxEntries=32,onRevo
  const prune=()=>{for(const [token,g] of grants)if(g.expires<=now())remove(token);};
  return {
  grant(value,{explicit=false}={}){if(explicit!==true)throw Error('Explicit SVN network consent required');const key=identity(value);prune();for(const [token,g] of grants)if(g.key===key)remove(token);while(grants.size>=maxEntries)remove(grants.keys().next().value);const token=randomBytes(32).toString('hex');grants.set(token,{key,sessionId:value.sessionId,expires:now()+ttlMs});return token;},
- assert(token,value){prune();const key=identity(value),grant=grants.get(token);if(!grant||grant.key!==key)throw Error('SVN network consent missing, expired or identity changed');},
+ assert(token,value){prune();const key=identity(value),grant=grants.get(token);if(!grant||grant.key!==key)throw Object.assign(Error('SVN network consent missing, expired or identity changed'),{code:'vcs/svn-consent-required'});},
  revokeSession(sessionId){for(const [token,g] of grants)if(g.sessionId===sessionId)remove(token);},
  revoke(token){remove(token);},
  clear(){for(const token of [...grants.keys()])remove(token);}
