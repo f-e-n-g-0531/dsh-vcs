@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import * as adapter from './vcs.mjs';
+import {createSvnHttpsHost} from './dist/svn-host.mjs';
 
 export const name = 'dsh-vcs';
 export const inject = ['connection', 'webServer', 'sessions', 'sessionPersistence'];
@@ -217,7 +218,9 @@ export function registerDirectAssets(ctx, load = filename => readFile(new URL('.
 export function apply(ctx) {
   // Pass the plugin owner explicitly: the nested rpc getter can retain the
   // connection service context, which does not inject webServer.
-  ctx.connection.register(ctx, RPC_CHANNEL, createHandler(ctx));
+  const host=createSvnHttpsHost(ctx,adapter);
+  ctx.effect(()=>()=>host.dispose());
+  ctx.connection.register(ctx, RPC_CHANNEL, host.handle);
   registerAssets(ctx);
   registerDirectAssets(ctx);
 }
