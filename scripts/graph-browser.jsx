@@ -18,8 +18,8 @@ export async function checkGraph(){
  if(host.querySelectorAll('path').length!==4||host.textContent.includes('graphMissing')||host.textContent.includes('graphLimit'))throw Error('Merge graph relationships incorrect');
  const curves=[...host.querySelectorAll('path')].map(path=>path.getAttribute('d'));
  const tracks=curves.map(d=>Number(d.split(' C ')[1].split(' ')[0]));
- // Edges 0 and 3 cover disjoint rows and deliberately reuse a track.
- if(tracks.join(',')!=='35,47,59,35')throw Error('Merge interval track allocation incorrect: '+tracks.join(','));
+ // First-parent nodes retain lane zero; the second parent occupies lane one until join.
+ if(tracks.join(',')!=='12,12,12,30'||[...host.querySelectorAll('circle')].map(n=>n.getAttribute('cx')).join(',')!=='12,12,30,12')throw Error('Merge swimlane geometry incorrect: '+tracks.join(','));
  const svg=host.querySelector('svg');if(Number(svg.getAttribute('width'))<Math.max(...tracks)+12)throw Error('Graph tracks clipped by SVG viewport');
  const buttons=host.querySelectorAll('ol button');buttons[2].click();if(selected!==id(2))throw Error('Merge branch selection incorrect');
  buttons[0].focus();const priorSelection=selected;
