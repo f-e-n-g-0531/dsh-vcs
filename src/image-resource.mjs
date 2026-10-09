@@ -2,7 +2,7 @@
 export function loadPreviewImage(blob,{width,height,signal,timeoutMs=10000,createURL=b=>URL.createObjectURL(b),revokeURL=u=>URL.revokeObjectURL(u),createImage=()=>new Image()}={}){
  return new Promise((resolve,reject)=>{
   if(signal?.aborted){reject(signal.reason);return;}
-  if(!['image/png','image/jpeg'].includes(blob?.type)||blob.size>2*1024*1024||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width>8192||height>8192||width*height>16000000||!Number.isFinite(timeoutMs)||timeoutMs<=0){reject(new Error('Invalid image preview'));return;}
+  if(!['image/png','image/jpeg','image/webp'].includes(blob?.type)||blob.size>2*1024*1024||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width>8192||height>8192||width*height>16000000||!Number.isFinite(timeoutMs)||timeoutMs<=0){reject(new Error('Invalid image preview'));return;}
   let url,image,timer,settled=false,released=false;
   const release=()=>{if(released)return;released=true;if(image)image.src='';if(url)revokeURL(url);};
   const cleanup=()=>{clearTimeout(timer);signal?.removeEventListener('abort',abort);};

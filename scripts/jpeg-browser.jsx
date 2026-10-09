@@ -7,6 +7,12 @@ export async function checkJpegComparison(images){
  try{flushSync(()=>root.render(<ImageComparison base={'a'.repeat(40)} target={'b'.repeat(40)} sessionId='jpeg' repositoryId='fixture' id={'c'.repeat(64)} t={k=>k} onRediscover={()=>{}} rpc={async(e,p,s)=>{if(e!=='vcs/revision-image')throw Error('JPEG UI endpoint');calls.push(s);return images[p.side==='left'?0:1];}}/>));host.querySelector('button').click();await wait(()=>host.querySelectorAll('img').length===2);if(urls.size!==2||!host.textContent.includes('renamed.jpg'))throw Error('JPEG UI images missing');host.querySelector('button').click();await wait(()=>urls.size===0);if(calls.some(s=>!s.aborted))throw Error('JPEG UI close did not cancel');}
  finally{root.unmount();host.remove();URL.createObjectURL=create;URL.revokeObjectURL=revoke;for(const u of urls)revoke.call(URL,u);}
 }
+export async function checkPreparedWebp(base64){
+ const blob=new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:'image/webp'}),urls=new Set();
+ const options={width:3,height:2,createURL:b=>{const u=URL.createObjectURL(b);urls.add(u);return u;},revokeURL:u=>{if(!urls.delete(u))throw Error('WebP double release');URL.revokeObjectURL(u);}};
+ const image=await loadPreviewImage(blob,options);image.dispose();if(urls.size)throw Error('WebP URL retained');let rejected=false;try{await loadPreviewImage(blob,{...options,width:4});}catch{rejected=true;}if(!rejected||urls.size)throw Error('WebP mismatch accepted or leaked');
+ rejected=false;try{await loadPreviewImage(new Blob(['bad'],{type:'image/webp'}),options);}catch{rejected=true;}if(!rejected||urls.size)throw Error('WebP corrupt accepted or leaked');
+}
 export async function checkPreparedJpeg(base64){
  const blob=new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:'image/jpeg'});const image=await loadPreviewImage(blob,{width:3,height:2});image.dispose();
 }

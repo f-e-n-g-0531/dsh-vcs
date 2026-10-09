@@ -1,7 +1,7 @@
 import {spawn,execFileSync} from 'node:child_process';
 import * as vcs from '../vcs.mjs';
 import {createHandler} from '../index.mjs';
-import {prepareBaselineJpeg} from '../image-preview.mjs';
+import {prepareBaselineJpeg,prepareSimpleWebp} from '../image-preview.mjs';
 import {writeFile,mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,6 +28,8 @@ try{
  const jpeg=await evaluate("new Promise(resolve=>{const c=document.createElement('canvas');c.width=3;c.height=2;c.getContext('2d').fillRect(0,0,3,2);c.toBlob(b=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.readAsDataURL(b);},'image/jpeg',0.8);})");
  const prepared=prepareBaselineJpeg(Buffer.from(jpeg,'base64'));if(prepared.width!==3||prepared.height!==2)throw Error('Prepared JPEG geometry');
  await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedJpeg("+JSON.stringify(prepared.data.toString('base64'))+"))");await writeFile('test-results/jpeg-prepared-report.json',JSON.stringify({pass:true,width:prepared.width,height:prepared.height,bytes:prepared.bytes,metadataStripped:prepared.metadataStripped}));
+ const webp=await evaluate("new Promise(resolve=>{const c=document.createElement('canvas');c.width=3;c.height=2;c.getContext('2d').fillRect(0,0,3,2);c.toBlob(b=>{if(b.type!=='image/webp')throw Error('WebP unavailable');const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.readAsDataURL(b);},'image/webp',0.8);})");
+ const preparedWebp=prepareSimpleWebp(Buffer.from(webp,'base64'));if(preparedWebp.width!==3||preparedWebp.height!==2)throw Error('Prepared WebP geometry');await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(preparedWebp.data.toString('base64'))+"))");await writeFile('test-results/webp-prepared-report.json',JSON.stringify({pass:true,bytes:preparedWebp.bytes,width:preparedWebp.width,height:preparedWebp.height}));
  const repository=await mkdtemp(path.join(os.tmpdir(),'vcs-jpeg-repo-'));
  try{
   const git=(...args)=>execFileSync('git',['-C',repository,...args],{encoding:'utf8'});git('init','-q');git('config','user.name','JPEG');git('config','user.email','jpeg@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.jpg'),Buffer.from(jpeg,'base64'));git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.jpg'),'UNCOMMITTED');

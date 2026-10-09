@@ -1,5 +1,5 @@
 import React from 'react';
-export {checkJpegDecode,checkPreparedJpeg,checkJpegComparison} from './jpeg-browser.jsx';
+export {checkJpegDecode,checkPreparedJpeg,checkJpegComparison,checkPreparedWebp} from './jpeg-browser.jsx';
 export {checkBlameLocation} from './blame-location-browser.jsx';
 export {checkFollowHistory} from './follow-history-browser.jsx';
 export {checkBranchHistory} from './branch-history-browser.jsx';
