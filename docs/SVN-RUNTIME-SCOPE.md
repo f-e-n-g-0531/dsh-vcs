@@ -17,7 +17,7 @@
 - 真实临时 SVN 仓库验证日志、详情、比较、复制边界和删除追溯；工作区覆盖不参与历史正文，读取不改变工作副本。
 - [隔离 Apache／Chrome 回归通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37905967130)：真实提交、UUID、r2 baseline、REPORT、固定历史正文与符号链接属性名。未读取链接正文。
 - 真实 TLS socket 验证证书信任、重定向拒绝、取消、撤销后停止下一请求；TLS 服务返回捕获 XML，不是 Apache HTTPS 整链验收。
-- 最近 DAV 专项 17 项测试通过，含内部日志／详情链；该链使用响应注入，不等同 Session/cwd 与真实服务贯通。
+- DAV 专项 17 项测试通过。[组合链 Apache／Chrome 回归通过](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37907085725)：内部日志／详情链经有界 HTTP socket 测试适配器读取真实服务，6 次请求、每步前后授权；未授权调用不增加请求。不是 Session/cwd 或 Apache TLS 整链验收。
 - React／Monaco 自动证据不是当前 DSH 实机验收。
 
 ## 尚未完成
