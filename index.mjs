@@ -25,7 +25,7 @@ const rediscover = () => Object.assign(new Error('Repository authorization is mi
 import {historySearchArgs} from './git-history.mjs';
 function validatePayload(endpoint, payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw invalid('An object payload is required.');
-  const fields = endpoint==='vcs/tree-file'?['sessionId','repositoryId','commit','path'] : endpoint==='vcs/references'?['sessionId','repositoryId'] : endpoint==='vcs/commit-image'?['sessionId','repositoryId','commit','parentIndex','id','side'] : endpoint==='vcs/tree'?['sessionId','repositoryId','commit'] : endpoint==='vcs/file-history'?['sessionId','repositoryId','commit','parentIndex','id','offset','limit','follow'] : ['vcs/revision-changes','vcs/revision-compare'].includes(endpoint) ? ['sessionId','repositoryId','base','target',...(endpoint==='vcs/revision-compare'?['id']:[])] : ['vcs/commit-compare','vcs/blame'].includes(endpoint) ? ['sessionId','repositoryId','commit','parentIndex','id'] : endpoint === 'vcs/commit' ? ['sessionId','repositoryId','commit','parentIndex'] : endpoint === 'vcs/history' ? ['sessionId','repositoryId','snapshot','offset','limit','search'] : endpoint === 'vcs/repositories' ? ['sessionId', 'subdirectory'] : ['sessionId', 'repositoryId', 'mode', ...(endpoint === 'vcs/compare' ? ['id'] : [])];
+  const fields = endpoint==='vcs/tree-file'?['sessionId','repositoryId','commit','path'] : endpoint==='vcs/references'?['sessionId','repositoryId'] : endpoint==='vcs/commit-image'?['sessionId','repositoryId','commit','parentIndex','id','side'] : endpoint==='vcs/tree'?['sessionId','repositoryId','commit'] : endpoint==='vcs/file-history'?['sessionId','repositoryId','commit','parentIndex','id','offset','limit','follow'] : ['vcs/revision-changes','vcs/revision-compare'].includes(endpoint) ? ['sessionId','repositoryId','base','target',...(endpoint==='vcs/revision-compare'?['id']:[])] : ['vcs/commit-compare','vcs/blame'].includes(endpoint) ? ['sessionId','repositoryId','commit','parentIndex','id',...(endpoint==='vcs/blame'?['startLine','lineLimit']:[])] : endpoint === 'vcs/commit' ? ['sessionId','repositoryId','commit','parentIndex'] : endpoint === 'vcs/history' ? ['sessionId','repositoryId','snapshot','offset','limit','search'] : endpoint === 'vcs/repositories' ? ['sessionId', 'subdirectory'] : ['sessionId', 'repositoryId', 'mode', ...(endpoint === 'vcs/compare' ? ['id'] : [])];
   if (Object.keys(payload).some(key => !fields.includes(key))) throw invalid('Only Session-addressed repository requests are supported; unknown payload field.');
   if (endpoint === 'vcs/repositories') {
     if (payload.subdirectory !== undefined) {
@@ -45,6 +45,7 @@ function validatePayload(endpoint, payload) {
       if(typeof payload.commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(payload.commit))throw invalid('Invalid commit id.');
       if(payload.parentIndex!==undefined&&(!Number.isInteger(payload.parentIndex)||payload.parentIndex<0||payload.parentIndex>100))throw invalid('Invalid parent index.');
     }
+    if(endpoint==='vcs/blame'&&((payload.startLine!==undefined&&(!Number.isInteger(payload.startLine)||payload.startLine<1||payload.startLine>100001))||(payload.lineLimit!==undefined&&(!Number.isInteger(payload.lineLimit)||payload.lineLimit<1||payload.lineLimit>500))))throw invalid('Invalid blame line window.');
     if(endpoint==='vcs/file-history'&&payload.follow!==undefined&&typeof payload.follow!=='boolean')throw invalid('Invalid rename follow mode.');
     if(endpoint==='vcs/history'){try{historySearchArgs(payload.search);}catch{throw invalid('Invalid history search.');}}
     if(['vcs/history','vcs/file-history'].includes(endpoint)){
@@ -133,7 +134,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
         : endpoint === 'vcs/tree'
         ? await api.getHistoricalTree({...repository},{commit:payload.commit,signal})
         : endpoint === 'vcs/blame'
-        ? await api.getFileBlame({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,signal})
+        ? await api.getFileBlame({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,...(payload.startLine!==undefined?{startLine:payload.startLine}:{}),...(payload.lineLimit!==undefined?{lineLimit:payload.lineLimit}:{}),signal})
         : endpoint === 'vcs/file-history'
         ? await api.listFileHistory({...repository},{commit:payload.commit,parentIndex:payload.parentIndex??0,id:payload.id,offset:payload.offset??0,limit:payload.limit??50,...(payload.follow!==undefined?{follow:payload.follow}:{}),signal})
         : endpoint === 'vcs/revision-changes'

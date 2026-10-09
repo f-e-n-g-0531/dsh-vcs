@@ -331,21 +331,24 @@ export async function getCommitImage(repo,{commit,parentIndex=0,id,side='right',
  const {data,...metadata}=await preparePng(raw,{signal});
  return {commit:revision,path:file,oid,...metadata,base64:data.toString('base64')};
 }
-export async function getFileBlame(repo,{commit,parentIndex=0,id,signal}={}){
+export async function getFileBlame(repo,{commit,parentIndex=0,id,startLine=1,lineLimit=500,signal}={}){
+ if(!Number.isInteger(startLine)||startLine<1||startLine>100001||!Number.isInteger(lineLimit)||lineLimit<1||lineLimit>500)throw Error('Invalid blame line window');
  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
  const details=await commitDetails(repo,{commit,parentIndex,signal});
  const entry=details.changes.find(row=>row.id===id);if(!entry)throw new Error('Change is not part of selected commit');
- const result={commit,path:entry.path,lines:[],truncated:false};
+ const result={commit,path:entry.path,lines:[],truncated:false,startLine,nextLine:null};
  if(entry.status==='deleted')return {...result,notice:'File is deleted at this commit; blame unavailable.'};
  const blob=await historicalBlob(repo.root,commit,entry.path,signal);
  if(blob.notice||blob.binary||blob.encoding!=='UTF-8')return {...result,notice:blob.notice||'Blame supports UTF-8 regular text only.'};
  if(!blob.text)return result;
- const count=blob.text.split('\n').length-(blob.text.endsWith('\n')?1:0),limit=Math.min(count,500);
+ const count=blob.text.split('\n').length-(blob.text.endsWith('\n')?1:0);
+ if(startLine>count)return {...result,totalLines:count};
+ const endLine=Math.min(count,startLine+lineLimit-1),limit=endLine-startLine+1;
  let ignored;
  try{ignored=(await git(repo.root,['config','--null','--get-all','blame.ignoreRevsFile'],MAX_TEXT,{signal})).toString('utf8');}catch(e){if(e.code!=='VCS_COMMAND'||e.exitCode!==1)throw e;}
  if(ignored?.split(String.fromCharCode(0)).some(value=>value.length>0))return {...result,notice:'Blame unavailable while blame.ignoreRevsFile is configured; external revision files are not read.'};
- const output=await git(repo.root,['--literal-pathspecs','blame','--ignore-revs-file=','--line-porcelain','--no-textconv','--encoding=UTF-8','-L','1,'+limit,commit,'--',entry.path],MAX_TEXT,{signal});
- return {...result,lines:parseBlame(output.toString('utf8'),limit),truncated:count>limit};
+ const output=await git(repo.root,['--literal-pathspecs','blame','--ignore-revs-file=','--line-porcelain','--no-textconv','--encoding=UTF-8','-L',startLine+','+endLine,commit,'--',entry.path],MAX_TEXT,{signal});
+ return {...result,lines:parseBlame(output.toString('utf8'),limit),totalLines:count,nextLine:endLine<count&&endLine<100001?endLine+1:null,truncated:endLine<count};
 }
 export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,follow=false,signal}={}){
   if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid history pagination');

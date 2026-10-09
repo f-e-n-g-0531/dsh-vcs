@@ -1,5 +1,7 @@
 {
   "zh": {
+    "blamePrevious": "上一行页",
+    "blameNext": "下一行页",
     "fileHistoryMergeBoundary": "身份边界：合并提交，此处停止，不推断多父来源",
     "fileHistoryBoundary": "身份边界：复制或非精确重命名，此处停止",
     "fileHistoryFollow": "跟随内容相同的重命名（第一父链）",
@@ -163,6 +165,8 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "blamePrevious": "Previous line page",
+    "blameNext": "Next line page",
     "fileHistoryMergeBoundary": "Identity boundary: merge commit; stopped without inferring parent origin",
     "fileHistoryBoundary": "Identity boundary: copy or inexact rename; stopped here",
     "fileHistoryFollow": "Follow exact renames (first-parent)",
