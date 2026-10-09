@@ -334,6 +334,43 @@ async function historicalImage(repo,revision,file,signal){
  const {data,...metadata}=await preparePng(raw,{signal});
  return {commit:revision,path:file,oid,...metadata,base64:data.toString('base64')};
 }
+async function workspacePng(buffer,signal){const {data,...metadata}=await preparePng(buffer,{signal});return {...metadata,base64:data.toString('base64')};}
+// Workspace image reads use immutable HEAD/index blobs and a checked regular-file handle.
+export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}={}){
+ if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id)||!['left','right'].includes(side))throw Error('Invalid workspace image selection');
+ repo=await checkedRepo(repo,signal);if(repo.type!=='git')throw Error('Workspace PNG supports Git only');modeFor(repo,mode);
+ const entry=(await changes(repo,mode)).find(row=>row.id===id);if(!entry)throw Error('Change no longer exists; refresh repository status.');
+ if(entry.status==='conflicted')throw Error('Conflicted images are not supported');
+ const head=async()=>{try{return (await git(repo.root,['rev-parse','--verify','HEAD'],MAX_TEXT,{signal})).toString('utf8').trim();}catch(e){if(e.code==='VCS_COMMAND')return null;throw e;}};
+ const revision=await head();const index=await git(repo.root,['--literal-pathspecs','ls-files','--stage','-z','--',entry.path],MAX_TEXT,{signal});
+ const file=side==='left'&&mode!=='unstaged'?(entry.oldPath||entry.path):entry.path;
+ let result;
+ const absent=()=>({path:file,commit:null,absent:true});
+ const readIndex=async()=>{
+  const rows=index.toString('utf8').split('\0').filter(Boolean);if(!rows.length)return absent();
+  if(rows.length!==1)throw Error('Unmerged index image');const match=/^(100644|100755) ([a-f0-9]{40}|[a-f0-9]{64}) 0\t/.exec(rows[0]);if(!match)throw Error('Image preview requires a regular file');
+  const buffer=await git(repo.root,['cat-file','blob',match[2]],MAX_TEXT,{signal});return {path:file,commit:'Index',...await workspacePng(buffer,signal)};
+ };
+ if(side==='left'){
+  if(entry.indexStatus==='?'||(mode==='unstaged'&&entry.indexStatus==='D')||(mode!=='unstaged'&&(!revision||['A','C'].includes(entry.indexStatus))))result=absent();
+  else result=mode==='unstaged'?await readIndex():await historicalImage(repo,revision,file,signal);
+ }else if(mode==='staged')result=entry.indexStatus==='D'?absent():await readIndex();
+ else{
+  const target=await confined(repo.root,file);let before;try{before=await fs.lstat(target);}catch(e){if(e.code!=='ENOENT')throw e;}
+  if(!before)result=absent();else{
+   if(!before.isFile()||before.isSymbolicLink())throw Error('Image preview requires a regular file');if(before.size>MAX_TEXT)throw Error('Image exceeds 2 MiB limit');
+   const handle=await fs.open(target,'r');try{
+    const fingerprint=s=>JSON.stringify([s.dev,s.ino,s.size,s.mtimeMs,s.ctimeMs]);const opened=await handle.stat();if(!opened.isFile()||fingerprint(opened)!==fingerprint(before))throw Error('Working image changed during read');
+    const buffer=Buffer.alloc(MAX_TEXT+1);const {bytesRead}=await handle.read(buffer,0,buffer.length,0);signal?.throwIfAborted();const after=await handle.stat(),named=await fs.lstat(target);await confined(repo.root,file);
+    if(named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before)||bytesRead!==before.size)throw Error('Working image changed during read');
+    result={path:file,commit:'Working tree',...await workspacePng(buffer.subarray(0,bytesRead),signal)};
+   }finally{await handle.close();}
+  }
+ }
+ signal?.throwIfAborted();const afterIndex=await git(repo.root,['--literal-pathspecs','ls-files','--stage','-z','--',entry.path],MAX_TEXT,{signal});
+ if(!index.equals(afterIndex)||revision!==await head()||!(await changes(repo,mode)).some(row=>row.id===id))throw Error('Workspace image selection changed; refresh repository status.');
+ signal?.throwIfAborted();return result;
+}
 export async function getRevisionImage(repo,{base,target,id,side='right',signal}={}){
  if(!['left','right'].includes(side))throw Error('Invalid image side');
  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid revision change id');

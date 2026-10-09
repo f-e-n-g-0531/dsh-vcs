@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import path from 'node:path';import {execFileSync} from 'node:child_process';import {detectRepository,listChanges,getWorkspaceImage} from '../vcs.mjs';
+test('workspace PNG modes bind HEAD index and working bytes without text conversion',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-work-image-')),git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true}),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+ try{git('init','-q');git('config','user.name','Image');git('config','user.email','i@example.test');git('config','core.autocrlf','false');await writeFile(path.join(root,'image.png'),png);git('add','.');git('commit','-qm','image');await writeFile(path.join(root,'image.png'),'invalid index');git('add','.');await writeFile(path.join(root,'image.png'),png);
+ const repo=await detectRepository(root),select=async mode=>(await listChanges(repo,mode))[0].id;
+ const all=await getWorkspaceImage(repo,{id:await select('all')});assert.deepEqual(Buffer.from(all.base64,'base64'),png);
+ const stagedId=await select('staged');await assert.rejects(getWorkspaceImage(repo,{mode:'staged',id:stagedId}),/PNG/);assert.equal((await getWorkspaceImage(repo,{mode:'staged',id:stagedId,side:'left'})).mime,'image/png');
+ const unstagedId=await select('unstaged');await assert.rejects(getWorkspaceImage(repo,{mode:'unstaged',id:unstagedId,side:'left'}),/PNG/);assert.equal((await getWorkspaceImage(repo,{mode:'unstaged',id:unstagedId})).mime,'image/png');
+ await writeFile(path.join(root,'new.png'),png);const added=(await listChanges(repo)).find(r=>r.path==='new.png');assert.equal((await getWorkspaceImage(repo,{id:added.id,side:'left'})).absent,true);assert.equal((await getWorkspaceImage(repo,{id:added.id})).mime,'image/png');
+ }finally{await rm(root,{recursive:true,force:true});}
+});
