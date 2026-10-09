@@ -1,5 +1,14 @@
 {
   "zh": {
+    "svnConsentReview": "审阅 SVN 网络访问范围",
+    "svnConsentScope": "同意前仅读取本地身份。授权只适用于所列仓库、Session 与目录，五分钟有效；不授权重定向或写操作。",
+    "svnConsentExplicit": "我同意访问以上 HTTPS SVN 仓库",
+    "svnConsentApprove": "同意并读取历史",
+    "svnHistoryScope": "固定本地 revision 快照的 SVN 历史；分页替换显示",
+    "svnHistoricalDiff": "历史只读 Diff",
+    "svnTraceScope": "文件追溯在复制边界停止，不跟随范围外来源",
+    "svnGrantScope": "网络授权五分钟有效；可随时撤销，历史操作不修改工作副本。",
+    "svnRevoke": "撤销 SVN 网络授权",
     "svnIdentity": "查看 SVN 本地历史访问身份",
     "svnOfflineIdentity": "仅从授权工作副本读取本地元数据，不发起远程请求。",
     "svnRemoteDisabled": "远程 SVN 历史传输尚未启用；没有网络授权或可用访问凭据。本页不是已授权历史入口。",
@@ -175,6 +184,15 @@
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
+    "svnConsentReview": "Review SVN network access",
+    "svnConsentScope": "Before consent, read local identity only. Access binds this repository, Session and cwd for five minutes; redirects and writes are not authorized.",
+    "svnConsentExplicit": "I consent to access the HTTPS SVN repository above",
+    "svnConsentApprove": "Consent and read history",
+    "svnHistoryScope": "SVN history at a fixed local revision snapshot; pages replace displayed rows",
+    "svnHistoricalDiff": "Historical read-only Diff",
+    "svnTraceScope": "File trace stops at copy boundaries and does not follow out-of-scope sources",
+    "svnGrantScope": "Network consent lasts five minutes; revoke at any time. History operations do not modify the working copy.",
+    "svnRevoke": "Revoke SVN network consent",
     "svnIdentity": "Inspect local SVN history identity",
     "svnOfflineIdentity": "Read local metadata from the authorized working copy only; no remote request.",
     "svnRemoteDisabled": "Remote SVN history transport is not enabled; no network grant or usable access token. This is not an authorized history entry point.",
