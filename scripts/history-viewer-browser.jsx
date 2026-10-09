@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkBlameLocation} from './blame-location-browser.jsx';
 export {checkFollowHistory} from './follow-history-browser.jsx';
 export {checkBranchHistory} from './branch-history-browser.jsx';
 export {checkHistorySearch} from './history-search-browser.jsx';

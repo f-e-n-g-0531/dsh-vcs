@@ -10,6 +10,10 @@ function setup(overrides={}){
  const call=createHandler(ctx,api,4,{now:()=>clock});
  return {call,discover:()=>call('vcs/repositories',{sessionId:'s'}),move:()=>{cwd='/other';},expire:()=>{clock=300001;},calls:()=>calls};
 }
+test('Blame line window validates bounds and forwards only authorized selection',async()=>{
+ let received;const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64),startLine:501,lineLimit:100};const h=setup({getFileBlame:async(_r,o)=>{received=o;return {lines:[]};}});await h.discover();
+ for(const fields of [{startLine:null},{startLine:0},{startLine:100002},{startLine:1.5},{lineLimit:501},{lineLimit:0},{lineLimit:null},{path:'secret'}])assert.equal((await h.call('vcs/blame',{...p,...fields})).error.code,'vcs/invalid-request');assert.equal(received,undefined);assert.equal((await h.call('vcs/blame',p)).ok,true);assert.equal(received.startLine,501);assert.equal(received.lineLimit,100);
+});
 test('file history follow is boolean authorized and forwards unchanged cancellation',async()=>{
  const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64),follow:true};let received;
  const h=setup({listFileHistory:async(_r,o)=>{received=o;return {commits:[]};}});assert.equal((await h.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');await h.discover();
