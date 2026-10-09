@@ -1,4 +1,7 @@
 import {loadPreviewImage} from '../src/image-resource.mjs';
+export async function checkPreparedJpeg(base64){
+ const blob=new Blob([Uint8Array.from(atob(base64),c=>c.charCodeAt(0))],{type:'image/jpeg'});const image=await loadPreviewImage(blob,{width:3,height:2});image.dispose();
+}
 export async function checkJpegDecode(){
  const canvas=document.createElement('canvas');canvas.width=3;canvas.height=2;const ctx=canvas.getContext('2d');ctx.fillStyle='#ef5812';ctx.fillRect(0,0,3,2);
  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.8));if(blob?.type!=='image/jpeg')throw Error('JPEG encoding unavailable');

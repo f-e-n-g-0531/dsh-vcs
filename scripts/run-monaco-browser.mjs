@@ -1,4 +1,5 @@
 import {spawn} from 'node:child_process';
+import {prepareBaselineJpeg} from '../image-preview.mjs';
 import {writeFile,mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,6 +23,9 @@ try{
  if(!JSON.parse(report).pass)throw Error('Main browser fixture failed');
  const evaluate=async expression=>{const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};
  await evaluate("import('./graph-native-browser.js').then(m=>{globalThis.disposeNativeGraph=m.mount();})");
+ const jpeg=await evaluate("new Promise(resolve=>{const c=document.createElement('canvas');c.width=3;c.height=2;c.getContext('2d').fillRect(0,0,3,2);c.toBlob(b=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.readAsDataURL(b);},'image/jpeg',0.8);})");
+ const prepared=prepareBaselineJpeg(Buffer.from(jpeg,'base64'));if(prepared.width!==3||prepared.height!==2)throw Error('Prepared JPEG geometry');
+ await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedJpeg("+JSON.stringify(prepared.data.toString('base64'))+"))");await writeFile('test-results/jpeg-prepared-report.json',JSON.stringify({pass:true,width:prepared.width,height:prepared.height,bytes:prepared.bytes,metadataStripped:prepared.metadataStripped}));
  const press=async(key,code,virtualKey,text,modifiers=0)=>{
   await call('Input.dispatchKeyEvent',{type:'keyDown',key,code,modifiers,windowsVirtualKeyCode:virtualKey,...(text?{text}: {})});
   await call('Input.dispatchKeyEvent',{type:'keyUp',key,code,modifiers,windowsVirtualKeyCode:virtualKey});
