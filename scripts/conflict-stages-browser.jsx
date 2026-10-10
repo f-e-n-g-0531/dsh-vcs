@@ -11,12 +11,12 @@ export async function checkConflictStages(){
  try{for(const lang of ['zh','en']){
   const t=k=>locales[lang][k];let mode='normal',pending=[],calls=[],rediscovered=0,tick=1;
   const overLimit='File exceeds the 2 MiB preview limit.',binaryNotice='Binary file; text preview unavailable.';
-  const stages=()=>({id,path:'file',snapshot,stages:[
-   mode==='binary'?{stage:1,mode:'100644',oid:a,kind:'file',present:true,text:'',binary:true,notice:binaryNotice}:{stage:1,mode:'100644',oid:a,kind:'file',present:true,text:'base\n'},
+  const stages=(marker='')=>({id,path:'file',snapshot,stages:[
+   mode==='binary'?{stage:1,mode:'100644',oid:a,kind:'file',present:true,text:'',binary:true,notice:binaryNotice}:{stage:1,mode:'100644',oid:a,kind:'file',present:true,text:marker+'base\n'},
    mode==='notices'?{stage:2,mode:'100644',oid:a,kind:'file',present:true,text:'',notice:overLimit}:{stage:2,mode:'120000',oid:a,kind:'symlink',present:true,text:'target\n',notice:'Symbolic link target text; not followed.'},
    mode==='binary'?{stage:3,mode:'100644',oid:a,kind:'file',present:true,text:'',binary:true,notice:binaryNotice}:{stage:3,present:false,text:''}]});
   const rpc=async(endpoint,p,signal)=>{if(endpoint!=='vcs/conflict-stages')throw Error('Unexpected conflict endpoint');calls.push({p,signal});
-   if(mode==='pending')return new Promise(resolve=>pending.push(()=>resolve(stages())));
+   if(mode==='pending'){const marker='pending-'+calls.length;return new Promise(resolve=>pending.push(()=>resolve(stages(marker))));}
    if(mode==='error')throw Error('CONFLICT READ FAILURE');
    if(mode==='expired')throw Object.assign(Error('expired'),{code:'vcs/rediscover-required'});
    return stages();};
@@ -40,8 +40,8 @@ export async function checkConflictStages(){
   tick=5;mode='error';render(lang+'-error');await wait(()=>host.querySelector('[role=alert]'),'error-alert');
   const before=calls.length;[...host.querySelectorAll('button')].find(b=>b.textContent===t('retry')).click();await wait(()=>calls.length===before+1,'retry-refetch');
   mode='expired';[...host.querySelectorAll('button')].find(b=>b.textContent===t('retry')).click();await wait(()=>rediscovered===1,'rediscovery');
-  mode='pending';tick=6;render(lang+'-pending');await wait(()=>pending.length===1,'pending-request');const old=calls.at(-1);tick=7;render(lang+'-next');await wait(()=>old.signal.aborted,'cancel-on-switch');pending.forEach(done=>done());await new Promise(r=>setTimeout(r,30));
-  if(host.textContent.includes('base'))throw Error('Stale conflict response replaced the new selection');
+  mode='pending';tick=6;render(lang+'-pending');await wait(()=>pending.length===1,'pending-request');const staleMarker='pending-'+calls.length,old=calls.at(-1);tick=7;render(lang+'-next');await wait(()=>old.signal.aborted,'cancel-on-switch');const freshMarker='pending-'+calls.length;pending.forEach(done=>done());await new Promise(r=>setTimeout(r,30));await wait(()=>host.textContent.includes(freshMarker),'fresh-response');
+  if(host.textContent.includes(staleMarker))throw Error('Stale conflict response replaced the new selection');
   mode='normal';tick=8;render(lang+'-final');await wait(()=>host.textContent.includes(t('conflictStageAbsent')),'final-render');
  }}finally{root.unmount();host.remove();}
 }
