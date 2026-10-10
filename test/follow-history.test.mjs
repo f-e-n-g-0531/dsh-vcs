@@ -16,18 +16,34 @@ test('merge introduction stops at explicit first-parent identity boundary',async
  const page=await listFileHistory(repo,{commit,id:entry.id,follow:true});assert.equal(page.commits.length,1);assert.equal(page.commits[0].boundary,'merge-first-parent');assert.equal(page.nextOffset,null);
  }finally{await rm(root,{recursive:true,force:true});}
 });
-test('follow stops at copy creation similarity rename and deleted path recreation',async()=>{
+test('follow crosses unique similarity rename but stops at copy creation and deleted path recreation',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-boundary-')),git=gitCommand(root);
  try{
  git('init','-q');git('config','user.name','Follow');git('config','user.email','f@example.test');
  const content=Array.from({length:100},(_,i)=>'line '+i).join('\n');await writeFile(path.join(root,'source.txt'),content);git('add','.');git('commit','-qm','source');
  const history=async name=>{const commit=git('rev-parse','HEAD').trim(),repo=await detectRepository(root),details=await getCommitDetails(repo,{commit}),entry=details.changes.find(c=>c.path===name);return listFileHistory(repo,{commit,id:entry.id,follow:true});};
  await writeFile(path.join(root,'copy.txt'),content);git('add','.');git('commit','-qm','copy creation');assert.deepEqual((await history('copy.txt')).commits.map(c=>c.subject),['copy creation']);
- git('mv','copy.txt','edited.txt');await writeFile(path.join(root,'edited.txt'),content+'\nchanged');git('add','.');git('commit','-qm','similarity rename');assert.deepEqual((await history('edited.txt')).commits.map(c=>c.subject),['similarity rename']);
+ git('mv','copy.txt','edited.txt');await writeFile(path.join(root,'edited.txt'),content+'\nchanged');git('add','.');git('commit','-qm','similarity rename');const renamed=await history('edited.txt');assert.deepEqual(renamed.commits.map(c=>c.subject),['similarity rename','copy creation']);assert.ok(renamed.commits[0].similarity>=50&&renamed.commits[0].similarity<100);assert.equal(renamed.commits[1].path,'copy.txt');
  git('rm','-q','edited.txt');git('commit','-qm','delete');assert.equal((await history('edited.txt')).commits[0].subject,'delete');
  await writeFile(path.join(root,'edited.txt'),'unrelated');git('add','.');git('commit','-qm','recreated');assert.deepEqual((await history('edited.txt')).commits.map(c=>c.subject),['recreated']);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+test('similar rename rejects competing deletions and replay preserves old path',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-ambiguous-')),git=gitCommand(root);
+ try{
+  git('init','-q');git('config','user.name','Follow');git('config','user.email','f@example.test');git('config','core.autocrlf','false');
+  const content=Array.from({length:100},(_,i)=>'line '+i).join('\n');await writeFile(path.join(root,'old.txt'),content);git('add','.');git('commit','-qm','create');
+  git('mv','old.txt','new.txt');await writeFile(path.join(root,'new.txt'),content+'\nchange');git('add','.');git('commit','-qm','rename with edit');
+  let commit=git('rev-parse','HEAD').trim(),repo=await detectRepository(root),detail=await getCommitDetails(repo,{commit});
+  const page=await listFileHistory(repo,{commit,id:detail.changes[0].id,follow:true,limit:1});assert.equal(page.nextOffset,1);
+  const next=await listFileHistory(repo,{commit,id:detail.changes[0].id,follow:true,offset:1,limit:1});assert.equal(next.commits[0].path,'old.txt');
+  await writeFile(path.join(root,'competitor.txt'),content);git('add','.');git('commit','-qm','competitor');
+  git('mv','new.txt','final.txt');git('rm','competitor.txt');await writeFile(path.join(root,'final.txt'),content+'\nchanged again');git('add','.');git('commit','-qm','ambiguous');
+  commit=git('rev-parse','HEAD').trim();detail=await getCommitDetails(repo,{commit});const entry=detail.changes.find(row=>row.path==='final.txt');
+  const stopped=await listFileHistory(repo,{commit,id:entry.id,follow:true});assert.equal(stopped.commits.length,1);assert.equal(stopped.commits[0].boundary,'ambiguous-rename');assert.equal(stopped.nextOffset,null);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
 test('exact rename chain has historical paths and pagination crosses earlier rename',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-')),git=gitCommand(root);
  try{

@@ -97,7 +97,7 @@ export function historyPage(rows,snapshot,offset,limit){
  return {snapshot,commits:rows.slice(0,limit),nextOffset:hasMore&&!truncated?offset+limit:null,truncated};
 }
 // --follow emits one selected-path name-status record per commit. Fail closed on unexpected framing.
-export function parseFollowHistory(text,path,maxRecords){
+export function parseFollowHistory(text,path,maxRecords,{similarity=false}={}){
  if(typeof text!=='string'||Buffer.byteLength(text,'utf8')>2*1024*1024||!Number.isInteger(maxRecords)||maxRecords<1||maxRecords>10101)throw Error('Invalid follow history bounds');
  if(!text)return [];if(!text.endsWith('\0'))throw Error('Truncated follow history');
  const fields=text.slice(0,-1).split('\0'),rows=[];let current=path;
@@ -109,10 +109,12 @@ export function parseFollowHistory(text,path,maxRecords){
   const oldPath=fields[i++],newPath=/^\n[RC]/.test(status)?fields[i++]:oldPath;
   if(!oldPath||!newPath||newPath!==current)throw Error('Ambiguous follow history path');
   if(/^\n[RC]/.test(status)&&Number(status.slice(2))>100)throw Error('Invalid follow similarity score');
-  const boundary=row.parents.length>1?'merge-first-parent':(/^\nC/.test(status)||(/^\nR/.test(status)&&status!=='\nR100'))?'copy-or-inexact-rename':null;
-  rows.push({...row,path:current,...(boundary?{boundary}:status==='\nR100'?{oldPath}:{})});
+  const rename=/^\nR/.test(status),score=rename?Number(status.slice(2)):null;
+  const accepted=rename&&(score===100||(similarity&&score>=50));
+  const boundary=row.parents.length>1?'merge-first-parent':(/^\nC/.test(status)||(rename&&!accepted))?'copy-or-inexact-rename':null;
+  rows.push({...row,path:current,...(boundary?{boundary}:accepted?{oldPath,...(similarity?{similarity:score}:{})}:{})});
   if(boundary)break;
-  if(status==='\nR100')current=oldPath;
+  if(accepted)current=oldPath;
   if(status==='\nA')break; // Stop at creation; never cross an older unrelated same-name file.
  }
  return rows;

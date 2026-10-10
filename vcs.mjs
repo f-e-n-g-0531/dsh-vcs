@@ -387,9 +387,25 @@ export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,lim
   if(!entry)throw new Error('Change is not part of selected commit');
   if(follow){
    const count=offset+limit+1;
-   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--diff-merges=first-parent','--find-renames=100%','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
-   const rows=parseFollowHistory(output.toString('utf8'),entry.path,count).slice(offset);
-   return {...historyPage(rows,commit,offset,limit),path:entry.path,followsRenames:true,followPolicy:'exact-first-parent'};
+   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--diff-merges=first-parent','--find-renames=50%','-l100','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
+   const chain=parseFollowHistory(output.toString('utf8'),entry.path,count,{similarity:true});
+   let checks=0;
+   for(let index=0;index<chain.length;index++){
+    const row=chain[index];if(!row.oldPath||row.similarity===100)continue;
+    let boundary;
+    if(++checks>32)boundary='rename-check-limit';
+    else {
+     // Confirm the whole transition, not Git's selected-path heuristic alone.
+     // A single deletion and addition excludes competing deleted sources.
+     const raw=await git(repo.root,['diff-tree','--no-commit-id','--name-status','-z','-r','--no-renames','--no-ext-diff','--no-textconv',row.parents[0],row.id,'--'],MAX_TEXT,{signal});
+     const changes=parseCommitChanges(raw.toString('utf8'),row.id);
+     const removed=changes.filter(change=>change.status==='deleted'),added=changes.filter(change=>change.status==='added');
+     if(removed.length!==1||added.length!==1||removed[0].path!==row.oldPath||added[0].path!==row.path)boundary='ambiguous-rename';
+    }
+    if(boundary){chain[index]={...row,boundary};chain.length=index+1;break;}
+   }
+   const rows=chain.slice(offset);
+   return {...historyPage(rows,commit,offset,limit),path:entry.path,followsRenames:true,followPolicy:'unique-similarity-first-parent'};
   }
   const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
   return {...historyPage(parseHistory(text.toString('utf8'),limit+1),commit,offset,limit),path:entry.path,followsRenames:false};
