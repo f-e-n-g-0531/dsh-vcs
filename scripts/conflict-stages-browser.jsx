@@ -31,7 +31,11 @@ export async function checkConflictStages(){
   tick=2;render(lang);await new Promise(r=>setTimeout(r,60));
   if(host.querySelector('.monaco-diff-editor')!==editor)throw Error('Ancestor re-render rebuilt the conflict diff editor');
   tick=3;mode='notices';render(lang+'-notices');await wait(()=>host.textContent.includes(overLimit));
-  if((host.textContent.match(new RegExp(overLimit.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'))||[]).length<2)throw Error('Over-limit notice missing from inventory or comparison disclosure');
+  const occurrence=()=>(host.textContent.match(new RegExp(overLimit.replace(/[.*+?^${}()|[\]\\]/g,'\\  tick=3;mode='notices';render(lang+'-notices');await wait(()=>host.textContent.includes(overLimit));
+  if((host.textContent.match(new RegExp(overLimit.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'))||[]).length<2)throw Error('Over-limit notice missing from inventory or comparison disclosure');'),'g'))||[]).length;
+  if(occurrence()!==1)throw Error('Over-limit notice missing from the stage inventory');
+  const sideSelects=host.querySelectorAll('select'),rightSelect=sideSelects[1];rightSelect.value='2';rightSelect.dispatchEvent(new Event('change',{bubbles:true}));
+  await wait(()=>occurrence()>=2);if(occurrence()<2)throw Error('Over-limit notice missing from the comparison disclosure');
   tick=4;mode='binary';render(lang+'-binary');await wait(()=>host.textContent.includes(t('binary'))&&host.textContent.includes(binaryNotice));
   if(host.querySelector('.monaco-diff-editor')||!host.textContent.includes(t('conflictStagePresent')))throw Error('Binary stages still rendered an empty diff or lost their inventory state');
   tick=5;mode='error';render(lang+'-error');await wait(()=>host.querySelector('[role=alert]'));
