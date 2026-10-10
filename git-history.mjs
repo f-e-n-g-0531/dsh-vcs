@@ -75,7 +75,7 @@ export function parseReferences(text){
  for(const line of lines){
   const fields=line.split('\0');if(fields.length!==6||fields[5]!=='')throw Error('Invalid reference framing');
   const [name,type,id,peeledType,peeled]=fields;
-  const prefix=name.startsWith('refs/heads/')?'refs/heads/':name.startsWith('refs/tags/')?'refs/tags/':null;
+  const prefix=name.startsWith('refs/heads/')?'refs/heads/':name.startsWith('refs/tags/')?'refs/tags/':name.startsWith('refs/remotes/')?'refs/remotes/':null;
   if(!prefix||seen.has(name)||name.length>1024)throw Error('Invalid reference name');
   const short=name.slice(prefix.length);
   if(!short||short.endsWith('.')||short.includes('..')||short.includes('@{')||[...short].some(c=>c.charCodeAt(0)<=32||c.charCodeAt(0)===127||'~^:?*['.includes(c)||c===String.fromCharCode(92))||short.split('/').some(p=>!p||p.startsWith('.')||p.endsWith('.lock')))throw Error('Invalid reference name');
@@ -83,7 +83,7 @@ export function parseReferences(text){
   if(!oid(id)||!['commit','tag','tree','blob'].includes(type)||Boolean(peeledType)!==Boolean(peeled)||(peeled&&(!oid(peeled)||peeled.length!==id.length||!['commit','tag','tree','blob'].includes(peeledType))))throw Error('Invalid reference object');
   if(type!=='tag'&&peeled)throw Error('Unexpected peeled object');
   const commit=type==='commit'?id:type==='tag'&&peeledType==='commit'?peeled:null;
-  if(commit)result.push({name,shortName:short,kind:prefix==='refs/heads/'?'branch':'tag',commit});
+  if(commit)result.push({name,shortName:short,kind:prefix==='refs/heads/'?'branch':prefix==='refs/remotes/'?'remote':'tag',commit});
  }
  return result;
 }

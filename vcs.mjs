@@ -211,7 +211,7 @@ export async function listHistory(repo, {snapshot,offset=0,limit=50,search,signa
 export async function listReferences(repo,{signal}={}){
  signal?.throwIfAborted();repo=await checkedRepo(repo,signal);
  if(repo.type!=='git')throw new Error('References support Git only');
- const raw=await git(repo.root,['for-each-ref','--sort=refname','--count=1001','--format='+REFS_FORMAT,'refs/heads/','refs/tags/'],MAX_TEXT,{signal});
+ const raw=await git(repo.root,['for-each-ref','--sort=refname','--count=1001','--format='+REFS_FORMAT,'refs/heads/','refs/tags/','refs/remotes/'],MAX_TEXT,{signal});
  return {references:parseReferences(raw.toString('utf8'))};
 }
 

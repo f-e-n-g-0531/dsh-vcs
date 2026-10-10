@@ -193,10 +193,10 @@
     "imageScope": "支持非交错静态 PNG 与 8 位单扫描 baseline JPEG 普通文件，以及单块静态VP8／无损VP8L WebP（不支持渐进式/CMYK JPEG、扩展/动画 WebP）；每侧最多 2 MiB、1600 万像素。元数据被移除，不适用于色彩精确性审阅。支持历史提交、固定 A/B 及 Git 工作区；按所选模式读取 HEAD、暂存区或工作文件。冲突图片不支持。",
     "commitMessageLimit": "完整提交说明超过 2 MiB 预览上限，已省略。",
     "revisionLoadRefs": "加载 / 刷新本地分支与标签",
-    "revisionRefsScope": "仅本地分支和指向提交的标签，最多 1000 条；不 fetch。选择固定为加载时的提交 OID；刷新引用不会移动已选版本。",
+    "revisionRefsScope": "本地分支、指向提交的标签及本地缓存的远程跟踪引用，共最多1000条；不连接远端或fetch，远程缓存可能过期，HEAD别名仅表示加载时目标。选择固定为加载时的提交 OID；刷新引用不会移动已选版本。",
     "revisionRefsEmpty": "没有可用的本地分支或提交标签。",
     "revisionLoadedCommits": "已加载的提交",
-    "revisionLocalRefs": "本地分支与标签",
+    "revisionLocalRefs": "本地引用（含远程缓存）",
     "revisionRefsCount": "已加载可选引用"
   },
   "en": {
@@ -393,10 +393,10 @@
     "imageScope": "Non-interlaced static PNG or 8-bit single-scan baseline JPEG regular files , or single-chunk static VP8 / lossless VP8L WebP (no progressive/CMYK JPEG or extended/animated WebP); at most 2 MiB and 16 million pixels per side. Metadata is removed; not suitable for color-critical review. Supports commits, fixed A/B and Git working changes; HEAD, index or working bytes follow the selected mode. Conflicted images are unsupported.",
     "commitMessageLimit": "Full commit message exceeds the 2 MiB preview limit and was omitted.",
     "revisionLoadRefs": "Load / refresh local branches and tags",
-    "revisionRefsScope": "Local branches and commit tags only, at most 1000 refs; no fetch. Selections pin the loaded commit OID; refreshing refs does not move selected versions.",
+    "revisionRefsScope": "Local branches, commit tags and locally cached remote-tracking refs, at most 1000 total; no network or fetch. Remote caches may be stale; HEAD aliases show their loaded target. Selections pin the loaded commit OID; refreshing refs does not move selected versions.",
     "revisionRefsEmpty": "No local branches or commit tags are available.",
     "revisionLoadedCommits": "Loaded commits",
-    "revisionLocalRefs": "Local branches and tags",
+    "revisionLocalRefs": "Local refs (including remote caches)",
     "revisionRefsCount": "Selectable references loaded"
   }
 }
