@@ -33,7 +33,7 @@ export async function checkBlame(){
  const link=host.querySelector('tbody button'),before=calls;
  if(link.title!==commit||link.textContent!==commit.slice(0,10))throw Error('Blame navigation identity incorrect');
  link.focus();if(selections.length||calls!==before)throw Error('Focus activated blame navigation');
- link.click();if(selections.length!==1||selections[0].length!==1||selections[0][0]!==commit||calls!==before)throw Error('Blame passed path or queried during navigation callback');
+ link.click();if(selections.length!==1||selections[0].length!==2||selections[0][0]!==commit||selections[0][1]!==null||calls!==before)throw Error('Blame invented a path or queried during navigation callback');
  }
  }finally{root.unmount();host.remove();}
 }
