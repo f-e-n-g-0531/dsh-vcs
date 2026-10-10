@@ -32,6 +32,22 @@ test('large comparison RPC requires boolean opt-in and shares heavy slot with se
   assert.equal((await call('vcs/tree-segment',{sessionId:'s',repositoryId:'r',commit:p.commit,path:'file'})).ok,true);
 });
 
+for(const endpoint of ['vcs/commit-compare','vcs/revision-compare'])test(endpoint+' active large cancellation suppresses results and releases heavy slot',async()=>{
+ let finish,entered;const started=new Promise(resolve=>entered=resolve);let actual;
+ const method=endpoint==='vcs/commit-compare'?'getCommitComparison':'getRevisionComparison';
+ let first=true;
+ const call=createHandler({sessions:{get:()=>({header:{cwd:'/workspace'}})}},{
+  discoverRepositories:async()=>({repositories:[{id:'r',root:'/workspace',type:'git'}],warnings:[]}),
+  [method]:async(_repo,opts)=>{actual=opts.signal;if(!first)return {};first=false;entered();return new Promise(resolve=>finish=resolve);},
+ });
+ await call('vcs/repositories',{sessionId:'s'});
+ const p={sessionId:'s',repositoryId:'r',id:'b'.repeat(64),large:true,...(method==='getCommitComparison'?{commit:'a'.repeat(40)}:{base:'a'.repeat(40),target:'c'.repeat(40)})};
+ for(const field of ['path','oid','root'])assert.equal((await call(endpoint,{...p,[field]:'arbitrary'})).error.code,'vcs/invalid-request');
+ const controller=new AbortController();const request=call(endpoint,p,controller.signal);await started;controller.abort();assert.equal(actual.aborted,true);
+ assert.equal((await call(endpoint,p)).error.code,'vcs/busy');finish({text:'late'});assert.equal((await request).error.code,'vcs/cancelled');
+ assert.equal((await call(endpoint,p)).ok,true);
+});
+
 test('real Git large comparisons read complete fixed versions including rename and empty sides', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(),'vcs-large-diff-'));
   t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
@@ -54,10 +70,20 @@ test('real Git large comparisons read complete fixed versions including rename a
   const pair=await read('vcs/revision-changes',{base,target});const diff=await read('vcs/revision-compare',{base,target,id:pair.changes[0].id,large:true});assert.equal(diff.left.text,before);assert.equal(diff.right.text,after);
   const rootDetail=await read('vcs/commit',{commit:base});const added=await read('vcs/commit-compare',{commit:base,id:rootDetail.changes[0].id,large:true});assert.equal(added.left.text,'');assert.equal(added.right.text,before);
   assert.equal((await call('vcs/commit-compare',{...address,commit:target,id:'f'.repeat(64),large:true})).ok,false);
+  assert.equal((await call('vcs/commit-compare',{...address,commit:target,id:rootDetail.changes[0].id,large:true})).ok,false);
+  assert.equal((await call('vcs/revision-compare',{...address,base:target,target:base,id:pair.changes[0].id,large:true})).ok,false);
   const abort=new AbortController();abort.abort();assert.equal((await call('vcs/commit-compare',{...address,commit:target,id,large:true},abort.signal)).error.code,'vcs/cancelled');
   assert.equal(git(['status','--porcelain']),status);assert.equal(git(['ls-files','--stage']),index);assert.equal(await fs.readFile(path.join(root,'after.txt'),'utf8'),'WORKING');
   git(['rm','-f','after.txt']);git(['commit','--no-gpg-sign','-m','delete']);const deleted=git(['rev-parse','HEAD']);
   const deletion=await read('vcs/commit',{commit:deleted});const empty=await read('vcs/commit-compare',{commit:deleted,id:deletion.changes[0].id,large:true});assert.equal(empty.left.text,after);assert.equal(empty.right.text,'');
   await fs.writeFile(path.join(root,'too-big.txt'),'x'.repeat(8*1024*1024+1));git(['add','.']);git(['commit','--no-gpg-sign','-m','oversize']);const oversize=git(['rev-parse','HEAD']);
   const excessive=await read('vcs/commit',{commit:oversize});const rejected=await call('vcs/commit-compare',{...address,commit:oversize,id:excessive.changes[0].id,large:true});assert.equal(rejected.ok,false);assert.match(rejected.error.message,/8 MiB/);
+  await fs.writeFile(path.join(root,'invalid.txt'),Buffer.from([0xff]));
+  await fs.writeFile(path.join(root,'lines.txt'),'\r'.repeat(100000));
+  await fs.writeFile(path.join(root,'long.txt'),'x'.repeat(65537));
+  git(['add','.']);git(['commit','--no-gpg-sign','-m','invalid boundaries']);const invalid=git(['rev-parse','HEAD']);
+  const invalidDetail=await read('vcs/commit',{commit:invalid});
+  for(const entry of invalidDetail.changes){const failed=await call('vcs/commit-compare',{...address,commit:invalid,id:entry.id,large:true});assert.equal(failed.ok,false);assert.match(failed.error.message,/UTF-8|100000 lines|characters per line/);}
+  const exact=('x'.repeat(1023)+'\n').repeat(8192);await fs.writeFile(path.join(root,'exact.txt'),exact);git(['add','.']);git(['commit','--no-gpg-sign','-m','exact budget']);const accepted=git(['rev-parse','HEAD']);
+  const acceptedDetail=await read('vcs/commit',{commit:accepted});const acceptedText=await read('vcs/commit-compare',{commit:accepted,id:acceptedDetail.changes[0].id,large:true});assert.equal(acceptedText.right.text,exact);assert.equal(acceptedText.right.totalBytes,8*1024*1024);
 });
