@@ -15,6 +15,7 @@
     "index.mjs",
     "vcs.mjs",
     "git-history.mjs",
+    "conflict-stages.mjs",
     "image-preview.mjs",
     "text-content.mjs",
     "workspace-large-text.mjs",
