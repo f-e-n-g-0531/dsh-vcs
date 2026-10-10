@@ -5,6 +5,7 @@ test('simple lossless WebP bounds structure dimensions version and padding',asyn
  const real=await prepareRaster(Buffer.from('UklGRh4AAABXRUJQVlA4TBEAAAAvAkAAEAdQqFIUuYCBiOh/AAA=','base64'));assert.equal(real.width,3);assert.equal(real.height,2);
  const buffer=image(),prepared=await prepareRaster(buffer);assert.equal(prepared.width,2);assert.equal(prepared.height,3);assert.equal(prepared.encoding,'VP8L');assert.deepEqual(prepared.data,buffer);
  for(const value of [image(8193,1),image(8192,8192),image(2,3,1)])assert.throws(()=>prepareSimpleWebp(value));
+ for(const offset of [0,8,12]){const alias=image();alias[offset]|=128;assert.throws(()=>prepareSimpleWebp(alias));}
  const signature=image();signature[20]=0;assert.throws(()=>prepareSimpleWebp(signature));
  const padding=image();padding[25]=1;assert.throws(()=>prepareSimpleWebp(padding));
  assert.throws(()=>prepareSimpleWebp(buffer.subarray(0,24)));

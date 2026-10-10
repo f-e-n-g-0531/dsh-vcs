@@ -39,6 +39,7 @@ try{
  const lossless=Buffer.from('UklGRh4AAABXRUJQVlA4TBEAAAAvAkAAEAdQqFIUuYCBiOh/AAA=','base64');
  const preparedLossless=prepareSimpleWebp(lossless);if(preparedLossless.encoding!=='VP8L'||preparedLossless.width!==3||preparedLossless.height!==2)throw Error('Lossless WebP gate failed');
  await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(preparedLossless.data.toString('base64'))+"))");
+ await evaluate("import('./history-viewer-browser.js').then(m=>m.checkLosslessWebp("+JSON.stringify(preparedLossless.data.toString('base64'))+"))");
  await writeFile('test-results/webp-lossless-report.json',JSON.stringify({pass:true,width:3,height:2,encoding:preparedLossless.encoding,bytes:preparedLossless.bytes}));
  const repository=await mkdtemp(path.join(os.tmpdir(),'vcs-jpeg-repo-'));
  try{

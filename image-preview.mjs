@@ -6,7 +6,7 @@ export async function prepareRaster(buffer, {signal} = {}) {
     signal?.throwIfAborted();
     return result;
   }
-  if (Buffer.isBuffer(buffer) && buffer.toString('ascii', 0, 4) === 'RIFF') {
+  if (Buffer.isBuffer(buffer) && buffer.toString('latin1', 0, 4) === 'RIFF') {
     const result = prepareSimpleWebp(buffer);
     signal?.throwIfAborted();
     return result;
@@ -17,11 +17,11 @@ export async function prepareRaster(buffer, {signal} = {}) {
 // Simple static WebP only; extended/animated containers remain rejected.
 export function prepareSimpleWebp(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 26 || buffer.length > 2097152 ||
-      buffer.toString('ascii', 0, 4) !== 'RIFF' || buffer.toString('ascii', 8, 12) !== 'WEBP' ||
+      buffer.toString('latin1', 0, 4) !== 'RIFF' || buffer.toString('latin1', 8, 12) !== 'WEBP' ||
       buffer.readUInt32LE(4) !== buffer.length - 8) {
     throw Error('Invalid WebP RIFF or byte limit');
   }
-  const kind = buffer.toString('ascii', 12, 16);
+  const kind = buffer.toString('latin1', 12, 16);
   const size = buffer.readUInt32LE(16);
   const end = 20 + size;
   if (end + (size & 1) !== buffer.length || (size & 1 && buffer[end] !== 0)) {
@@ -84,7 +84,7 @@ export function inspectPng(buffer){
   if(++chunks>4096||buffer.length-offset<12)throw new Error('Invalid PNG chunk bounds');
   const length=buffer.readUInt32BE(offset),end=offset+12+length;
   if(end>buffer.length)throw new Error('Truncated PNG chunk');
-  const type=buffer.toString('ascii',offset+4,offset+8);
+  const type=buffer.toString('latin1',offset+4,offset+8);
   if(!buffer.subarray(offset+4,offset+8).every(b=>(b>=65&&b<=90)||(b>=97&&b<=122)))throw new Error('Invalid PNG chunk type');
   if(buffer[offset+6]&32)throw new Error('Invalid PNG reserved chunk bit');
   let crc=0xffffffff;
@@ -150,7 +150,7 @@ async function validatePngStream(buffer,{signal}){
  const expected=stride*metadata.height;
  if(expected>64*1024*1024)throw new Error('PNG decoded byte limit exceeded');
  const parts=[];
- for(let offset=8;offset<buffer.length;){const length=buffer.readUInt32BE(offset);if(buffer.toString('ascii',offset+4,offset+8)==='IDAT')parts.push(buffer.subarray(offset+8,offset+8+length));offset+=length+12;}
+ for(let offset=8;offset<buffer.length;){const length=buffer.readUInt32BE(offset);if(buffer.toString('latin1',offset+4,offset+8)==='IDAT')parts.push(buffer.subarray(offset+8,offset+8+length));offset+=length+12;}
  const compressed=Buffer.concat(parts);
  const result=await inflateAsync(compressed,{maxOutputLength:expected,info:true,signal});
  signal?.throwIfAborted();
