@@ -20,6 +20,14 @@ export async function checkLargeCompare(){
  const button=k=>[...host.querySelectorAll('button')].find(n=>n.textContent===k);
  const wait=async fn=>{for(let i=0;i<400;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Large compare browser timeout: '+host.textContent.slice(0,200));};
  try{
+  const editorURL=new URL('../dist/editor.js',document.baseURI).href;
+  const module=await import(editorURL);
+  const target=document.createElement('div');target.style.height='360px';host.appendChild(target);
+  let stats,status;const editor=module.createDiff(target,{onStats:value=>stats=value,onComputation:value=>status=value});
+  try{
+   editor.setContent(value,'complete-large');await wait(()=>status==='complete'&&stats?.count>0);
+   if(stats.added<2||stats.deleted<1)throw Error('Full multi-MiB differences not computed');
+  }finally{editor.dispose();target.remove();}
   render();await wait(()=>button('largeLoad'));if(calls.some(c=>c.p.large))throw Error('Automatic large read');
   button('largeLoad').click();await wait(()=>host.textContent.includes('diffComplete'));
   if(!host.querySelector('.monaco-diff-editor')||calls.at(-1).p.large!==true)throw Error('No advanced full comparison');

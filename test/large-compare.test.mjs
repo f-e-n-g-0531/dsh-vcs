@@ -56,4 +56,8 @@ test('real Git large comparisons read complete fixed versions including rename a
   assert.equal((await call('vcs/commit-compare',{...address,commit:target,id:'f'.repeat(64),large:true})).ok,false);
   const abort=new AbortController();abort.abort();assert.equal((await call('vcs/commit-compare',{...address,commit:target,id,large:true},abort.signal)).error.code,'vcs/cancelled');
   assert.equal(git(['status','--porcelain']),status);assert.equal(git(['ls-files','--stage']),index);assert.equal(await fs.readFile(path.join(root,'after.txt'),'utf8'),'WORKING');
+  git(['rm','-f','after.txt']);git(['commit','--no-gpg-sign','-m','delete']);const deleted=git(['rev-parse','HEAD']);
+  const deletion=await read('vcs/commit',{commit:deleted});const empty=await read('vcs/commit-compare',{commit:deleted,id:deletion.changes[0].id,large:true});assert.equal(empty.left.text,after);assert.equal(empty.right.text,'');
+  await fs.writeFile(path.join(root,'too-big.txt'),'x'.repeat(8*1024*1024+1));git(['add','.']);git(['commit','--no-gpg-sign','-m','oversize']);const oversize=git(['rev-parse','HEAD']);
+  const excessive=await read('vcs/commit',{commit:oversize});const rejected=await call('vcs/commit-compare',{...address,commit:oversize,id:excessive.changes[0].id,large:true});assert.equal(rejected.ok,false);assert.match(rejected.error.message,/8 MiB/);
 });
