@@ -473,8 +473,8 @@ async function working(root, relative, svnLink = false) {
   try { const info = await handle.stat(); if (!info.isFile()) throw new Error('Not a regular file'); const buffer = Buffer.alloc(MAX_TEXT + 1); const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0); await confined(root, relative); return decode(buffer.subarray(0, bytesRead)); } finally { await handle.close(); }
 }
 async function gitBlob(root, revision, file) { return content(() => git(root, ['show', '--no-ext-diff', '--no-textconv', revision + ':' + file], MAX_TEXT)); }
-async function historicalBlob(root,revision,file,signal,large=false){
-  const listing=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,{signal})).toString('utf8');
+async function historicalBlob(root,revision,file,signal,large=false,budget){
+  const listing=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,budget?budget():{signal})).toString('utf8');
   const records=listing.split(String.fromCharCode(0)).filter(Boolean);
   const record=records.find(row=>row.slice(row.indexOf('	')+1)===file);
   if(!record)throw new Error('Historical path missing');
@@ -483,11 +483,11 @@ async function historicalBlob(root,revision,file,signal,large=false){
   if(mode==='160000')return {text:oid,notice:'Submodule commit reference; repository contents are not loaded.'};
   if(type!=='blob'||!['100644','100755','120000'].includes(mode))return {text:'',notice:'Unsupported historical object type.'};
   if (large) {
-    const rawSize = (await git(root, ['cat-file', '-s', oid], MAX_TEXT, {signal})).toString('utf8').trim();
+    const rawSize = (await git(root, ['cat-file', '-s', oid], MAX_TEXT, budget?budget():{signal})).toString('utf8').trim();
     if (!/^\d+$/.test(rawSize)) throw new Error('Invalid historical object size.');
     const size = Number(rawSize);
     if (size > MAX_LARGE_TEXT) throw new Error('Large comparison exceeds 8 MiB per side.');
-    const buffer = await git(root, ['cat-file', 'blob', oid], MAX_LARGE_TEXT, {signal});
+    const buffer = await git(root, ['cat-file', 'blob', oid], MAX_LARGE_TEXT, budget?budget():{signal});
     if (buffer.length !== size) throw new Error('Historical object size changed.');
     return decodeLargeText(buffer, signal);
   }
@@ -541,10 +541,11 @@ async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
  };
  let left={text:''},right={text:''},verify;
  const untracked=entry.indexStatus==='?',added=['A','C'].includes(entry.indexStatus);
- if(!untracked&&(mode==='unstaged'?entry.indexStatus!=='D':revision&&!added))left=mode==='unstaged'?await readIndex():await historicalBlob(repo.root,revision,entry.oldPath||entry.path,signal,true);
+ if(!untracked&&(mode==='unstaged'?entry.indexStatus!=='D':revision&&!added))left=mode==='unstaged'?await readIndex():await historicalBlob(repo.root,revision,entry.oldPath||entry.path,signal,true,options);
  if(mode==='staged'){if(entry.indexStatus!=='D')right=await readIndex();}
  else if(entry.worktreeStatus!=='D'){
-  const result=await readWorkspaceLargeText(repo.root,entry.path,signal);right=result.value;verify=result.verify;
+  try{const result=await readWorkspaceLargeText(repo.root,entry.path,signal);right=result.value;verify=result.verify;}
+  catch(error){if(error.code!=='ENOENT'||entry.indexStatus!=='D')throw error;verify=async()=>{const target=await confined(repo.root,entry.path);try{await fs.lstat(target);throw Error('Working file appeared; refresh repository status');}catch(missing){if(missing.code!=='ENOENT')throw missing;}};await verify();}
  }
  options();if(revision!==await head()||!index.equals(await run(indexArgs))||!(await status()).some(row=>row.id===id))throw Error('Workspace selection changed; refresh repository status');
  await verify?.();options();

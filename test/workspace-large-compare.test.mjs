@@ -28,6 +28,7 @@ test('large workspace modes bind HEAD Index and working complete content without
   await fs.writeFile(path.join(root,'untracked.txt'),working);const untracked=(await listChanges(repo)).find(row=>row.path==='untracked.txt');const newFile=await getComparison(repo,{id:untracked.id,large:true});assert.equal(newFile.left.text,'');assert.equal(newFile.right.text,working);
   git('add','untracked.txt');const added=(await listChanges(repo,'staged')).find(row=>row.path==='untracked.txt');assert.equal((await getComparison(repo,{mode:'staged',id:added.id,large:true})).right.text,working);
   await fs.rm(file);const removed=(await listChanges(repo,'unstaged')).find(row=>row.path==='file.txt');const deletion=await getComparison(repo,{mode:'unstaged',id:removed.id,large:true});assert.equal(deletion.left.text,staged);assert.equal(deletion.right.text,'');
+  git('rm','-f','file.txt');const stagedDelete=(await listChanges(repo)).find(row=>row.path==='file.txt');const allDelete=await getComparison(repo,{id:stagedDelete.id,large:true});assert.equal(allDelete.left.text,before);assert.equal(allDelete.right.text,'');
   const id=(await listChanges(repo))[0].id;await assert.rejects(getComparison(repo,{id,large:'yes'}),/mode/);
   const c=new AbortController();c.abort();await assert.rejects(getComparison(repo,{id,large:true,signal:c.signal}));
  }finally{await fs.rm(root,{recursive:true,force:true});}

@@ -74,7 +74,7 @@ export function apply(ctx){
     const selectedRepository=repositories.find(repo=>repo.id===selected?.repositoryId);
     const selectedStatus=selected?statuses[selected.repositoryId]:null;
     const selectionKey=JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id]);
-    const large=largeSelection===selectionKey;
+    const large=largeSelection?.key===selectionKey&&largeSelection?.status===selectedStatus;
     useEffect(()=>setLargeSelection(null),[selectionKey,selectedStatus,historyActive]);
     useEffect(()=>{
       const controller=new AbortController();compareController.current=controller;setComparison(null);setDetailError('');setStats({added:0,deleted:0,count:0});setTab('content');setLoading(!!selected&&!!selectedStatus);
@@ -131,7 +131,7 @@ export function apply(ctx){
         {editorError&&<div className="vcs-notice" role="status">{t('fallback')} <button onClick={()=>setEditorRetry(x=>x+1)}>{t('retry')}</button><details><summary>{t('diagnostics')}</summary>{editorError}</details></div>}
         {comparison&&<div className="vcs-context" aria-label={t('comparisonContext')}><span className="vcs-context-status" data-status={code(comparison)}>{t(code(comparison))}</span>{comparison.oldPath&&<span className="vcs-context-rename" title={comparison.oldPath+' → '+comparison.path}>{comparison.oldPath} <b>→</b> {comparison.path}</span>}<span>{comparison.left.label||'—'} <b>↔</b> {comparison.right.label||'—'}</span>{(comparison.left.encoding||comparison.right.encoding)&&<span>{t('encoding')}: {comparison.left.encoding||'—'} / {comparison.right.encoding||'—'}</span>}</div>}
         {comparison&&selectedRepository?.type==='git'&&<ImageComparison key={JSON.stringify([sessionId,discovery?.cwd,selected.repositoryId,mode,selected.id,refresh,selectedStatus])} workspace sessionId={sessionId} repositoryId={selected.repositoryId} mode={mode} id={selected.id} rpc={rpc} t={t} onRediscover={rediscover}/>}
-        {selectedRepository?.type==='git'&&(large||comparison?.notice?.includes('2 MiB'))&&<div className="vcs-notice"><span>{t('workspaceLargeScope')}</span><button onClick={()=>{compareController.current?.abort();setComparison(null);setLargeSelection(large?null:selectionKey);}}>{t(large?'largeClose':'largeLoad')}</button>{large&&detailError&&<button onClick={()=>setCompareRetry(x=>x+1)}>{t('retry')}</button>}</div>}
+        {selectedRepository?.type==='git'&&(large||comparison?.notice?.includes('2 MiB'))&&<div className="vcs-notice"><span>{t('workspaceLargeScope')}</span><button onClick={()=>{compareController.current?.abort();setComparison(null);setLargeSelection(large?null:{key:selectionKey,status:selectedStatus});}}>{t(large?'largeClose':'largeLoad')}</button>{large&&detailError&&<button onClick={()=>setCompareRetry(x=>x+1)}>{t('retry')}</button>}</div>}
         {comparison?.large&&<p role="status">{t(editorError?'largeFallback':computation==='complete'?'diffComplete':computation==='incomplete'?'diffIncomplete':'diffPending')}</p>}
         {comparison?.notice&&<div className="vcs-notice">{comparison.notice}</div>}
         {propertyNames.length>0&&<div className="vcs-tabs">{['content','properties'].map(value=><button key={value} aria-pressed={tab===value} onClick={()=>setTab(value)}>{t(value)}{value==='properties'?' ('+propertyNames.length+')':''}</button>)}</div>}
