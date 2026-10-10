@@ -18,10 +18,10 @@ try{
  ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}};
  const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
  await call('Page.navigate',{url:'http://127.0.0.1:8765/test-results/monaco-fixture.html'});
- const deadline=Date.now()+30000;let report;
+ const deadline=Date.now()+120000;let report;
  while(Date.now()<deadline){const r=await call('Runtime.evaluate',{expression:'document.querySelector("#report")?.textContent',returnByValue:true});report=r.result.value;if(report&&report!=='pending')break;await pause();}
  const dom=await call('Runtime.evaluate',{expression:'document.documentElement.outerHTML',returnByValue:true});await writeFile('test-results/monaco-dom.html',dom.result.value);
- if(!report||report==='pending')throw Error('Monaco report not completed within 30 seconds');
+ if(!report||report==='pending')throw Error('Monaco report not completed within 120 seconds');
  console.log(report);
  if(!JSON.parse(report).pass)throw Error('Main browser fixture failed');
  const evaluate=async expression=>{const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;};

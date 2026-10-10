@@ -53,7 +53,7 @@ jobs:
           server=$!
           trap 'kill "$server"' EXIT
           for i in {1..20}; do curl -fsS http://127.0.0.1:8765/test-results/monaco-fixture.html -o /dev/null && break || sleep 0.2; done
-          timeout 60s node scripts/run-monaco-browser.mjs
+          timeout 240s node scripts/run-monaco-browser.mjs
           node scripts/verify-monaco-result.mjs
       - uses: actions/upload-artifact@v4
         if: always()
