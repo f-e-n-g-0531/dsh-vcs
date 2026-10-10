@@ -1,4 +1,6 @@
-# Third-party notices
+# 第三方许可 / Third-party notices
+
+本页说明随包分发的第三方组件许可。下面的许可证原文保持不变；项目自己的非商业许可证不覆盖第三方独立授权的权利。
 
 The plugin is governed by the DSH VCS Non-Commercial Source Available License 1.0 in LICENSE. Third-party materials remain under their respective licenses; the plugin license does not restrict the rights those licenses independently grant.
 

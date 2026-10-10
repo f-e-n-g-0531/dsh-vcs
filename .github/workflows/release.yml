@@ -171,6 +171,7 @@ jobs:
         run: |
           set -euo pipefail
           # Existing releases are never overwritten. npm retries require identical integrity.
+          notes="docs/releases/${RELEASE_TAG#v}.md"
+          test -s "$notes" || { echo "Missing version-specific release notes" >&2; exit 1; }
           gh release create "$RELEASE_TAG" "$ARTIFACT" SHA256SUMS.txt \
-            --verify-tag --title "DSH VCS $RELEASE_TAG" --generate-notes \
-            --notes 'IMPORTANT: Released under explicit user authorization, including standing authorization for subsequent DSH VCS releases, before real DSH GUI acceptance. Actual loaded-build and M1-M4 GUI validation remain pending; isolated browser tests are not live GUI acceptance. Read-only Git/SVN plugin for DSH Web 0.1.7-rc.2 or 0.2.0-rc.2. SVN HTTPS history requires repository discovery and explicit scoped network consent; no unauthorized remote IO. Fixed local working-copy snapshot log, r-1/r readonly Diff and stop-on-copy file tracing are supported for HTTPS servers requiring no additional authentication. System TLS trust is required; no credentials or custom certificate configuration is provided. New SVN evidence is isolated real Apache TLS/RPC/Chrome automation, not current DSH GUI or external SVN acceptance. npm: @feng0531/dsh-vcs. Publication does not install or upgrade the running host and does not restart DSH. Installation requires separate authorization; see the tagged installation guide. Noncommercial use only; see LICENSE. Windows ANSI SVN builds may not support Chinese path arguments; CI uses a UTF-8-configured temporary SVN. The npm package and attached tgz are the same artifact. See docs/INSTALL.md and docs/COMPATIBILITY.md in the tagged source.'
+            --verify-tag --title "DSH VCS $RELEASE_TAG" --notes-file "$notes"

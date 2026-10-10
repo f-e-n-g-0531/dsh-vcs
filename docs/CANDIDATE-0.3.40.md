@@ -1,13 +1,21 @@
 # 0.3.40 当前提交标记正式发布记录
 
+> 历史记录：只描述标题中的版本，不是当前安装或功能指南。首次使用请看[项目说明](<../README.md>)。
+
 冻结范围仅为提交图接收历史面板selected OID，以aria-current及粗体下划线标明当前提交。焦点移动不改变选择；选中OID不在局部图中时无错误标记。无新增网络、产品写操作、SVN历史或布局扩展。
 
 - 功能提交c296330；[隔离Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36699931987)成功。
 - 第292轮本地245/245测试、19文件包校验及临时生产安装/stub注册通过。
 - 本地包SHA256：`609658d3032e0db39655eb949dcb0d4be79e6dfcee4ae597153ba8fe23b1fa22`。
-- 第293轮固定标签 `45353c621b14349a0954c4e1249c392575e6bac2` 的[四平台CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36700364311)及[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36700434780)全部成功。下载四份包均778658字节，SHA256与本地候选一致。Artifact ID：Windows22=11090120530、Ubuntu22=11089890914、Windows24=11089876744、Ubuntu24=11088993849。
+- 第293轮固定标签 `45353c621b14349a0954c4e1249c392575e6bac2` 的[四平台CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36700364311)及[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36700434780)全部成功。
+
+下载四份包均778658字节，SHA256与本地候选一致。
+
+Artifact ID：Windows22=11090120530、Ubuntu22=11089890914、Windows24=11089876744、Ubuntu24=11088993849。
 - 用户明确授权正式发布0.3.40并披露未验收项，同时授权后续DSH VCS版本沿用该流程，无需逐版确认。不安装、不重启，自动化验证门禁保留；真实GUI仍未验收。持久目标已更新该授权。
-- [发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36701726286)成功；[GitHub正式版](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.40)非草稿、非预发布；npm latest已为0.3.40。实际下载npm和GitHub包均778658字节，SHA256与候选及SHA256SUMS完全一致。
+- [发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36701726286)成功；[GitHub正式版](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.40)非草稿、非预发布；npm latest已为0.3.40。
+
+实际下载npm和GitHub包均778658字节，SHA256与候选及SHA256SUMS完全一致。
 
 后续真实验收需在授权安装后确认页面版本、从列表或图选择提交后标记与详情OID一致、键盘只移动焦点时标记不变、切换Session/仓库不残留旧标记；隔离组件测试不能替代这些步骤。
 

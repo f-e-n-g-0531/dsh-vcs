@@ -1,65 +1,52 @@
-# 发布清单
+# 维护者发布流程
 
-当前包名 @feng0531/dsh-vcs；正式发布统一走 GitHub Actions，不在本地 npm publish。公开下载不改变非商业许可证。
+本文用于维护项目。使用者请阅读[README](<../README.md>)和[安装指南](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/INSTALL.md)。
 
-## GitHub + npm 联合发布
+## 发布内容
 
-在 GitHub 仓库 Settings → Secrets and variables → Actions 添加 NPM_AUTOMATION_TOKEN。该令牌必须有 @feng0531/dsh-vcs 发布权限，并满足 npm 的 2FA 策略（需要时启用 bypass 2FA）；名字叫 AUTOMATION_TOKEN 不会自动赋予权限。不要在聊天、源码或日志中公开值。
+每个新版本必须有独立的中文发布说明，放在 `docs/releases/版本号.md`。按“本版变化、安装、限制、验证”组织，不把自动提交列表、开发轮次或内部恢复记录当作用户说明。没有新增功能时明确写出，不夸大改动。
 
-对应标签 CI 全绿及人工验收后，从 main 手动运行 Publish GitHub and npm 工作流，填写已有版本标签。构建、验证和打包步骤不注入 npm 凭据；仅 npm 发布步骤使用 NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTOMATION_TOKEN }}，且禁用生命周期脚本。同一 tgz 先发布 npm，再作为 GitHub 正式 Release 附件上传并附 SHA-256。
+更新包版本和锁文件，在变更记录中填写同一版本。核查许可证、第三方声明及公开文件，排除凭据和私人数据。
 
-两平台不支持原子事务：npm 失败则不发布 GitHub；npm 成功而 GitHub 失败时，重跑仅在已发布 npm integrity 与当前包完全一致时继续，否则拒绝覆盖。GitHub 已存在 Release 时也拒绝覆盖，需先检查现场。新版本不移动旧标签。
+## 1. 本地检查
 
-## 1. 公开发布前的决定
+需要 Node.js 22+、Git、SVN、svnadmin。在干净检出中执行：
 
-- [x] 仓库地址已确认：https://github.com/f-e-n-g-0531/dsh-vcs 。
-- [x] 正式采用 [非商业源码公开许可证 1.0](<../LICENSE>)，禁止商用，允许非商业修改和分发。
-- [ ] 每次发布检查源码权属及第三方声明；商业另行授权须覆盖全部有关权利人。
-- [ ] 确认安全报告渠道、维护责任与支持范围。
-- [ ] 审查待公开文件和 Git 历史，排除个人路径、令牌、用户数据、私人记录和敏感图片。
+	npm ci --include=dev
+	npm run check
+	npm run verify:package
+	npm run test:install
 
-## 2. 干净环境验证
+测试失败或跳过须调查；隔离安装只检查包和宿主注册，不是用户实际 DSH 验收。
 
-使用 Node.js 22 或更新版本，在干净检出目录中执行：
+## 2. 固定版本并验证
 
-    npm ci && npm run check
-    npm run verify:package
-    npm run test:install
-    npm pack --dry-run
-    npm pack
+1. 提交并推送版本修改，创建新标签 `vX.Y.Z`；不移动已有标签。
+2. 等待标签 CI 的 Windows／Ubuntu × Node 22／24 全部成功。
+3. 手动在同一标签运行 **Browser layout checks**，等待成功。
+4. 下载四个 CI 候选 tgz，确认字节大小和 SHA-256 全部一致。
 
-确认锁文件安装、构建和测试成功，记录失败与跳过项。完整 Git / SVN 测试需要 git、svn、svnadmin。npm pack 的 prepack 会执行 check；审查包内容是否包含客户端、编辑器、CSS、worker、宿主入口、适配器、语言文件与插件 patch。
+分支检查不能代替同标签检查。失败后先定位；需要修改源码或测试时使用新的版本和标签。
 
-构建会复制 Monaco 的许可证与第三方声明进入分发资源；仍应核查最终包中的声明及其他依赖义务。排除测试数据、依赖目录与私人材料。
+## 3. 联合发布
 
-Git 来源安装依赖 prepare 构建，需要另行验证生命周期和构建依赖。pnpm 可能需要 allowBuilds 审批；拒绝脚本的环境应优先使用已构建 tgz，不应直接关闭安全策略。
+在 Actions 从 main 运行 **Publish GitHub and npm**，输入已验证的标签。
 
-## 3. 安装与真实页面验收
+工作流检出该标签，重新检查并打包。它先上传 npm，再验证公开 npm 元数据与实际下载包，最后创建 GitHub 正式 Release，上传同一个 tgz 和 SHA-256 校验文件。
 
-    dsh plugin --profile web add <absolute-tgz>
+仓库需配置 `NPM_AUTOMATION_TOKEN`，具有该包发布权限并符合 npm 2FA 策略。凭据只用于上传步骤；不要写进源码、发布说明或聊天。
 
-替换为包的绝对路径，必要时加引号。先确认目标 profile 和宿主兼容性；安装改变运行配置，不是无副作用检查。
+## 4. 发布后核验
 
-**宿主重启只能由用户执行。** 用户重启后刷新现有 DSH Web 地址，在真实 Session 中验证：
+- npm 版本与 latest 正确，实际 tarball 可下载。
+- GitHub Release 非草稿、非预发布，附件可下载。
+- 两端实际包与四候选的字节大小和 SHA-256 一致。
+- 补记最终结论，但不修改已发布标签或替换工件。
 
-- [ ] 插件入口可见；顶部单仓库下拉，无额外仓库左栏。
-- [ ] 当前 / 上级仓库、一层子目录发现，以及明确相对子目录的定向发现。
-- [ ] Git 三模式、SVN BASE 与属性；新增、删除、重命名、未跟踪和冲突提示。
-- [ ] UTF-8、GBK、带 BOM 的 UTF-16；二进制与超大文件提示。
-- [ ] 并排 / 行内、空白选项、换行、导航、主题和编辑器加载失败降级。
-- [ ] Session / 仓库切换与重新发现不展示过期内容；预览不修改工作区或暂存区。
-- [ ] 发现授权过期后的手动重新发现，以及取消请求的实际反馈。
+npm 与 GitHub 不是原子发布。若 npm 已接受上传但公开下载暂时 404，**不要再次上传**；先只读确认公开包。确认相同后恢复原失败任务，工作流会核对已有 npm integrity 并跳过上传。不匹配则停止；已有 GitHub Release 不覆盖。
 
-记录宿主和浏览器版本、步骤及已知限制。自动化测试通过不等于这些项目已完成；未执行时明确写“未验收”，不补写成功结论。
+## 实机验证与安装边界
 
-## 4. 标签 CI 与发布工作流
+自动浏览器测试不等于当前 DSH 实机通过。发布说明须如实写出未确认项；用户明确授权在此边界下发布时，不伪造实机结论。
 
-普通分支 push、PR 和日常脚本修改不自动触发 CI；可手动对分支运行四组合CI作冻结前验证。维护者主动推送版本标签（`vX.Y.Z`）会触发 Windows/Linux × Node22/24矩阵；手动分支结果不能替代同标签CI。完成本地检查后，确认包版本并执行 `git tag vX.Y.Z`、`git push origin vX.Y.Z`（替换成真实版本，标签须指向包含新 CI 规则的提交）。不要移动已经发布的标签。等待该标签的 CI 全部通过并完成真实页面验收后再进行发布。在 Actions 手动运行 Release workflow 并填写已有 tag：工作流验证版本、重新构建与测试、检查包并生成 SHA256SUMS.txt，随后先发布 npm 再公开 GitHub Release。手动触发即授权两平台正式发布。未通过的真实页面验收不得勾选完成。
-
-CI 会严格校验标签为 `vX.Y.Z` 且与包版本相同。联合发布检查同标签同提交的最新四组合CI和Chrome工作流成功，并下载四候选包比较字节与SHA-256；未运行、失败、尚在运行或包不一致时拒绝发布。公开npm元数据、实际tarball及latest也须验证，再上传同包至GitHub。这不替代真实 DSH 页面人工验收；用户授权发布未实机验收功能时，Release必须明确披露，不自动安装或重启。
-
-## 5. 分发
-
-确认完整附带许可证及第三方声明，不把本项目标记为标准开源软件。在已确认的仓库中按实际验证结果编写发布说明，附审核过的 tgz 和校验值，注明兼容环境与未验证事项。是否打 tag / 创建 GitHub Release 由维护者决定；不为本次整理虚构日期、历史版本或功能变更。
-
-相关约定见 [README](<../README.md>)、[贡献指南](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CONTRIBUTING.md>)、[变更记录](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md>) 和 [安全说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/SECURITY.md>)。
+发布不安装、不升级、不重启运行中的 DSH。用户选择安装后，在原 Web 页面检查入口、仓库发现、差异、历史以及 Session 切换；由用户自行重启。维护者不能启动替代服务器冒充当前页面。

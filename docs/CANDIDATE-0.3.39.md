@@ -1,10 +1,28 @@
 # 0.3.39 提交图键盘正式发布记录
 
+> 历史记录：只描述标题中的版本，不是当前安装或功能指南。首次使用请看[项目说明](<../README.md>)。
+
 范围冻结为提交图上下键、Home/End焦点移动，不自动选择提交，不新增网络或产品写操作。继承0.3.38，SVN历史仍未启用。
 
-第281轮本地245/245测试、19文件包校验、临时生产安装与stub宿主注册通过。候选SHA256：`52b62f2a89502199f47b115ffcdeb4a7ebce1234303ca0e8157fa735340de1d6`。此前[源码隔离Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36696585033)通过；第282轮完成固定提交 `951b46cb800a1c1586c496097ab0b14c4156baab` 的[四平台标签CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36697061698)及[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36697128857)，全部成功。已下载四个平台包，均778612字节且上述SHA256一致。Artifact ID：Ubuntu22=11088283345、Windows24=11088224106、Ubuntu24=11088103895、Windows22=11087449487。候选自动化验证已完成。
+第281轮本地245/245测试、19文件包校验、临时生产安装与stub宿主注册通过。
 
-用户在第285轮阻塞后明确授权“正式发布0.3.39，披露未验收项”，目标已恢复。[发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36698288775)成功，[GitHub正式版](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.39)为非草稿、非预发布。npm latest已为0.3.39；npm/GitHub包均778612字节，SHA256与上述候选及SHA256SUMS一致。真实DSH GUI及原生键盘验收未完成，发布说明已披露；不安装、不重启。
+候选SHA256：`52b62f2a89502199f47b115ffcdeb4a7ebce1234303ca0e8157fa735340de1d6`。
+
+此前[源码隔离Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36696585033)通过；第282轮完成固定提交 `951b46cb800a1c1586c496097ab0b14c4156baab` 的[四平台标签CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36697061698)及[同标签Chrome](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36697128857)，全部成功。
+
+已下载四个平台包，均778612字节且上述SHA256一致。
+
+Artifact ID：Ubuntu22=11088283345、Windows24=11088224106、Ubuntu24=11088103895、Windows22=11087449487。
+
+候选自动化验证已完成。
+
+用户在第285轮阻塞后明确授权“正式发布0.3.39，披露未验收项”，目标已恢复。
+
+[发布工作流](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36698288775)成功，[GitHub正式版](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.39)为非草稿、非预发布。
+
+npm latest已为0.3.39；npm/GitHub包均778612字节，SHA256与上述候选及SHA256SUMS一致。
+
+真实DSH GUI及原生键盘验收未完成，发布说明已披露；不安装、不重启。
 
 第283轮发布确认请求超时，没有收到决定，不能等同同意或拒绝。保持标签与候选冻结，不触发release工作流，不追加本批次功能，也不重复弹出同一确认。
 

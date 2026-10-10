@@ -1,6 +1,6 @@
 # 独立布局检查
 
-执行 `node scripts/layout-fixture.mjs`，在浏览器打开生成的 [验收页](<../test-results/layout-fixture.html>)，点击 **Run geometry checks**。页面输出浏览器信息与 12 个组合的 JSON 结果。生成文件位于忽略目录，不进入发布包。
+执行 `node scripts/layout-fixture.mjs`，在浏览器打开生成的 test-results/layout-fixture.html验收页，点击 **Run geometry checks**。页面输出浏览器信息与 12 个组合的 JSON 结果。生成文件位于忽略目录，不进入发布包。
 
 使用项目实际 CSS 与中英文标签，组合 180/260px 侧栏及 1/1.25/2 倍 CSS zoom，带四位数计数和长文件列表。检查按钮在筛选栏内、按钮互不重叠、列表在筛选栏下方、重命名按钮中心点可命中。
 

@@ -1,5 +1,7 @@
 # 0.3.34 候选验证记录
 
+> 历史记录：只描述标题中的版本，不是当前安装或功能指南。首次使用请看[项目说明](<../README.md>)。
+
 - 标签：v0.3.34；源码：37d15a6b88c17c689098831074f4838f49b6cb31。
 - [标签 CI 36574878726](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/36574878726)：Windows/Ubuntu × Node 22/24 四个任务均成功。
 - 第 169/200 轮下载四个 CI artifact，分别计算内部 npm tarball 的 SHA-256；四包逐字节摘要一致。这里不是 artifact ZIP 自身的摘要。
