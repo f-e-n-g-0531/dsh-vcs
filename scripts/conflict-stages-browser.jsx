@@ -23,10 +23,11 @@ export async function checkConflictStages(){
   const render=key=>flushSync(()=>root.render(<Harness tick={tick}><ConflictStages key={key} sessionId='s' repositoryId='r' mode='all' id={id} rpc={rpc} t={t} onRediscover={()=>{rediscovered++;}}/></Harness>));
   render(lang);await wait(()=>host.querySelector('[role=status]')&&host.textContent.includes(t('conflictStageAbsent')));
   if(calls[0].p.mode!=='all'||calls[0].p.id!==id||!calls[0].signal)throw Error('Conflict request fields or cancellation signal missing');
-  if(!host.textContent.includes(t('conflictStagesScope'))||!host.textContent.includes('base\n'))throw Error('Conflict scope or base stage text missing');
+  if(!host.textContent.includes(t('conflictStagesScope'))||!host.textContent.includes(t('conflictStage1')))throw Error('Conflict scope or stage inventory missing');
   if(host.querySelectorAll('select').length!==2||host.querySelectorAll('li').length!==3)throw Error('Conflict stage selectors or inventory missing');
   if(!host.textContent.includes(t('conflictStageSymlink'))||!host.textContent.includes(t('conflictStageMissing')))throw Error('Symlink or missing-stage disclosure absent');
   const editor=await (async()=>{await wait(()=>host.querySelector('.monaco-diff-editor'));return host.querySelector('.monaco-diff-editor');})();
+  if(![...host.querySelectorAll('.view-line')].map(n=>n.textContent).join('|').includes('base'))throw Error('Stage text missing from the rendered diff editor');
   tick=2;render(lang);await new Promise(r=>setTimeout(r,60));
   if(host.querySelector('.monaco-diff-editor')!==editor)throw Error('Ancestor re-render rebuilt the conflict diff editor');
   tick=3;mode='notices';render(lang+'-notices');await wait(()=>host.textContent.includes(overLimit));
@@ -37,7 +38,7 @@ export async function checkConflictStages(){
   const before=calls.length;[...host.querySelectorAll('button')].find(b=>b.textContent===t('retry')).click();await wait(()=>calls.length===before+1);
   mode='expired';[...host.querySelectorAll('button')].find(b=>b.textContent===t('retry')).click();await wait(()=>rediscovered===1);
   mode='pending';tick=6;render(lang+'-pending');await wait(()=>pending.length===1);const old=calls.at(-1);tick=7;render(lang+'-next');await wait(()=>old.signal.aborted);pending.forEach(done=>done());await new Promise(r=>setTimeout(r,30));
-  if(host.textContent.includes('base\n'))throw Error('Stale conflict response replaced the new selection');
-  mode='normal';tick=8;render(lang+'-final');await wait(()=>host.textContent.includes('base\n'));
+  if(host.textContent.includes('base'))throw Error('Stale conflict response replaced the new selection');
+  mode='normal';tick=8;render(lang+'-final');await wait(()=>host.textContent.includes(t('conflictStageAbsent')));
  }}finally{root.unmount();host.remove();}
 }
