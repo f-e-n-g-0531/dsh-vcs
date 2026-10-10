@@ -413,6 +413,45 @@ export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,lim
   const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
   return {...historyPage(parseHistory(text.toString('utf8'),limit+1),commit,offset,limit),path:entry.path,followsRenames:false};
 }
+
+// Shared bounded rename-follow implementation for an explicit historical path.
+async function followHistoricalPath(repo,{commit,file,offset,limit,signal}){
+ const count=offset+limit+1,deadline=Date.now()+TIMEOUT;
+ const followOptions=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Rename tracing timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
+ const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--diff-merges=first-parent','--find-renames=50%','-l100','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',file],MAX_TEXT,followOptions());
+ const chain=parseFollowHistory(output.toString('utf8'),file,count,{similarity:true});
+ let checks=0;
+ for(let index=0;index<chain.length;index++){
+  const row=chain[index];if(!row.oldPath)continue;
+  let boundary;
+  if(++checks>32)boundary='rename-check-limit';
+  else {
+   const raw=await git(repo.root,['diff-tree','--no-commit-id','--name-status','-z','-r','--no-renames','--no-ext-diff','--no-textconv',row.parents[0],row.id,'--'],MAX_TEXT,followOptions());
+   const changes=parseCommitChanges(raw.toString('utf8'),row.id);
+   const removed=changes.filter(change=>change.status==='deleted'),added=changes.filter(change=>change.status==='added');
+   if(removed.length!==1||added.length!==1||removed[0].path!==row.oldPath||added[0].path!==row.path)boundary='ambiguous-rename';
+  }
+  if(boundary){chain[index]={...row,boundary};chain.length=index+1;break;}
+ }
+ return {...historyPage(chain.slice(offset),commit,offset,limit),path:file,followsRenames:true,followPolicy:'unique-similarity-first-parent'};
+}
+
+// Explicit historical path history; the path must exist in the selected commit.
+export async function listPathHistory(repo,{commit,path:file,offset=0,limit=50,follow=false,signal}={}){
+ if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw Error('Invalid commit id');
+ if(typeof file!=='string'||!file||file.length>32768||file.includes('\0')||file.startsWith('/')||file.split('/').some(part=>!part||part==='.'||part==='..'))throw Error('Invalid historical path');
+ if(typeof follow!=='boolean')throw Error('Invalid rename follow mode');
+ if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw Error('Invalid history pagination');
+ repo=await checkedRepo(repo,signal);
+ if(repo.type!=='git')throw Error('Historical path history supports Git only');
+ const listing=(await git(repo.root,['ls-tree','-z',commit,'--',file],MAX_TEXT,{signal})).toString('utf8');
+ const record=listing.split('\0').filter(Boolean).find(row=>row.slice(row.indexOf('\t')+1)===file);
+ if(!record)throw Error('Path does not exist in the selected commit');
+ const mode=record.slice(0,record.indexOf('\t')).split(' ')[0];
+ if(follow&&!['100644','100755','120000'].includes(mode))throw Error('Rename following requires a committed regular file or link');
+ return follow?followHistoricalPath(repo,{commit,file,offset,limit,signal}):{...historyPage(parseHistory((await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',file],MAX_TEXT,{signal})).toString('utf8'),limit+1),commit,offset,limit),path:file,followsRenames:false};
+}
+
 export async function getRevisionChanges(repo,{base,target,signal}={}){
   for(const oid of [base,target])if(typeof oid!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))throw new Error('Invalid revision commit id');
   signal?.throwIfAborted();repo=await checkedRepo(repo,signal);

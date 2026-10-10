@@ -100,6 +100,17 @@ test('historical file enforces path grants and rejects stale results',async()=>{
  const moved=setup({getHistoricalFile:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree-file',p)).error.code,'vcs/rediscover-required');
  const cancel=setup({getHistoricalFile:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree-file',p,controller.signal)).error.code,'vcs/cancelled');
 });
+test('explicit historical path history enforces commit path pagination grants and cancellation',async()=>{
+ const p={...payload,commit:'a'.repeat(40),path:'nested/file.txt',offset:0,limit:50,follow:false},controller=new AbortController();let count=0;
+ const h=setup({listPathHistory:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.equal(o.commit,p.commit);assert.equal(o.path,p.path);assert.equal(o.signal,count===1?controller.signal:undefined);assert.equal(o.offset,0);assert.equal(o.limit,50);assert.equal(o.follow,count===2);return {commits:[]};}});
+ assert.equal((await h.call('vcs/tree-history',p)).error.code,'vcs/rediscover-required');await h.discover();
+ for(const extra of [{root:'/evil'},{path:'../secret'},{path:'/secret'},{path:''},{path:null},{path:'a//b'},{path:'x\0'},{follow:'yes'},{follow:1},{offset:-1},{offset:1.5},{offset:10001},{limit:0},{limit:101},{limit:null},{commit:'HEAD'},{id:'b'.repeat(64)},{mode:'staged'}])assert.equal((await h.call('vcs/tree-history',{...p,...extra})).error.code,'vcs/invalid-request',JSON.stringify(extra));
+ assert.equal(count,0);assert.equal((await h.call('vcs/tree-history',p,controller.signal)).ok,true);assert.equal(count,1);
+ assert.equal((await h.call('vcs/tree-history',{...p,follow:true})).ok,true);assert.equal(count,2);
+ h.expire();assert.equal((await h.call('vcs/tree-history',p)).error.code,'vcs/rediscover-required');
+ const moved=setup({listPathHistory:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree-history',p)).error.code,'vcs/rediscover-required');
+ const cancel=setup({listPathHistory:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree-history',p,controller.signal)).error.code,'vcs/cancelled');
+});
 test('historical tree enforces commit-only grants and rejects stale results',async()=>{
  const p={...payload,commit:'a'.repeat(40)},controller=new AbortController();let count=0;
  const h=setup({getHistoricalTree:async(r,o)=>{count++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,signal:controller.signal});return {entries:[]};}});

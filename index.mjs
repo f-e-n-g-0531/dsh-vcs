@@ -44,6 +44,7 @@ const REQUEST_FIELDS = {
   'vcs/tree': ['sessionId', 'repositoryId', 'commit'],
   'vcs/tree-file': ['sessionId', 'repositoryId', 'commit', 'path'],
   'vcs/tree-segment': ['sessionId', 'repositoryId', 'commit', 'path', 'offset'],
+  'vcs/tree-history': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'limit', 'follow'],
   'vcs/commit-image': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'side'],
   'vcs/workspace-image': ['sessionId', 'repositoryId', 'mode', 'id', 'side'],
 };
@@ -58,23 +59,23 @@ function validatePayload(endpoint, payload) {
     }
   } else {
     if (typeof payload.repositoryId !== 'string' || !payload.repositoryId || payload.repositoryId.length > 1024) throw invalid('A discovered repositoryId is required.');
-    if(['vcs/tree-file','vcs/tree-segment'].includes(endpoint)&&(typeof payload.path!=='string'||!payload.path||payload.path.length>32768||payload.path.includes('\0')||payload.path.startsWith('/')||payload.path.split('/').some(part=>!part||part==='.'||part==='..')))throw invalid('Invalid historical file path.');
+    if(['vcs/tree-file','vcs/tree-segment','vcs/tree-history'].includes(endpoint)&&(typeof payload.path!=='string'||!payload.path||payload.path.length>32768||payload.path.includes('\0')||payload.path.startsWith('/')||payload.path.split('/').some(part=>!part||part==='.'||part==='..')))throw invalid('Invalid historical file path.');
     if(['vcs/commit-image','vcs/revision-image','vcs/workspace-image'].includes(endpoint)&&payload.side!==undefined&&!['left','right'].includes(payload.side))throw invalid('Invalid image side.');
     if(['vcs/revision-changes','vcs/revision-compare','vcs/revision-image'].includes(endpoint)){
       for(const oid of [payload.base,payload.target])if(typeof oid!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))throw invalid('Invalid revision commit id.');
       if(['vcs/revision-compare','vcs/revision-image'].includes(endpoint)&&(typeof payload.id!=='string'||!/^[a-f0-9]{64}$/.test(payload.id)))throw invalid('Invalid revision change id.');
     }
     if(['vcs/commit-compare','vcs/file-history','vcs/blame','vcs/commit-image'].includes(endpoint)&&(typeof payload.id!=='string'||!/^[a-f0-9]{64}$/.test(payload.id)))throw invalid('Invalid historical change id.');
-    if(['vcs/commit','vcs/commit-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/commit-image'].includes(endpoint)){
+    if(['vcs/commit','vcs/commit-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/tree-history','vcs/commit-image'].includes(endpoint)){
       if(typeof payload.commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(payload.commit))throw invalid('Invalid commit id.');
       if(payload.parentIndex!==undefined&&(!Number.isInteger(payload.parentIndex)||payload.parentIndex<0||payload.parentIndex>100))throw invalid('Invalid parent index.');
     }
     if(['vcs/compare','vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large!==undefined&&typeof payload.large!=='boolean')throw invalid('Invalid large comparison mode.');
     if(endpoint==='vcs/tree-segment'&&payload.offset!==undefined&&(!Number.isInteger(payload.offset)||payload.offset<0||payload.offset>16777216))throw invalid('Invalid segment offset.');
     if(endpoint==='vcs/blame'&&((payload.startLine!==undefined&&(!Number.isInteger(payload.startLine)||payload.startLine<1||payload.startLine>100001))||(payload.lineLimit!==undefined&&(!Number.isInteger(payload.lineLimit)||payload.lineLimit<1||payload.lineLimit>500))))throw invalid('Invalid blame line window.');
-    if(endpoint==='vcs/file-history'&&payload.follow!==undefined&&typeof payload.follow!=='boolean')throw invalid('Invalid rename follow mode.');
+    if(['vcs/file-history','vcs/tree-history'].includes(endpoint)&&payload.follow!==undefined&&typeof payload.follow!=='boolean')throw invalid('Invalid rename follow mode.');
     if(endpoint==='vcs/history'){try{historySearchArgs(payload.search);}catch{throw invalid('Invalid history search.');}}
-    if(['vcs/history','vcs/file-history'].includes(endpoint)){
+    if(['vcs/history','vcs/file-history','vcs/tree-history'].includes(endpoint)){
       if(payload.offset===null||payload.limit===null)throw invalid('Invalid history pagination.');
       if(payload.snapshot!==undefined&&(typeof payload.snapshot!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(payload.snapshot)))throw invalid('Invalid history snapshot.');
       if(!Number.isInteger(payload.offset??0)||(payload.offset??0)<0||(payload.offset??0)>10000||!Number.isInteger(payload.limit??50)||(payload.limit??50)<1||(payload.limit??50)>100)throw invalid('Invalid history pagination.');
@@ -88,6 +89,8 @@ function validatePayload(endpoint, payload) {
 /** Dispatch only after grants and capacity have been checked by createHandler. */
 async function readRepository(api, endpoint, repository, payload, {cwd, mode, signal}) {
   switch (endpoint) {
+    case 'vcs/tree-history':
+      return api.listPathHistory({...repository},{commit:payload.commit,path:payload.path,offset:payload.offset??0,limit:payload.limit??50,follow:payload.follow??false,signal});
     case 'vcs/tree-segment':
       return api.getHistoricalSegment({...repository}, {commit: payload.commit, path: payload.path, offset: payload.offset ?? 0, signal});
     case 'vcs/workspace-image':
@@ -146,7 +149,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
   }
   if(bindSvnIdentityResolver!==undefined){if(typeof bindSvnIdentityResolver!=='function')throw new Error('Invalid internal SVN resolver binding');bindSvnIdentityResolver(async(address,signal)=>{validatePayload('vcs/svn-identity',address);signal?.throwIfAborted();const cwd=await resolveSessionCwd(ctx,address.sessionId,signal),entry=current(address.sessionId,cwd),repository=entry?.repositories.get(address.repositoryId);if(!repository)throw rediscover();if(repository.type!=='svn')throw invalid('SVN working copy required.');const identity=await api.getSvnIdentity({...repository},{signal});await assertCurrent(address.sessionId,cwd,entry,signal);if(entry.repositories.get(address.repositoryId)!==repository)throw rediscover();return {...identity,cwd};});}
   return async (endpoint, payload, signal) => {
-    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
+    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
     let imageSlot=false,segmentSlot=false;
