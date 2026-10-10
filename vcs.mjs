@@ -469,7 +469,33 @@ function modeFor(repo, mode) {
   if (!['all', 'staged', 'unstaged'].includes(mode)) throw new Error('Invalid comparison mode');
   if (repo.type === 'svn' && mode !== 'all') throw new Error('SVN supports only all mode');
 }
-function identity(entry, mode) { return createHash('sha256').update(JSON.stringify([mode, entry.path, entry.oldPath, entry.status, entry.indexStatus, entry.worktreeStatus, entry.propertyStatus])).digest('hex'); }
+function identity(entry, mode) { return createHash('sha256').update(JSON.stringify([mode, entry.path, entry.oldPath, entry.status, entry.indexStatus, entry.worktreeStatus, entry.propertyStatus, entry.submodule?.recorded, entry.submodule?.checkout])).digest('hex'); }
+// Read-only gitlink metadata: recorded index pointer plus local checkout presence.
+// Never runs Git inside the submodule, never follows its gitdir and never fetches.
+async function annotateSubmodules(repo, entries, options) {
+  if (!entries.length) return;
+  let listing;
+  try { listing = (await git(repo.root, ['ls-files', '--stage', '-z'], MAX_TEXT, options)).toString('utf8'); }
+  catch (e) { if (e.code === 'TOO_LARGE') return; throw e; }
+  const pointers = new Map();
+  for (const record of listing.split('\0')) {
+    const tab = record.indexOf('\t'); if (tab < 0) continue;
+    const [mode, oid] = record.slice(0, tab).split(' ');
+    if (mode === '160000' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid)) pointers.set(record.slice(tab + 1), oid);
+  }
+  if (!pointers.size) return;
+  for (const entry of entries) {
+    const recorded = pointers.get(entry.path); if (!recorded) continue;
+    let checkout = 'uninitialized';
+    try {
+      const target = await confined(repo.root, entry.path);
+      const info = await fs.lstat(target);
+      if (info.isDirectory()) { try { await fs.lstat(path.join(target, '.git')); checkout = 'initialized'; } catch (inner) { if (inner.code !== 'ENOENT') checkout = 'unreadable'; } }
+      else checkout = 'uninitialized';
+    } catch (e) { checkout = e.code === 'ENOENT' ? 'absent' : 'unreadable'; }
+    entry.submodule = { recorded, checkout };
+  }
+}
 const statuses = { M: 'modified', A: 'added', D: 'deleted', R: 'renamed', C: 'copied', U: 'conflicted', T: 'typechanged', '?': 'untracked' };
 async function changes(repo, mode, options) {
   let entries;
@@ -485,6 +511,7 @@ async function changes(repo, mode, options) {
       const code = mode === 'staged' ? x : mode === 'unstaged' ? y : (y !== ' ' && y !== '?' ? y : x);
       entries.push({ path: file, ...(oldPath ? { oldPath } : {}), status: conflict ? 'conflicted' : statuses[code] || 'modified', indexStatus: x, worktreeStatus: y });
     }
+    await annotateSubmodules(repo, entries, options);
   } else {
     const document = parseXML(await svn(repo.root, ['status', '--xml', '--ignore-externals', '--', '.']));
     entries = [];
@@ -513,6 +540,14 @@ async function working(root, relative, svnLink = false) {
   try { const info = await handle.stat(); if (!info.isFile()) throw new Error('Not a regular file'); const buffer = Buffer.alloc(MAX_TEXT + 1); const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0); await confined(root, relative); return decode(buffer.subarray(0, bytesRead)); } finally { await handle.close(); }
 }
 async function gitBlob(root, revision, file) { return content(() => git(root, ['show', '--no-ext-diff', '--no-textconv', revision + ':' + file], MAX_TEXT)); }
+// Gitlink pointers are commits, not blobs; read the tree entry instead of `git show`.
+async function gitlinkAt(root, revision, file) {
+  const listing = (await git(root, ['ls-tree','-z',revision,'--',file], MAX_TEXT)).toString('utf8');
+  const record = listing.split('\0').filter(Boolean).find(row => row.slice(row.indexOf('\t') + 1) === file);
+  if (!record) return null;
+  const [mode, , oid] = record.slice(0, record.indexOf('\t')).split(' ');
+  return mode === '160000' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid) ? oid : null;
+}
 async function historicalBlob(root,revision,file,signal,large=false,budget){
   const listing=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,budget?budget():{signal})).toString('utf8');
   const records=listing.split(String.fromCharCode(0)).filter(Boolean);
@@ -625,7 +660,12 @@ export async function getComparison(repo, { mode = 'all', id, large=false, signa
   let left = { text: '' }, right = { text: '' }, leftLabel, rightLabel, props, notice;
   if (repo.type === 'git') {
     leftLabel = mode === 'unstaged' ? 'Index' : 'HEAD'; rightLabel = mode === 'staged' ? 'Index' : 'Working tree';
-    if (entry.status === 'conflicted') {
+    if (entry.submodule) {
+      const head = mode === 'unstaged' ? null : await gitlinkAt(repo.root, 'HEAD', entry.oldPath || entry.path).catch(() => null);
+      left = mode === 'unstaged' ? { text: 'Submodule ' + entry.submodule.recorded } : head ? { text: 'Submodule ' + head } : { text: '', notice: 'No recorded submodule pointer in HEAD.' };
+      right = mode === 'unstaged' ? { text: '', notice: 'Working submodule checkout is not read.' } : { text: 'Submodule ' + entry.submodule.recorded };
+      notice = 'Submodule pointer (checkout: ' + entry.submodule.checkout + '); the submodule working tree is not read.';
+    } else if (entry.status === 'conflicted') {
       notice = 'Unmerged conflict: showing HEAD versus working tree (index has conflict stages).'; leftLabel = 'HEAD'; rightLabel = 'Working tree';
       try { left = await gitBlob(repo.root, 'HEAD', entry.oldPath || entry.path); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; }
       right = await working(repo.root, entry.path);
@@ -652,5 +692,6 @@ export async function getComparison(repo, { mode = 'all', id, large=false, signa
     if (entry.status !== 'unversioned') props = { left: added ? {} : await properties(repo.root, entry.path, true), right: ['deleted', 'missing'].includes(entry.status) ? {} : await properties(repo.root, entry.path, false) };
     if (entry.status === 'conflicted') notice = 'Conflicted working copy: showing BASE versus working content.';
   }
+  if (entry.submodule) notice = [notice, `Submodule pointer ${entry.submodule.recorded} (checkout: ${entry.submodule.checkout}); the submodule working tree is not read.`].filter(Boolean).join(' ');
   return { ...entry, left: { label: leftLabel, text: left.text, encoding: left.encoding }, right: { label: rightLabel, text: right.text, encoding: right.encoding }, ...(left.binary || right.binary ? { binary: true } : {}), ...([notice, left.notice, right.notice].filter(Boolean).length ? { notice: [...new Set([notice, left.notice, right.notice].filter(Boolean))].join(' ') } : {}), ...(props ? { properties: props } : {}) };
 }

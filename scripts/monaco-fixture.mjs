@@ -57,7 +57,8 @@ try{
  phase='image-ui';await (await import('./history-viewer-browser.js')).checkImageUI();
  phase='conflict-stages';await (await import('./history-viewer-browser.js')).checkConflictStages();
  phase='path-history';await (await import('./history-viewer-browser.js')).checkPathHistory();
+ phase='submodule-badge';await (await import('./history-viewer-browser.js')).checkSubmoduleBadge();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);
