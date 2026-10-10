@@ -54,6 +54,21 @@ test('exact rename with identical competing deleted source stops',async()=>{
   git('mv','one.txt','new.txt');git('rm','two.txt');git('commit','-qm','ambiguous exact');
   const commit=git('rev-parse','HEAD').trim(),repo=await detectRepository(root),details=await getCommitDetails(repo,{commit}),entry=details.changes.find(row=>row.path==='new.txt');
   const page=await listFileHistory(repo,{commit,id:entry.id,follow:true});assert.equal(page.commits.length,1);assert.equal(page.commits[0].boundary,'ambiguous-rename');
+  git('mv','new.txt','destination.txt');await writeFile(path.join(root,'extra.txt'),'identical');git('add','.');git('commit','-qm','duplicate destinations');
+  const nextCommit=git('rev-parse','HEAD').trim(),nextDetails=await getCommitDetails(repo,{commit:nextCommit}),nextEntry=nextDetails.changes.find(row=>row.path==='destination.txt');
+  const stopped=await listFileHistory(repo,{commit:nextCommit,id:nextEntry.id,follow:true});assert.equal(stopped.commits[0].boundary,'ambiguous-rename');assert.equal(stopped.commits.length,1);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('rename confirmation cap is stable across pagination lookahead',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-cap-')),git=gitCommand(root);
+ try{
+  git('init','-q');git('config','user.name','Follow');git('config','user.email','f@example.test');
+  await writeFile(path.join(root,'file0.txt'),'same');git('add','.');git('commit','-qm','create');
+  for(let i=1;i<=33;i++){git('mv','file'+(i-1)+'.txt','file'+i+'.txt');git('commit','-qm','rename'+i);}
+  const commit=git('rev-parse','HEAD').trim(),repo=await detectRepository(root),details=await getCommitDetails(repo,{commit}),id=details.changes[0].id;
+  const first=await listFileHistory(repo,{commit,id,follow:true,limit:32});assert.equal(first.commits.length,32);assert.equal(first.commits[31].subject,'rename2');assert.equal(first.nextOffset,32);
+  const last=await listFileHistory(repo,{commit,id,follow:true,offset:32,limit:2});assert.equal(last.commits.length,1);assert.equal(last.commits[0].subject,'rename1');assert.equal(last.commits[0].boundary,'rename-check-limit');assert.equal(last.nextOffset,null);
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
