@@ -8,7 +8,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
-import {decode, MAX_TEXT} from './text-content.mjs';
+import {decode, MAX_TEXT, MAX_LARGE_TEXT, decodeLargeText} from './text-content.mjs';
 import {inside, confined} from './repository-path.mjs';
 const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseTagValue: false, parseAttributeValue: false, trimValues: false, processEntities: true, isArray: name => ['entry', 'target', 'property'].includes(name) });
 
@@ -455,35 +455,48 @@ async function working(root, relative, svnLink = false) {
   try { const info = await handle.stat(); if (!info.isFile()) throw new Error('Not a regular file'); const buffer = Buffer.alloc(MAX_TEXT + 1); const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0); await confined(root, relative); return decode(buffer.subarray(0, bytesRead)); } finally { await handle.close(); }
 }
 async function gitBlob(root, revision, file) { return content(() => git(root, ['show', '--no-ext-diff', '--no-textconv', revision + ':' + file], MAX_TEXT)); }
-async function historicalBlob(root,revision,file,signal){
+async function historicalBlob(root,revision,file,signal,large=false){
   const listing=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,{signal})).toString('utf8');
   const records=listing.split(String.fromCharCode(0)).filter(Boolean);
   const record=records.find(row=>row.slice(row.indexOf('	')+1)===file);
   if(!record)throw new Error('Historical path missing');
   const [mode,type,oid]=record.slice(0,record.indexOf('	')).split(' ');
+  if(large&&(!['100644','100755'].includes(mode)||type!=='blob'))throw new Error('Large comparison requires a committed regular file.');
   if(mode==='160000')return {text:oid,notice:'Submodule commit reference; repository contents are not loaded.'};
   if(type!=='blob'||!['100644','100755','120000'].includes(mode))return {text:'',notice:'Unsupported historical object type.'};
+  if (large) {
+    const rawSize = (await git(root, ['cat-file', '-s', oid], MAX_TEXT, {signal})).toString('utf8').trim();
+    if (!/^\d+$/.test(rawSize)) throw new Error('Invalid historical object size.');
+    const size = Number(rawSize);
+    if (size > MAX_LARGE_TEXT) throw new Error('Large comparison exceeds 8 MiB per side.');
+    const buffer = await git(root, ['cat-file', 'blob', oid], MAX_LARGE_TEXT, {signal});
+    if (buffer.length !== size) throw new Error('Historical object size changed.');
+    return decodeLargeText(buffer, signal);
+  }
+
   const result=await content(()=>git(root,['cat-file','blob',oid],MAX_TEXT,{signal}));
   if(mode==='120000')result.notice=[result.notice,'Symbolic link target text; not followed.'].filter(Boolean).join(' ');
   return result;
 }
-export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal}={}){
+export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal,large=false}={}){
+  if(typeof large!=='boolean')throw new Error('Invalid large comparison mode');
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
   const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Historical change is not part of selected commit and parent');
-  const left=details.parent&&entry.status!=='added'?await historicalBlob(repo.root,details.parent,entry.oldPath||entry.path,signal):{text:''};
-  const right=entry.status!=='deleted'?await historicalBlob(repo.root,commit,entry.path,signal):{text:''};
-  return {...entry,left:{...left,label:details.parent||'Empty tree'},right:{...right,label:commit},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
+  const left=details.parent&&entry.status!=='added'?await historicalBlob(repo.root,details.parent,entry.oldPath||entry.path,signal,large):{text:''};
+  const right=entry.status!=='deleted'?await historicalBlob(repo.root,commit,entry.path,signal,large):{text:''};
+  return {...entry,large,left:{...left,label:details.parent||'Empty tree'},right:{...right,label:commit},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
 }
-export async function getRevisionComparison(repo,{base,target,id,signal}={}){
+export async function getRevisionComparison(repo,{base,target,id,signal,large=false}={}){
+  if(typeof large!=='boolean')throw new Error('Invalid large comparison mode');
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid revision change id');
   const details=await getRevisionChanges(repo,{base,target,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected revision pair');
-  const left=entry.status!=='added'?await historicalBlob(repo.root,base,entry.oldPath||entry.path,signal):{text:''};
-  const right=entry.status!=='deleted'?await historicalBlob(repo.root,target,entry.path,signal):{text:''};
-  return {...entry,base,target,left:{...left,label:base},right:{...right,label:target},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
+  const left=entry.status!=='added'?await historicalBlob(repo.root,base,entry.oldPath||entry.path,signal,large):{text:''};
+  const right=entry.status!=='deleted'?await historicalBlob(repo.root,target,entry.path,signal,large):{text:''};
+  return {...entry,base,target,large,left:{...left,label:base},right:{...right,label:target},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
 }
 async function properties(root, file, base) {
   const result = parseXML(await svn(root, ['proplist', '--xml', '--verbose', ...(base ? ['--revision', 'BASE'] : []), '--', file + '@']));

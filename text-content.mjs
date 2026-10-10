@@ -1,5 +1,28 @@
 /** Pure bounded byte decoding shared by working and committed previews. */
 export const MAX_TEXT = 2 * 1024 * 1024;
+export const MAX_LARGE_TEXT = 8 * 1024 * 1024;
+
+/** Explicit historical mode only: complete UTF-8, never a truncated Diff input. */
+export function decodeLargeText(buffer, signal) {
+  signal?.throwIfAborted();
+  if (buffer.length > MAX_LARGE_TEXT) throw new Error('Large comparison exceeds 8 MiB per side.');
+  if (buffer.some(byte => byte < 32 && ![9, 10, 12, 13].includes(byte))) {
+    throw new Error('Large comparison requires UTF-8 text without binary control bytes.');
+  }
+  let text;
+  try { text = new TextDecoder('utf-8', {fatal: true}).decode(buffer); }
+  catch { throw new Error('Large comparison requires valid UTF-8 text.'); }
+  let lines = 1, length = 0;
+  for (let index = 0; index < text.length; index++) {
+    if (index % 65536 === 0) signal?.throwIfAborted();
+    if (text[index] === '\n') {
+      if (++lines > 100000) throw new Error('Large comparison exceeds 100000 lines per side.');
+      length = 0;
+    } else if (++length > 65536) throw new Error('Large comparison exceeds 65536 characters per line.');
+  }
+  signal?.throwIfAborted();
+  return {text, encoding: 'UTF-8', totalBytes: buffer.length, lineCount: lines};
+}
 
 export function decode(buffer) {
   if (buffer.length > MAX_TEXT) {
