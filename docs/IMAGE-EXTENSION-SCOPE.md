@@ -6,7 +6,7 @@ Git工作区及两个本地提交的A/B比较支持部分静态图片。新增�
 
 - PNG：经过严格结构和像素检查，并移除附加元数据。
 - JPEG：仅基线单扫描，详见[JPEG范围](<JPEG-SCOPE.md>)。
-- WebP：仅简单静态VP8，详见[WebP范围](<WEBP-SCOPE.md>)。
+- WebP：仅简单静态VP8／无损VP8L，详见[WebP范围](<WEBP-SCOPE.md>)。
 
 不支持SVG、动画或未经验证的格式。SVN工作区图片不在此范围。
 
