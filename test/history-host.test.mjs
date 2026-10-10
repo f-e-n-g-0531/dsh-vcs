@@ -49,6 +49,13 @@ test('file history follow is boolean authorized and forwards unchanged cancellat
  const controller=new AbortController();assert.equal((await h.call('vcs/file-history',p,controller.signal)).ok,true);assert.equal(received.follow,true);assert.equal(received.signal,controller.signal);
  const moved=setup({listFileHistory:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');
 });
+test('rename follow discards in-flight cancellation and cwd changes',async()=>{
+ const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64),follow:true};let finish,entered;const started=new Promise(resolve=>entered=resolve),controller=new AbortController();
+ const h=setup({listFileHistory:async(_r,o)=>{assert.equal(o.signal,controller.signal);entered();return new Promise(resolve=>finish=resolve);}});await h.discover();
+ const request=h.call('vcs/file-history',p,controller.signal);await started;controller.abort();finish({commits:[]});assert.equal((await request).error.code,'vcs/cancelled');
+ const moved=setup({listFileHistory:async()=>{moved.move();return {commits:[]};}});await moved.discover();assert.equal((await moved.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');
+});
+
 test('history search validates strict query fields and forwards literal search under grants',async()=>{
  const search={message:'--all .*',author:'作者',path:':(glob)*.txt'};let received;
  const h=setup({listHistory:async(_r,o)=>{received=o;return {commits:[]};}});await h.discover();

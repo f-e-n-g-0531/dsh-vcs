@@ -5,6 +5,8 @@ import {detectRepository,listFileHistory,getCommitDetails} from '../vcs.mjs';
 test('follow parser refuses malformed framing mismatched paths and invalid scores',()=>{
  const oid='a'.repeat(40),header=[oid,'','author','2026-10-09T00:00:00Z','subject'].join('\0')+'\0';
  const output=header+'\nM\0path\0';assert.equal(parseFollowHistory(output,'path',1)[0].path,'path');
+ for(const score of [50,87,100]){const rows=parseFollowHistory(header+'\nR'+score+'\0old\0path\0','path',1,{similarity:true});assert.equal(rows[0].oldPath,'old');assert.equal(rows[0].similarity,score);}
+ assert.equal(parseFollowHistory(header+'\nR49\0old\0path\0','path',1,{similarity:true})[0].boundary,'copy-or-inexact-rename');
  for(const data of [output.slice(0,-1),header+'\nR101\0old\0path\0',header+'\nR100\0old\0',header+'\nM\0wrong\0',output+output])assert.throws(()=>parseFollowHistory(data,'path',1));
 });
 test('merge introduction stops at explicit first-parent identity boundary',async()=>{
@@ -41,6 +43,17 @@ test('similar rename rejects competing deletions and replay preserves old path',
   git('mv','new.txt','final.txt');git('rm','competitor.txt');await writeFile(path.join(root,'final.txt'),content+'\nchanged again');git('add','.');git('commit','-qm','ambiguous');
   commit=git('rev-parse','HEAD').trim();detail=await getCommitDetails(repo,{commit});const entry=detail.changes.find(row=>row.path==='final.txt');
   const stopped=await listFileHistory(repo,{commit,id:entry.id,follow:true});assert.equal(stopped.commits.length,1);assert.equal(stopped.commits[0].boundary,'ambiguous-rename');assert.equal(stopped.nextOffset,null);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('exact rename with identical competing deleted source stops',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'vcs-follow-exact-ambiguous-')),git=gitCommand(root);
+ try{
+  git('init','-q');git('config','user.name','Follow');git('config','user.email','f@example.test');
+  for(const name of ['one.txt','two.txt'])await writeFile(path.join(root,name),'identical');git('add','.');git('commit','-qm','sources');
+  git('mv','one.txt','new.txt');git('rm','two.txt');git('commit','-qm','ambiguous exact');
+  const commit=git('rev-parse','HEAD').trim(),repo=await detectRepository(root),details=await getCommitDetails(repo,{commit}),entry=details.changes.find(row=>row.path==='new.txt');
+  const page=await listFileHistory(repo,{commit,id:entry.id,follow:true});assert.equal(page.commits.length,1);assert.equal(page.commits[0].boundary,'ambiguous-rename');
  }finally{await rm(root,{recursive:true,force:true});}
 });
 

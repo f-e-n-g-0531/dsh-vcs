@@ -386,18 +386,19 @@ export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,lim
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected commit');
   if(follow){
-   const count=offset+limit+1;
-   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--diff-merges=first-parent','--find-renames=50%','-l100','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
+   const count=offset+limit+1,deadline=Date.now()+TIMEOUT;
+   const followOptions=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Rename tracing timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
+   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--diff-merges=first-parent','--find-renames=50%','-l100','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,followOptions());
    const chain=parseFollowHistory(output.toString('utf8'),entry.path,count,{similarity:true});
    let checks=0;
    for(let index=0;index<chain.length;index++){
-    const row=chain[index];if(!row.oldPath||row.similarity===100)continue;
+    const row=chain[index];if(!row.oldPath)continue;
     let boundary;
     if(++checks>32)boundary='rename-check-limit';
     else {
      // Confirm the whole transition, not Git's selected-path heuristic alone.
      // A single deletion and addition excludes competing deleted sources.
-     const raw=await git(repo.root,['diff-tree','--no-commit-id','--name-status','-z','-r','--no-renames','--no-ext-diff','--no-textconv',row.parents[0],row.id,'--'],MAX_TEXT,{signal});
+     const raw=await git(repo.root,['diff-tree','--no-commit-id','--name-status','-z','-r','--no-renames','--no-ext-diff','--no-textconv',row.parents[0],row.id,'--'],MAX_TEXT,followOptions());
      const changes=parseCommitChanges(raw.toString('utf8'),row.id);
      const removed=changes.filter(change=>change.status==='deleted'),added=changes.filter(change=>change.status==='added');
      if(removed.length!==1||added.length!==1||removed[0].path!==row.oldPath||added[0].path!==row.path)boundary='ambiguous-rename';
