@@ -10,6 +10,7 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
 import {decode, MAX_TEXT, MAX_LARGE_TEXT, decodeLargeText} from './text-content.mjs';
 import {inside, confined} from './repository-path.mjs';
+import {readWorkspaceLargeText} from './workspace-large-text.mjs';
 const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseTagValue: false, parseAttributeValue: false, trimValues: false, processEntities: true, isArray: name => ['entry', 'target', 'property'].includes(name) });
 
 
@@ -430,10 +431,10 @@ function modeFor(repo, mode) {
 }
 function identity(entry, mode) { return createHash('sha256').update(JSON.stringify([mode, entry.path, entry.oldPath, entry.status, entry.indexStatus, entry.worktreeStatus, entry.propertyStatus])).digest('hex'); }
 const statuses = { M: 'modified', A: 'added', D: 'deleted', R: 'renamed', C: 'copied', U: 'conflicted', T: 'typechanged', '?': 'untracked' };
-async function changes(repo, mode) {
+async function changes(repo, mode, options) {
   let entries;
   if (repo.type === 'git') {
-    const fields = (await git(repo.root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none'])).toString('utf8').split('\0');
+    const fields = (await git(repo.root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none'],undefined,options)).toString('utf8').split('\0');
     entries = [];
     for (let i = 0; i < fields.length && fields[i]; i++) {
       const raw = fields[i], x = raw[0], y = raw[1], file = raw.slice(3);
@@ -521,8 +522,39 @@ async function properties(root, file, base) {
   for (const target of result.properties?.target || []) for (const prop of target.property || []) props[prop.name] = prop.encoding === 'base64' ? '[base64] ' + (prop['#text'] || '') : String(prop['#text'] ?? '');
   return props;
 }
+async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
+ signal?.throwIfAborted();repo=await checkedRepo(repo,signal);modeFor(repo,mode);
+ if(repo.type!=='git')throw Error('Large workspace comparison supports Git only');
+ const deadline=Date.now()+TIMEOUT;
+ const options=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Workspace comparison timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
+ const run=args=>git(repo.root,args,MAX_TEXT,options());
+ const status=()=>changes(repo,mode,options());
+ const entry=(await status()).find(row=>row.id===id);if(!entry)throw Error('Change no longer exists; refresh repository status');
+ if(entry.status==='conflicted')throw Error('Large conflicted comparisons are not supported');
+ const head=async()=>{try{return (await run(['rev-parse','--verify','HEAD^{commit}'])).toString('utf8').trim();}catch(e){if(e.code!=='VCS_COMMAND')throw e;const ref=(await run(['symbolic-ref','-q','HEAD'])).toString('utf8').trim();try{await run(['show-ref','--verify','--quiet',ref]);}catch(missing){if(missing.code==='VCS_COMMAND'&&missing.exitCode===1)return null;throw missing;}throw e;}};
+ const revision=await head(),indexArgs=['ls-files','--stage','-z','--',entry.path],index=await run(indexArgs);
+ const readIndex=async()=>{
+  const rows=index.toString('utf8').split('\0').filter(Boolean);if(rows.length!==1)throw Error('Large comparison requires one stage0 Index entry');
+  const match=/^(100644|100755) ([a-f0-9]{40}|[a-f0-9]{64}) 0\t/.exec(rows[0]);if(!match||rows[0].slice(match[0].length)!==entry.path)throw Error('Large comparison requires a regular Index file');
+  const size=(await run(['cat-file','-s',match[2]])).toString('utf8').trim();if(!/^\d+$/.test(size)||Number(size)>MAX_LARGE_TEXT)throw Error('Large comparison exceeds 8 MiB per side');
+  const bytes=await git(repo.root,['cat-file','blob',match[2]],MAX_LARGE_TEXT,options());if(bytes.length!==Number(size))throw Error('Index object size mismatch');return decodeLargeText(bytes,signal);
+ };
+ let left={text:''},right={text:''},verify;
+ const untracked=entry.indexStatus==='?',added=['A','C'].includes(entry.indexStatus);
+ if(!untracked&&(mode==='unstaged'?entry.indexStatus!=='D':revision&&!added))left=mode==='unstaged'?await readIndex():await historicalBlob(repo.root,revision,entry.oldPath||entry.path,signal,true);
+ if(mode==='staged'){if(entry.indexStatus!=='D')right=await readIndex();}
+ else if(entry.worktreeStatus!=='D'){
+  const result=await readWorkspaceLargeText(repo.root,entry.path,signal);right=result.value;verify=result.verify;
+ }
+ options();if(revision!==await head()||!index.equals(await run(indexArgs))||!(await status()).some(row=>row.id===id))throw Error('Workspace selection changed; refresh repository status');
+ await verify?.();options();
+ return {...entry,large:true,left:{...left,label:mode==='unstaged'?'Index':'HEAD'},right:{...right,label:mode==='staged'?'Index':'Working tree'}};
+}
+
 /** Revalidates the opaque ID against fresh status before reading any selected path. */
-export async function getComparison(repo, { mode = 'all', id } = {}) {
+export async function getComparison(repo, { mode = 'all', id, large=false, signal } = {}) {
+  if(typeof large!=='boolean')throw Error('Invalid large comparison mode');
+  if(large)return getWorkspaceLargeComparison(repo,{mode,id,signal});
   repo = await checkedRepo(repo); modeFor(repo, mode);
   const entry = (await changes(repo, mode)).find(item => item.id === id);
   if (!entry) throw new Error('Change no longer exists; refresh repository status.');

@@ -17,6 +17,7 @@
     "git-history.mjs",
     "image-preview.mjs",
     "text-content.mjs",
+    "workspace-large-text.mjs",
     "repository-path.mjs",
     "local-command.mjs",
     "src/svn-identity.mjs",

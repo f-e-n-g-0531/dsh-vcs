@@ -31,7 +31,7 @@ const REQUEST_FIELDS = {
   'vcs/svn-identity': ['sessionId', 'repositoryId'],
   'vcs/references': ['sessionId', 'repositoryId'],
   'vcs/status': ['sessionId', 'repositoryId', 'mode'],
-  'vcs/compare': ['sessionId', 'repositoryId', 'mode', 'id'],
+  'vcs/compare': ['sessionId', 'repositoryId', 'mode', 'id', 'large'],
   'vcs/history': ['sessionId', 'repositoryId', 'snapshot', 'offset', 'limit', 'search'],
   'vcs/commit': ['sessionId', 'repositoryId', 'commit', 'parentIndex'],
   'vcs/commit-compare': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'large'],
@@ -68,7 +68,7 @@ function validatePayload(endpoint, payload) {
       if(typeof payload.commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(payload.commit))throw invalid('Invalid commit id.');
       if(payload.parentIndex!==undefined&&(!Number.isInteger(payload.parentIndex)||payload.parentIndex<0||payload.parentIndex>100))throw invalid('Invalid parent index.');
     }
-    if(['vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large!==undefined&&typeof payload.large!=='boolean')throw invalid('Invalid large comparison mode.');
+    if(['vcs/compare','vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large!==undefined&&typeof payload.large!=='boolean')throw invalid('Invalid large comparison mode.');
     if(endpoint==='vcs/tree-segment'&&payload.offset!==undefined&&(!Number.isInteger(payload.offset)||payload.offset<0||payload.offset>16777216))throw invalid('Invalid segment offset.');
     if(endpoint==='vcs/blame'&&((payload.startLine!==undefined&&(!Number.isInteger(payload.startLine)||payload.startLine<1||payload.startLine>100001))||(payload.lineLimit!==undefined&&(!Number.isInteger(payload.lineLimit)||payload.lineLimit<1||payload.lineLimit>500))))throw invalid('Invalid blame line window.');
     if(endpoint==='vcs/file-history'&&payload.follow!==undefined&&typeof payload.follow!=='boolean')throw invalid('Invalid rename follow mode.');
@@ -122,7 +122,7 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
     case 'vcs/status':
       return {cwd, repository: {...repository}, changes: await api.listChanges({...repository}, mode), mode};
     case 'vcs/compare':
-      return api.getComparison({...repository}, {mode, id: payload.id});
+      return api.getComparison({...repository}, {mode, id: payload.id, ...(payload.large !== undefined ? {large: payload.large,signal} : {})});
   }
 }
 
@@ -195,7 +195,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
       if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
-      if(endpoint==='vcs/tree-segment'||(['vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large===true)){if(activeSegments>=1)return failure('vcs/busy','A text segment is already loading. Please retry.');activeSegments++;segmentSlot=true;}
+      if(endpoint==='vcs/tree-segment'||(['vcs/compare','vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large===true)){if(activeSegments>=1)return failure('vcs/busy','A text segment is already loading. Please retry.');activeSegments++;segmentSlot=true;}
       if(['vcs/commit-image','vcs/revision-image','vcs/workspace-image'].includes(endpoint)){
         if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');
         activeImages++;imageSlot=true;

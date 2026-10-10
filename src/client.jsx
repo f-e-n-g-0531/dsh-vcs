@@ -39,7 +39,7 @@ export function apply(ctx){
     const [mode,setMode]=useState('all'),[refresh,setRefresh]=useState(0),[historyRefresh,setHistoryRefresh]=useState(0),[discovery,setDiscovery]=useState(null),[statuses,setStatuses]=useState({}),[repositoryId,setRepositoryId]=useState(()=>readProject(session?.cwd)),[scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState(''),[selected,setSelected]=useState(null),[comparison,setComparison]=useState(null);
     const [scanning,setScanning]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[detailError,setDetailError]=useState(''),[editorError,setEditorError]=useState(''),[copiedPath,setCopiedPath]=useState(false);
     const [query,setQuery]=useState(''),[statusFilter,setStatusFilter]=useState('all'),[tree,setTree]=useState(true),[collapsedDirectories,setCollapsedDirectories]=useState({}),[sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false),[tab,setTab]=useState('content');
-    const [editorRetry,setEditorRetry]=useState(0),[historyOpen,setHistoryOpen]=useState(false);
+    const [editorRetry,setEditorRetry]=useState(0),[historyOpen,setHistoryOpen]=useState(false),[largeSelection,setLargeSelection]=useState(null),[compareRetry,setCompareRetry]=useState(0),[computation,setComputation]=useState('pending');
     const [stats,setStats]=useState({added:0,deleted:0,count:0}),[editorReady,setEditorReady]=useState(false);
     const panelNode=useRef(null),editorNode=useRef(null),viewer=useRef(null),fileListNode=useRef(null),searchNode=useRef(null),revealChange=useRef(null);
     const statusController=useRef(null),compareController=useRef(null),scanController=useRef(null),previousDiscovery=useRef(null),preserveStatusRefresh=useRef(false),rediscovering=useRef(false);
@@ -73,18 +73,21 @@ export function apply(ctx){
     useEffect(()=>{const focus=e=>{if(e.target===window&&sessionId&&repositoryId&&document.visibilityState==='visible')refreshStatuses(true);};window.addEventListener('focus',focus);return()=>window.removeEventListener('focus',focus);},[sessionId,repositoryId,mode]);
     const selectedRepository=repositories.find(repo=>repo.id===selected?.repositoryId);
     const selectedStatus=selected?statuses[selected.repositoryId]:null;
+    const selectionKey=JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id]);
+    const large=largeSelection===selectionKey;
+    useEffect(()=>setLargeSelection(null),[selectionKey,selectedStatus,historyActive]);
     useEffect(()=>{
       const controller=new AbortController();compareController.current=controller;setComparison(null);setDetailError('');setStats({added:0,deleted:0,count:0});setTab('content');setLoading(!!selected&&!!selectedStatus);
-      if(!historyActive&&selected&&selectedStatus&&selectedRepository)rpc('vcs/compare',{sessionId,repositoryId:selected.repositoryId,mode:requestMode(selectedRepository,mode),id:selected.id},controller.signal).then(value=>{if(!controller.signal.aborted)setComparison(value);}).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'){rediscover();return;}setDetailError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+      if(!historyActive&&selected&&selectedStatus&&selectedRepository)rpc('vcs/compare',{sessionId,repositoryId:selected.repositoryId,mode:requestMode(selectedRepository,mode),id:selected.id,...(large?{large:true}:{})},controller.signal).then(value=>{if(!controller.signal.aborted)setComparison(value);}).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'){rediscover();return;}setDetailError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
       return()=>controller.abort();
-    },[selected,selectedStatus,sessionId,mode,historyActive]);
+    },[selected,selectedStatus,sessionId,mode,historyActive,large,compareRetry]);
     useEffect(()=>{
       let disposed=false;let instance;const controller=new AbortController();setEditorReady(false);setEditorError('');
       const link=document.createElement('link');link.rel='stylesheet';link.href=asset('editor.css');document.head.appendChild(link);
-      loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry='+editorRetry,{signal:controller.signal}).then(module=>{if(disposed)return;instance=module.createDiff(editorNode.current,{onStats:setStats});viewer.current=instance;setEditorReady(true);}).catch(e=>{if(!disposed)setEditorError(e.message);});
+      loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry='+editorRetry,{signal:controller.signal}).then(module=>{if(disposed)return;instance=module.createDiff(editorNode.current,{onStats:setStats,onComputation:state=>{if(!disposed)setComputation(state);}});viewer.current=instance;setEditorReady(true);}).catch(e=>{if(!disposed)setEditorError(e.message);});
       return()=>{disposed=true;controller.abort();instance?.dispose();viewer.current=null;link.remove();};
     },[editorRetry]);
-    useEffect(()=>{if(editorReady&&comparison&&!comparison.binary)viewer.current?.setContent(comparison,JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id,comparison.path]));},[editorReady,comparison,sessionId,discovery,selected,mode]);
+    useEffect(()=>{if(editorReady&&(!comparison||comparison.binary||historyActive))viewer.current?.setContent({left:{text:''},right:{text:''}},'empty');if(editorReady&&comparison&&!comparison.binary&&!historyActive)viewer.current?.setContent(comparison,JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id,comparison.path]));},[editorReady,comparison,sessionId,discovery,selected,mode,historyActive]);
     useEffect(()=>{viewer.current?.options({sideBySide,ignoreWhitespace,wrap});},[editorReady,sideBySide,ignoreWhitespace,wrap]);
     const groups=groupChanges(visibleRepositories,statuses,query,statusFilter);
     const changes=groups.flatMap(group=>group.changes);
@@ -128,6 +131,8 @@ export function apply(ctx){
         {editorError&&<div className="vcs-notice" role="status">{t('fallback')} <button onClick={()=>setEditorRetry(x=>x+1)}>{t('retry')}</button><details><summary>{t('diagnostics')}</summary>{editorError}</details></div>}
         {comparison&&<div className="vcs-context" aria-label={t('comparisonContext')}><span className="vcs-context-status" data-status={code(comparison)}>{t(code(comparison))}</span>{comparison.oldPath&&<span className="vcs-context-rename" title={comparison.oldPath+' → '+comparison.path}>{comparison.oldPath} <b>→</b> {comparison.path}</span>}<span>{comparison.left.label||'—'} <b>↔</b> {comparison.right.label||'—'}</span>{(comparison.left.encoding||comparison.right.encoding)&&<span>{t('encoding')}: {comparison.left.encoding||'—'} / {comparison.right.encoding||'—'}</span>}</div>}
         {comparison&&selectedRepository?.type==='git'&&<ImageComparison key={JSON.stringify([sessionId,discovery?.cwd,selected.repositoryId,mode,selected.id,refresh,selectedStatus])} workspace sessionId={sessionId} repositoryId={selected.repositoryId} mode={mode} id={selected.id} rpc={rpc} t={t} onRediscover={rediscover}/>}
+        {selectedRepository?.type==='git'&&(large||comparison?.notice?.includes('2 MiB'))&&<div className="vcs-notice"><span>{t('workspaceLargeScope')}</span><button onClick={()=>{compareController.current?.abort();setComparison(null);setLargeSelection(large?null:selectionKey);}}>{t(large?'largeClose':'largeLoad')}</button>{large&&detailError&&<button onClick={()=>setCompareRetry(x=>x+1)}>{t('retry')}</button>}</div>}
+        {comparison?.large&&<p role="status">{t(editorError?'largeFallback':computation==='complete'?'diffComplete':computation==='incomplete'?'diffIncomplete':'diffPending')}</p>}
         {comparison?.notice&&<div className="vcs-notice">{comparison.notice}</div>}
         {propertyNames.length>0&&<div className="vcs-tabs">{['content','properties'].map(value=><button key={value} aria-pressed={tab===value} onClick={()=>setTab(value)}>{t(value)}{value==='properties'?' ('+propertyNames.length+')':''}</button>)}</div>}
         <div className="vcs-labels"><span>{comparison?.left.label||'—'}{comparison?.left.encoding?' · '+comparison.left.encoding:''}</span><span>{comparison?.right.label||'—'}{comparison?.right.encoding?' · '+comparison.right.encoding:''}</span></div>
