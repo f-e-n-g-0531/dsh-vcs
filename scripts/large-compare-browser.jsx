@@ -4,6 +4,7 @@ import {flushSync} from 'react-dom';
 import HistoryComparison from '../src/HistoryComparison.jsx';
 
 export async function checkLargeCompare(){
+ const initialEnvironment=globalThis.MonacoEnvironment;
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
  const calls=[];let mode='normal',pending;
  const text=('line '+ 'x'.repeat(110)+'\n').repeat(24000);
@@ -47,5 +48,5 @@ export async function checkLargeCompare(){
   mode='error';button('largeLoad').click();await wait(()=>host.querySelector('[role=alert]'));mode='normal';button('retry').click();await wait(()=>host.textContent.includes('diffComplete'));
   button('largeClose').click();await wait(()=>button('largeLoad'));mode='pending';button('largeLoad').click();await wait(()=>pending);const old=calls.at(-1);
   render('next');if(!old.signal.aborted)throw Error('Switch failed to cancel large read');pending();await wait(()=>button('largeLoad'));if(host.textContent.includes('diffComplete')||calls.at(-1).p.large)throw Error('Late data revived or mode retained');
- }finally{root.unmount();host.remove();}
+ }finally{root.unmount();host.remove();if(globalThis.MonacoEnvironment!==initialEnvironment)throw Error('Large comparison worker ownership leaked');}
 }

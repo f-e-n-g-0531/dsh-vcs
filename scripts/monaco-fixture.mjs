@@ -52,6 +52,6 @@ try{
  phase='image';await (await import('./history-viewer-browser.js')).checkImage();
  phase='image-ui';await (await import('./history-viewer-browser.js')).checkImageUI();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);
