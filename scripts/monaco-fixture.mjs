@@ -2,6 +2,7 @@ import {mkdir,writeFile,copyFile} from 'node:fs/promises';
 import {build} from 'esbuild';
 await mkdir('test-results/vcs-assets',{recursive:true});
 for(const file of ['editor.js','editor.css','editor.worker.js'])await copyFile('dist/'+file,'test-results/vcs-assets/'+file);
+await build({entryPoints:['scripts/large-compare-browser.jsx'],outfile:'test-results/large-compare-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/history-viewer-browser.jsx'],outfile:'test-results/history-viewer-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/graph-native-browser.jsx'],outfile:'test-results/graph-native-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/blame-native-browser.jsx'],outfile:'test-results/blame-native-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
@@ -29,6 +30,7 @@ try{
  if(globalThis.MonacoEnvironment!==initial)throw Error('Environment not restored');
  cases.push(mode+'-'+first);
  }
+ phase='large-compare';await (await import('./large-compare-browser.js')).checkLargeCompare();
  phase='react-controls';await (await import('./history-viewer-browser.js')).checkViewer();
  phase='revision-controls';await (await import('./history-viewer-browser.js')).checkRevisions();
  phase='file-history';await (await import('./history-viewer-browser.js')).checkFileHistory();
