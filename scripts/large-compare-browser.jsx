@@ -31,6 +31,14 @@ export async function checkLargeCompare(){
    if(snapshot.lengths[0]!==value.left.text.length||snapshot.lengths[1]!==value.right.text.length||snapshot.lines[0]!==24001||snapshot.lines[1]!==24002)throw Error('Large models incomplete');
    if(!snapshot.changes.some(change=>change.originalStartLineNumber<=1&&change.modifiedStartLineNumber<=2))throw Error('Initial insertion/change not located');
   }finally{editor.dispose();target.remove();}
+  const timedNode=document.createElement('div');timedNode.style.height='360px';host.appendChild(timedNode);
+  let timedStatus;const timed=module.createDiff(timedNode,{maxComputationTime:1,onComputation:state=>timedStatus=state});
+  try{
+   const lines=Array.from({length:50000},(_,i)=>'line-'+i+'-'+('x'.repeat(40)));
+   timed.setContent({path:'time.txt',left:{text:lines.join('\n')},right:{text:[...lines].reverse().join('\n')}},'timeout');
+   await wait(()=>timedStatus==='incomplete');
+   if(timed.snapshot().computation==='complete')throw Error('Timed out result claimed complete');
+  }finally{timed.dispose();timedNode.remove();}
   render();await wait(()=>button('largeLoad'));if(calls.some(c=>c.p.large))throw Error('Automatic large read');
   button('largeLoad').click();await wait(()=>host.textContent.includes('diffComplete'));
   if(!host.querySelector('.monaco-diff-editor')||calls.at(-1).p.large!==true)throw Error('No advanced full comparison');

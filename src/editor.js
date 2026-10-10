@@ -41,12 +41,16 @@ function updateTheme() {
   }).filter(([, value]) => value !== undefined))});
   monaco.editor.setTheme('dsh-vcs');
 }
-export function createDiff(node, { onStats, onComputation, single = false } = {}) {
+export function createDiff(node, { onStats, onComputation, single = false, maxComputationTime = 3000 } = {}) {
   const releaseEnvironment = acquireEnvironment();
   let editor, observer, subscription;
   let models = [], key = '', disposed = false, viewModel, computationTimer;
   const reportComputation = () => {if(!disposed)onComputation?.(diffStatus(viewModel));};
   const states = new Map();
+  const armComputationDeadline = () => {
+    clearTimeout(computationTimer);
+    computationTimer=setTimeout(()=>{if(!disposed&&diffStatus(viewModel)!=='complete')onComputation?.('incomplete');},10000);
+  };
   function dispose() {
     if (disposed) return;
     disposed = true;
@@ -62,7 +66,7 @@ export function createDiff(node, { onStats, onComputation, single = false } = {}
   }
   try {
   updateTheme();
-  editor = (single?monaco.editor.create:monaco.editor.createDiffEditor)(node, {readOnly:true,originalEditable:false,domReadOnly:true,automaticLayout:true,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,ignoreTrimWhitespace:false,minimap:{enabled:false},fontSize:13,scrollBeyondLastLine:false,renderOverviewRuler:false,hideUnchangedRegions:{enabled:true,contextLineCount:4,minimumLineCount:8},maxComputationTime:3000,accessibilityVerbose:true});
+  editor = (single?monaco.editor.create:monaco.editor.createDiffEditor)(node, {readOnly:true,originalEditable:false,domReadOnly:true,automaticLayout:true,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,ignoreTrimWhitespace:false,minimap:{enabled:false},fontSize:13,scrollBeyondLastLine:false,renderOverviewRuler:false,hideUnchangedRegions:{enabled:true,contextLineCount:4,minimumLineCount:8},maxComputationTime,accessibilityVerbose:true});
   observer = new MutationObserver(updateTheme);
   observer.observe(document.body,{attributes:true,attributeFilter:['data-ds-dark-theme','style','class']});
   subscription = single ? undefined : editor.onDidUpdateDiff(() => {
@@ -93,12 +97,12 @@ export function createDiff(node, { onStats, onComputation, single = false } = {}
         onComputation?.('pending');
         editor.setModel(viewModel);
         // Worker may never return a usable result: never imply equality on silence.
-        computationTimer=setTimeout(()=>{if(!disposed&&diffStatus(viewModel)!=='complete')onComputation?.('incomplete');},10000);
+        armComputationDeadline();
       }
       key=nextKey;
       if(states.has(key)) editor.restoreViewState(states.get(key));
     },
-    options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});if(!single)reportComputation();},
+    options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});if(!single){reportComputation();armComputationDeadline();}},
     revealLine(line) {if(!single||!Number.isInteger(line)||line<1||line>models[0]?.getLineCount())return false;editor.setSelection({startLineNumber:line,startColumn:1,endLineNumber:line,endColumn:models[0].getLineMaxColumn(line)});editor.revealLineInCenter(line);return true;},
     navigate(direction) {if(!single)editor.goToDiff(direction);},
     snapshot() {

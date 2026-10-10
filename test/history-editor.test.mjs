@@ -20,6 +20,12 @@ test('content initialization failure disposes editor and reports fallback',async
  const task=startHistoryEditor({load:async()=>({createDiff:()=>({setContent(){throw failure;},dispose(){released++;}})}),onError:e=>{reported=e;}});
  await task.done;task.dispose();assert.equal(released,1);assert.equal(reported,failure);
 });
+test('disposed history task suppresses late computation callbacks',async()=>{
+ let report;const states=[];
+ const task=startHistoryEditor({load:async()=>({createDiff:(_node,opts)=>{report=opts.onComputation;return {setContent(){report('pending');},dispose(){}};}}),onComputation:state=>states.push(state)});
+ await task.done;report('complete');task.dispose();report('incomplete');assert.deepEqual(states,['pending','complete']);
+});
+
 test('cancel before load prevents resource access and load failures report once',async()=>{
  let loads=0,errors=0;
  const early=startHistoryEditor({load:()=>{loads++;},onError:()=>errors++});early.dispose();await early.done;assert.equal(loads,0);assert.equal(errors,0);
