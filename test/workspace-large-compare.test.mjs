@@ -14,6 +14,19 @@ test('workspace large RPC strictly validates mode and shares heavy slot until ca
  c.abort();finish({});assert.equal((await request).error.code,'vcs/cancelled');assert.equal((await call('vcs/tree-segment',{sessionId:'s',repositoryId:'r',commit:'a'.repeat(40),path:'file'})).ok,true);
 });
 
+test('workspace large handles unborn additions and rename but rejects unmerged Index',async()=>{
+ const root=await fs.realpath(await fs.mkdtemp(path.join(tmpdir(),'vcs-large-special-'))),git=gitCommand(root);
+ try{
+  git('init','-q');git('config','user.name','Test');git('config','user.email','t@example.test');git('config','core.autocrlf','false');
+  const text=('base '+ 'x'.repeat(110)+'\n').repeat(24000);await fs.writeFile(path.join(root,'old.txt'),text);git('add','.');let repo=await detectRepository(root);
+  const added=(await listChanges(repo,'staged'))[0];const unborn=await getComparison(repo,{mode:'staged',id:added.id,large:true});assert.equal(unborn.left.text,'');assert.equal(unborn.right.text,text);
+  git('commit','-qm','root');git('mv','old.txt','new.txt');const renamed=(await listChanges(repo,'staged'))[0];const diff=await getComparison(repo,{mode:'staged',id:renamed.id,large:true});assert.equal(diff.left.text,text);assert.equal(diff.right.text,text);assert.equal(diff.oldPath,'old.txt');
+  git('commit','-qm','rename');const branch=git('branch','--show-current').trim();git('checkout','-qb','topic');await fs.writeFile(path.join(root,'new.txt'),'topic');git('add','.');git('commit','-qm','topic');git('checkout','-q',branch);await fs.writeFile(path.join(root,'new.txt'),'main');git('add','.');git('commit','-qm','main');
+  try{git('merge','topic');}catch{}
+  const conflict=(await listChanges(repo)).find(row=>row.status==='conflicted');assert.ok(conflict);await assert.rejects(getComparison(repo,{id:conflict.id,large:true}),/conflicted/);
+ }finally{await fs.rm(root,{recursive:true,force:true});}
+});
+
 test('large workspace modes bind HEAD Index and working complete content without writes',async()=>{
  const root=await fs.realpath(await fs.mkdtemp(path.join(tmpdir(),'vcs-large-modes-'))),git=gitCommand(root);
  try{
