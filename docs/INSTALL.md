@@ -8,7 +8,7 @@ profile是DSH配置与插件环境，不是Session。下面以web为例：请使
 
 ## 安装正式包
 
-	dsh plugin --profile web add @feng0531/dsh-vcs@0.3.70
+	dsh plugin --profile web add @feng0531/dsh-vcs@0.3.71
 
 也可以从[正式发布页](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest)下载 tgz 与 SHA256SUMS.txt，核对 SHA-256 后执行：
 
