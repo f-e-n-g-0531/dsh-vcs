@@ -8,7 +8,7 @@ export async function checkLargeCompare(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
  const calls=[];let mode='normal',pending;
  const text=('line '+ 'x'.repeat(110)+'\n').repeat(24000);
- const value={path:'large.txt',large:true,left:{text},right:{text:'INSERTED\n'+text.replace('line ','CHANGED ')}};
+ const value={path:'large.txt',large:true,left:{text},right:{text:'INSERTED\n'+text.replace('line ','CHANGED ')+'EOF ADDED\n'}};
  const rpc=async(endpoint,p,signal)=>{
   if(!endpoint.endsWith('compare'))return endpoint.endsWith('image')?{absent:true}:{commits:[],rows:[]};
   calls.push({p,signal});
@@ -29,9 +29,10 @@ export async function checkLargeCompare(){
    editor.setContent(value,'complete-large');await wait(()=>status==='complete'&&stats?.count>0);
    if(stats.added<2||stats.deleted<1)throw Error('Full multi-MiB differences not computed');
    const snapshot=editor.snapshot();
-   if(snapshot.lengths[0]!==value.left.text.length||snapshot.lengths[1]!==value.right.text.length||snapshot.lines[0]!==24001||snapshot.lines[1]!==24002)throw Error('Large models incomplete');
+   if(snapshot.lengths[0]!==value.left.text.length||snapshot.lengths[1]!==value.right.text.length||snapshot.lines[0]!==24001||snapshot.lines[1]!==24003)throw Error('Large models incomplete');
    if(!snapshot.changes.some(change=>change.originalStartLineNumber<=1&&change.modifiedStartLineNumber<=2))throw Error('Initial insertion/change not located');
-  }finally{editor.dispose();target.remove();}
+   if(!snapshot.changes.some(change=>change.modifiedEndLineNumber>=24002))throw Error('EOF difference missing');
+  }finally{editor.dispose();if(editor.snapshot()!==null)throw Error('Disposed editor retained models');target.remove();}
   const timedNode=document.createElement('div');timedNode.style.height='360px';host.appendChild(timedNode);
   let timedStatus;const timed=module.createDiff(timedNode,{maxComputationTime:1,onComputation:state=>timedStatus=state});
   try{
