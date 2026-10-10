@@ -32,6 +32,7 @@ const REQUEST_FIELDS = {
   'vcs/references': ['sessionId', 'repositoryId'],
   'vcs/status': ['sessionId', 'repositoryId', 'mode'],
   'vcs/compare': ['sessionId', 'repositoryId', 'mode', 'id', 'large'],
+  'vcs/conflict-stages': ['sessionId', 'repositoryId', 'mode', 'id'],
   'vcs/history': ['sessionId', 'repositoryId', 'snapshot', 'offset', 'limit', 'search'],
   'vcs/commit': ['sessionId', 'repositoryId', 'commit', 'parentIndex'],
   'vcs/commit-compare': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'large'],
@@ -78,7 +79,7 @@ function validatePayload(endpoint, payload) {
       if(payload.snapshot!==undefined&&(typeof payload.snapshot!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(payload.snapshot)))throw invalid('Invalid history snapshot.');
       if(!Number.isInteger(payload.offset??0)||(payload.offset??0)<0||(payload.offset??0)>10000||!Number.isInteger(payload.limit??50)||(payload.limit??50)<1||(payload.limit??50)>100)throw invalid('Invalid history pagination.');
     }
-    if(endpoint==='vcs/workspace-image'&&(typeof payload.id!=='string'||!/^[a-f0-9]{64}$/.test(payload.id)))throw invalid('Invalid workspace image change id.');
+    if(['vcs/workspace-image','vcs/conflict-stages'].includes(endpoint)&&(typeof payload.id!=='string'||!/^[a-f0-9]{64}$/.test(payload.id)))throw invalid('Invalid workspace image change id.');
     if (!['all', 'unstaged', 'staged'].includes(payload.mode ?? 'all')) throw invalid('Unsupported comparison mode.');
     if (['vcs/compare','vcs/workspace-image'].includes(endpoint) && (typeof payload.id !== 'string' || !payload.id || payload.id.length > 32768)) throw invalid('A change id is required.');
   }
@@ -121,6 +122,8 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
       return api.listHistory({...repository}, {snapshot: payload.snapshot, search: payload.search, offset: payload.offset ?? 0, limit: payload.limit ?? 50, signal});
     case 'vcs/status':
       return {cwd, repository: {...repository}, changes: await api.listChanges({...repository}, mode), mode};
+    case 'vcs/conflict-stages':
+      return api.getConflictStages({...repository},{mode,id:payload.id,signal});
     case 'vcs/compare':
       return api.getComparison({...repository}, {mode, id: payload.id, ...(payload.large !== undefined ? {large: payload.large,signal} : {})});
   }
@@ -143,7 +146,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
   }
   if(bindSvnIdentityResolver!==undefined){if(typeof bindSvnIdentityResolver!=='function')throw new Error('Invalid internal SVN resolver binding');bindSvnIdentityResolver(async(address,signal)=>{validatePayload('vcs/svn-identity',address);signal?.throwIfAborted();const cwd=await resolveSessionCwd(ctx,address.sessionId,signal),entry=current(address.sessionId,cwd),repository=entry?.repositories.get(address.repositoryId);if(!repository)throw rediscover();if(repository.type!=='svn')throw invalid('SVN working copy required.');const identity=await api.getSvnIdentity({...repository},{signal});await assertCurrent(address.sessionId,cwd,entry,signal);if(entry.repositories.get(address.repositoryId)!==repository)throw rediscover();return {...identity,cwd};});}
   return async (endpoint, payload, signal) => {
-    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
+    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
     let imageSlot=false,segmentSlot=false;

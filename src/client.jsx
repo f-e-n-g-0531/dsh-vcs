@@ -4,6 +4,7 @@ import {createClientRpc} from './client-rpc.mjs';
 import {createStatusLimiter} from './status-limiter.mjs';
 import TextComparison from './TextComparison.jsx';
 import ImageComparison from './ImageComparison.jsx';
+import ConflictStages from './ConflictStages.jsx';
 import {comparisonLabels} from './comparison-labels.mjs';
 import SvnIdentity from './SvnIdentity.jsx';
 import SvnRemote from './SvnRemote.jsx';
@@ -134,6 +135,7 @@ export function apply(ctx){
         {selectedRepository?.type==='git'&&(large||comparison?.notice?.includes('2 MiB'))&&<div className="vcs-notice"><span>{t('workspaceLargeScope')}</span><button onClick={()=>{compareController.current?.abort();setComparison(null);setLargeSelection(large?null:{key:selectionKey,status:selectedStatus});}}>{t(large?'largeClose':'largeLoad')}</button>{large&&detailError&&<button onClick={()=>setCompareRetry(x=>x+1)}>{t('retry')}</button>}</div>}
         {comparison?.large&&<p role="status">{t(editorError?'largeFallback':computation==='complete'?'diffComplete':computation==='incomplete'?'diffIncomplete':'diffPending')}</p>}
         {comparison?.notice&&<div className="vcs-notice">{comparison.notice}</div>}
+        {comparison?.status==='conflicted'&&selectedRepository?.type==='git'&&<ConflictStages key={JSON.stringify([sessionId,selected.repositoryId,mode,selected.id,refresh])} sessionId={sessionId} repositoryId={selected.repositoryId} mode={mode} id={selected.id} rpc={rpc} t={t} onRediscover={rediscover}/>}
         {propertyNames.length>0&&<div className="vcs-tabs">{['content','properties'].map(value=><button key={value} aria-pressed={tab===value} onClick={()=>setTab(value)}>{t(value)}{value==='properties'?' ('+propertyNames.length+')':''}</button>)}</div>}
         <div className="vcs-labels"><span>{comparison?.left.label||'—'}{comparison?.left.encoding?' · '+comparison.left.encoding:''}</span><span>{comparison?.right.label||'—'}{comparison?.right.encoding?' · '+comparison.right.encoding:''}</span></div>
         <div className="vcs-editorbox" data-hidden={!!overlay||tab!=='content'} style={tab==='properties'?{display:'none'}:undefined}><div className="vcs-editor" ref={editorNode} style={editorError?{display:'none'}:undefined}/>{editorError&&comparison&&!comparison.binary&&!overlay&&<TextComparison comparison={comparison} labels={comparisonLabels(t)}/>}{overlay&&<div className={'vcs-message '+((error||detailError||editorError)?'vcs-error':'')} role="status">{overlay}{(error||detailError||editorError)&&<button onClick={()=>editorError?setEditorRetry(x=>x+1):rescan()}>{t(editorError?'retry':'rescan')}</button>}</div>}</div>

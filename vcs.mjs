@@ -1,3 +1,4 @@
+import {parseConflictStages} from './conflict-stages.mjs';
 import {parseSvnIdentity} from './src/svn-identity.mjs';
 import {prepareRaster} from './image-preview.mjs';
 import {git, svn, TIMEOUT} from './local-command.mjs';
@@ -550,6 +551,28 @@ async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
  options();if(revision!==await head()||!index.equals(await run(indexArgs))||!(await status()).some(row=>row.id===id))throw Error('Workspace selection changed; refresh repository status');
  await verify?.();options();
  return {...entry,large:true,left:{...left,label:mode==='unstaged'?'Index':'HEAD'},right:{...right,label:mode==='staged'?'Index':'Working tree'}};
+}
+
+/** Explicit Index stage snapshot; never reads the selected working file or submodule. */
+export async function getConflictStages(repo,{mode='all',id,signal}={}){
+ const deadline=Date.now()+TIMEOUT,budget=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Conflict stage read timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
+ if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid conflict change id');
+ repo=await checkedRepo(repo,signal,budget);modeFor(repo,mode);if(repo.type!=='git')throw Error('Conflict stages support Git only');
+ const entry=(await changes(repo,mode,budget())).find(row=>row.id===id);if(!entry||entry.status!=='conflicted')throw Error('Selected conflict no longer exists; refresh status.');
+ await confined(repo.root,entry.path);
+ const list=()=>git(repo.root,['ls-files','--unmerged','-z','--',entry.path],MAX_TEXT,budget());
+ const before=await list(),metadata=parseConflictStages(before,entry.path);if(!metadata.length)throw Error('Conflict stages no longer exist; refresh status.');
+ const stages=[];
+ for(const stage of [1,2,3]){
+  const record=metadata.find(row=>row.stage===stage);if(!record){stages.push({stage,present:false,text:''});continue;}
+  let body;if(record.kind==='gitlink')body={text:record.oid,notice:'Submodule commit reference; repository contents are not loaded.'};
+  else{body=await content(()=>git(repo.root,['cat-file','blob',record.oid],MAX_TEXT,budget()));if(record.kind==='symlink')body.notice=[body.notice,'Symbolic link target text; not followed.'].filter(Boolean).join(' ');}
+  stages.push({...record,present:true,...body});
+ }
+ if(!(await list()).equals(before))throw Error('Conflict Index changed while reading; refresh status.');
+ if(!(await changes(repo,mode,budget())).some(row=>row.id===id&&row.status==='conflicted'))throw Error('Selected conflict changed while reading; refresh status.');
+ await confined(repo.root,entry.path);budget();
+ return {id,path:entry.path,stages,snapshot:createHash('sha256').update(before).digest('hex')};
 }
 
 /** Revalidates the opaque ID against fresh status before reading any selected path. */

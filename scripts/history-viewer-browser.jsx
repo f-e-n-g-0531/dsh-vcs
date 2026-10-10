@@ -12,6 +12,7 @@ export {checkHistorySearch} from './history-search-browser.jsx';
 export {checkReviewViews} from './review-views-browser.jsx';
 export {checkHistoryRefs} from './history-refs-browser.jsx';
 export {checkImageUI} from './image-ui-browser.jsx';
+export {checkConflictStages} from './conflict-stages-browser.jsx';
 export {checkImage} from './image-browser.mjs';
 export {checkGraph} from './graph-browser.jsx';
 export {checkTree} from './tree-browser.jsx';
