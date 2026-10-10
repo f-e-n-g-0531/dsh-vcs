@@ -2,6 +2,7 @@ import {mkdir,writeFile,copyFile} from 'node:fs/promises';
 import {build} from 'esbuild';
 await mkdir('test-results/vcs-assets',{recursive:true});
 for(const file of ['editor.js','editor.css','editor.worker.js'])await copyFile('dist/'+file,'test-results/vcs-assets/'+file);
+await build({entryPoints:['scripts/svn-copy-browser.jsx'],outfile:'test-results/svn-copy-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/workspace-large-browser.jsx'],outfile:'test-results/workspace-large-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/large-compare-browser.jsx'],outfile:'test-results/large-compare-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/history-viewer-browser.jsx'],outfile:'test-results/history-viewer-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
@@ -31,6 +32,7 @@ try{
  if(globalThis.MonacoEnvironment!==initial)throw Error('Environment not restored');
  cases.push(mode+'-'+first);
  }
+ phase='svn-copy';await (await import('./svn-copy-browser.js')).checkSvnCopy();
  phase='workspace-large';await (await import('./workspace-large-browser.js')).checkWorkspaceLarge();
  phase='large-compare';await (await import('./large-compare-browser.js')).checkLargeCompare();
  phase='react-controls';await (await import('./history-viewer-browser.js')).checkViewer();
@@ -54,6 +56,6 @@ try{
  phase='image';await (await import('./history-viewer-browser.js')).checkImage();
  phase='image-ui';await (await import('./history-viewer-browser.js')).checkImageUI();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);

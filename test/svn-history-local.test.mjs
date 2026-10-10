@@ -11,6 +11,8 @@ import {relativeSvnPath} from '../src/svn-path.mjs';
 import {parseSvnDetail} from '../src/svn-detail.mjs';
 import {parseSvnPropertyNames} from '../src/svn-property-names.mjs';
 import {planSvnComparison} from '../src/svn-comparison-plan.mjs';
+import {createSvnRuntime} from '../src/svn-runtime.mjs';
+import {createSvnRpc} from '../src/svn-rpc.mjs';
 import {planSvnLog,planSvnDetail} from '../src/svn-log-plan.mjs';
 test('local SVN path history skips unrelated revisions and pins numeric snapshot',async t=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-svn-history-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5}));
@@ -27,7 +29,7 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  const parser=new XMLParser({ignoreAttributes:false,parseAttributeValue:false,isArray:name=>name==='logentry'});
  // Test-only transport substitution: production planner still rejects file:// roots.
  const planningRoot='https://example.test/fixture';
- const executePlan=plan=>{const args=[...plan.args];assert.ok(args.at(-1).startsWith(planningRoot+'/'));args[args.length-1]=pathToFileURL(repository).href+args.at(-1).slice(planningRoot.length);return run('svn',args,wc);};
+ const executePlan=plan=>{const args=[...plan.args];assert.ok(args.at(-1).startsWith(planningRoot+'/')||args.at(-1).startsWith(planningRoot+'@'));args[args.length-1]=pathToFileURL(repository).href+args.at(-1).slice(planningRoot.length);return run('svn',args,wc);};
  const planOptions={root:planningRoot,scope:'/',path:'/'+name,snapshot:'3'};
  const pageAt=cursor=>{const plan=planSvnLog({...planOptions,cursor,limit:1});return parseSvnLogPage(executePlan(plan),plan);};
  const status=svn(['status','--xml']),info=svn(['info','--xml','--',name+'@']);
@@ -49,6 +51,12 @@ test('local SVN path history skips unrelated revisions and pins numeric snapshot
  assert.deepEqual(copyNext.entries.map(e=>e.revision),['5']);assert.equal(copyNext.nextRevision,null);
  const creationPlan=planSvnDetail({...copyOptions,revision:'5'});const creationDetail=parseSvnDetail(executePlan(creationPlan),creationPlan);
  assert.equal(creationDetail.changes[0].copyFromPath,'/'+name);assert.equal(creationDetail.changes[0].copyFromRevision,'4');
+ const runtime=createSvnRuntime({resolveIdentity:async()=>({cwd:wc,root:planningRoot,uuid:'12345678-1234-1234-1234-123456789abc',scope:'/',revision:'6'}),transport:async plan=>executePlan(plan)}),rpc=createSvnRpc(runtime),address={sessionId:'s',repositoryId:'r'};
+ const offer=await runtime.describe(address),grant=await runtime.approve(address,{offer:offer.offer,explicit:true}),selected=await runtime.detail(address,{token:grant.token,snapshot:'6',revision:'5'});
+ const sourceOptions={...address,token:grant.token,snapshot:'6',revision:'5',id:selected.changes[0].id,limit:1};
+ const source=await rpc('vcs/svn-copytrace',sourceOptions);assert.ok(source.ok);assert.equal(source.value.path,'/'+name);assert.equal(source.value.pegRevision,'4');assert.deepEqual(source.value.entries.map(e=>e.revision),['4']);
+ const sourceNext=await rpc('vcs/svn-copytrace',{...sourceOptions,cursor:source.value.nextRevision});assert.ok(sourceNext.ok);assert.deepEqual(sourceNext.value.entries.map(e=>e.revision),['3']);
+ await runtime.revoke(address,{token:grant.token});assert.equal((await rpc('vcs/svn-copytrace',sourceOptions)).ok,false);runtime.dispose();
  const stopped=copyLog(true);assert.deepEqual(stopped.map(e=>e['@_revision']),['6','5']);
  const copy=stopped[1].paths.path;assert.equal(copy['@_action'],'A');assert.equal(copy['@_copyfrom-path'],'/'+name);assert.equal(copy['@_copyfrom-rev'],'4');
  // Positive control proves the default command would cross the copy boundary.

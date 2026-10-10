@@ -8,6 +8,7 @@ const FIELDS = {
   detail: ['token', 'snapshot', 'revision'],
   compare: ['token', 'snapshot', 'revision', 'id'],
   trace: ['token', 'snapshot', 'revision', 'id', 'cursor', 'limit'],
+  copytrace: ['token', 'snapshot', 'revision', 'id', 'cursor', 'limit'],
 };
 
 function validatePayload(method, payload) {
@@ -33,14 +34,14 @@ function validatePayload(method, payload) {
     }
     if (method !== 'revoke') parseSvnRevision(payload.snapshot);
     if (payload.revision !== undefined) parseSvnRevision(payload.revision);
-    if (['detail', 'compare', 'trace'].includes(method) && payload.revision === undefined) {
+    if (['detail', 'compare', 'trace', 'copytrace'].includes(method) && payload.revision === undefined) {
       throw Error('Selected SVN revision required');
     }
     if (payload.cursor !== undefined) parseSvnRevision(payload.cursor);
     if (payload.limit !== undefined && (!Number.isInteger(payload.limit) || payload.limit < 1 || payload.limit > 100)) {
       throw Error('Invalid SVN page size');
     }
-    if (['compare', 'trace'].includes(method) && (typeof payload.id !== 'string' || !/^[a-f0-9]{64}$/.test(payload.id))) {
+    if (['compare', 'trace', 'copytrace'].includes(method) && (typeof payload.id !== 'string' || !/^[a-f0-9]{64}$/.test(payload.id))) {
       throw Error('Selected SVN change ID required');
     }
   }

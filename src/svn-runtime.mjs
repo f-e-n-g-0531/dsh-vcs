@@ -40,6 +40,13 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid SVN change ID');const detail=await runtime.detail(address,{token,snapshot,revision,signal}),member=detail.changes.find(change=>change.id===id);if(!member||member.kind!=='file')throw Error('SVN tracing requires selected file member');
   const peg=member.action==='D'?previousSvnRevision(revision):revision;const page=await runtime.log(address,{token,snapshot:peg,cursor:cursor??peg,limit,path:member.path,signal});return {...page,selectionSnapshot:snapshot,selectionRevision:revision,path:member.path,pegRevision:peg,stopOnCopy:true,copySourceOutsideScope:!!member.copySourceOutsideScope};
  },
+ async copytrace(address,{token,snapshot,revision,id,cursor,limit=50,signal}={}){
+  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid SVN change ID');
+  const detail=await runtime.detail(address,{token,snapshot,revision,signal}),member=detail.changes.find(change=>change.id===id);
+  if(!member||member.kind!=='file'||member.copySourceOutsideScope||member.copyFromPath===undefined||member.copyFromRevision===undefined)throw Error('Selected file has no authorized copy source');
+  const peg=member.copyFromRevision;const page=await runtime.log(address,{token,snapshot:peg,cursor:cursor??peg,limit,path:member.copyFromPath,signal});
+  return {...page,selectionSnapshot:snapshot,selectionRevision:revision,path:member.copyFromPath,pegRevision:peg,sourceForPath:member.path,stopOnCopy:true};
+ },
  async revoke(address,{token,signal}={}){const identity=await resolve(address,signal);grants.assert(token,identity);grants.revoke(token);cancelToken(token);return {revoked:true};},
  dispose(){disposed=true;offers.clear();grants.clear();for(const token of inFlight.keys())cancelToken(token);},
  revokeSession(sessionId){offers.revokeSession(sessionId);grants.revokeSession(sessionId);for(const [token,tasks] of inFlight)if([...tasks].some(task=>task.sessionId===sessionId))cancelToken(token);}
