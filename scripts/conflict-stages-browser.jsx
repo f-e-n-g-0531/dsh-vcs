@@ -31,8 +31,7 @@ export async function checkConflictStages(){
   tick=2;render(lang);await new Promise(r=>setTimeout(r,60));
   if(host.querySelector('.monaco-diff-editor')!==editor)throw Error('Ancestor re-render rebuilt the conflict diff editor');
   tick=3;mode='notices';render(lang+'-notices');await wait(()=>host.textContent.includes(overLimit));
-  const occurrence=()=>(host.textContent.match(new RegExp(overLimit.replace(/[.*+?^${}()|[\]\\]/g,'\\  tick=3;mode='notices';render(lang+'-notices');await wait(()=>host.textContent.includes(overLimit));
-  if((host.textContent.match(new RegExp(overLimit.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'))||[]).length<2)throw Error('Over-limit notice missing from inventory or comparison disclosure');'),'g'))||[]).length;
+  const occurrence=()=>host.textContent.split(overLimit).length-1;
   if(occurrence()!==1)throw Error('Over-limit notice missing from the stage inventory');
   const sideSelects=host.querySelectorAll('select'),rightSelect=sideSelects[1];rightSelect.value='2';rightSelect.dispatchEvent(new Event('change',{bubbles:true}));
   await wait(()=>occurrence()>=2);if(occurrence()<2)throw Error('Over-limit notice missing from the comparison disclosure');
