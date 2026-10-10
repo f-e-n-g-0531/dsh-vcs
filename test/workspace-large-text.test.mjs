@@ -10,6 +10,7 @@ test('workspace large reader returns complete text and rejects later replacement
   await fs.writeFile(file,Buffer.from([255]));await assert.rejects(readWorkspaceLargeText(root,'file.txt'),/UTF-8/);
   await fs.writeFile(file,'x'.repeat(8*1024*1024+1));await assert.rejects(readWorkspaceLargeText(root,'file.txt'),/8 MiB/);
   await assert.rejects(readWorkspaceLargeText(root,'../outside'),/escapes/);
+  await assert.rejects(readWorkspaceLargeText(root,'file.txt',undefined,()=>{throw Object.assign(Error('deadline'),{code:'TIMEOUT'});}),{code:'TIMEOUT'});
   const c=new AbortController();c.abort();await assert.rejects(readWorkspaceLargeText(root,'file.txt',c.signal));
  }finally{await fs.rm(root,{recursive:true,force:true});}
 });

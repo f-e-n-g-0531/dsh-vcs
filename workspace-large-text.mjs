@@ -6,8 +6,8 @@ import {MAX_LARGE_TEXT,decodeLargeText} from './text-content.mjs';
 const fingerprint=s=>[s.dev,s.ino,s.size,s.mtimeNs,s.ctimeNs].map(String).join(':');
 
 /** Read complete bounded text, retaining a final named-path verification. No writes. */
-export async function readWorkspaceLargeText(root,file,signal){
- const check=()=>signal?.throwIfAborted();
+export async function readWorkspaceLargeText(root,file,signal,budget){
+ const check=()=>{signal?.throwIfAborted();budget?.();};
  const resolve=async()=>{
   check();const target=await confined(root,file);let component=root;
   for(const part of path.relative(root,target).split(path.sep).filter(Boolean)){

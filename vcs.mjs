@@ -173,10 +173,10 @@ export async function discoverRepositories(cwd, { signal, maxDepth = 6, maxDirec
   return result;
 }
 
-async function checkedRepo(repo, signal) {
+async function checkedRepo(repo, signal, budget) {
   signal?.throwIfAborted();
   if (!repo || !['git', 'svn'].includes(repo.type) || typeof repo.root !== 'string') throw new Error('Invalid repository');
-  const found = await repositoryAt(repo.root, repo.type, () => ({signal}));
+  const found = await repositoryAt(repo.root, repo.type, budget || (() => ({signal})));
   signal?.throwIfAborted();
   if (!found || found.type !== repo.type || path.resolve(found.root) !== path.resolve(repo.root)) throw new Error('Repository root changed or is invalid');
   return found;
@@ -523,10 +523,10 @@ async function properties(root, file, base) {
   return props;
 }
 async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
- signal?.throwIfAborted();repo=await checkedRepo(repo,signal);modeFor(repo,mode);
- if(repo.type!=='git')throw Error('Large workspace comparison supports Git only');
  const deadline=Date.now()+TIMEOUT;
  const options=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Workspace comparison timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
+ repo=await checkedRepo(repo,signal,options);modeFor(repo,mode);
+ if(repo.type!=='git')throw Error('Large workspace comparison supports Git only');
  const run=args=>git(repo.root,args,MAX_TEXT,options());
  const status=()=>changes(repo,mode,options());
  const entry=(await status()).find(row=>row.id===id);if(!entry)throw Error('Change no longer exists; refresh repository status');
@@ -544,7 +544,7 @@ async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
  if(!untracked&&(mode==='unstaged'?entry.indexStatus!=='D':revision&&!added))left=mode==='unstaged'?await readIndex():await historicalBlob(repo.root,revision,entry.oldPath||entry.path,signal,true,options);
  if(mode==='staged'){if(entry.indexStatus!=='D')right=await readIndex();}
  else if(entry.worktreeStatus!=='D'){
-  try{const result=await readWorkspaceLargeText(repo.root,entry.path,signal);right=result.value;verify=result.verify;}
+  try{const result=await readWorkspaceLargeText(repo.root,entry.path,signal,options);right=result.value;verify=result.verify;}
   catch(error){if(error.code!=='ENOENT'||entry.indexStatus!=='D')throw error;verify=async()=>{const target=await confined(repo.root,entry.path);try{await fs.lstat(target);throw Error('Working file appeared; refresh repository status');}catch(missing){if(missing.code!=='ENOENT')throw missing;}};await verify();}
  }
  options();if(revision!==await head()||!index.equals(await run(indexArgs))||!(await status()).some(row=>row.id===id))throw Error('Workspace selection changed; refresh repository status');
