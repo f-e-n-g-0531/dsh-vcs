@@ -27,6 +27,9 @@ export async function checkLargeCompare(){
   try{
    editor.setContent(value,'complete-large');await wait(()=>status==='complete'&&stats?.count>0);
    if(stats.added<2||stats.deleted<1)throw Error('Full multi-MiB differences not computed');
+   const snapshot=editor.snapshot();
+   if(snapshot.lengths[0]!==value.left.text.length||snapshot.lengths[1]!==value.right.text.length||snapshot.lines[0]!==24001||snapshot.lines[1]!==24002)throw Error('Large models incomplete');
+   if(!snapshot.changes.some(change=>change.originalStartLineNumber<=1&&change.modifiedStartLineNumber<=2))throw Error('Initial insertion/change not located');
   }finally{editor.dispose();target.remove();}
   render();await wait(()=>button('largeLoad'));if(calls.some(c=>c.p.large))throw Error('Automatic large read');
   button('largeLoad').click();await wait(()=>host.textContent.includes('diffComplete'));

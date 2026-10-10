@@ -19,6 +19,8 @@ test('large text refuses oversized binary invalid encoding and pathological line
   assert.throws(() => decodeLargeText(Buffer.from([0xff])), /UTF-8/);
   assert.throws(() => decodeLargeText(Buffer.from('x'.repeat(65537))), /characters per line/);
   assert.throws(() => decodeLargeText(Buffer.from('\n'.repeat(100000))), /100000 lines/);
+  assert.throws(() => decodeLargeText(Buffer.from('\r'.repeat(100000))), /100000 lines/);
+  assert.equal(decodeLargeText(Buffer.from('a\r\nb\rc\n')).lineCount, 4);
   assert.equal(decodeLargeText(Buffer.from('x'.repeat(65536))).text.length, 65536);
   const controller = new AbortController(); controller.abort();
   assert.throws(() => decodeLargeText(Buffer.from('safe'), controller.signal), {name: 'AbortError'});

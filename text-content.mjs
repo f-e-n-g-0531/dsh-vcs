@@ -15,7 +15,8 @@ export function decodeLargeText(buffer, signal) {
   let lines = 1, length = 0;
   for (let index = 0; index < text.length; index++) {
     if (index % 65536 === 0) signal?.throwIfAborted();
-    if (text[index] === '\n') {
+    if (text[index] === '\n' || text[index] === '\r') {
+      if (text[index] === '\r' && text[index + 1] === '\n') index++;
       if (++lines > 100000) throw new Error('Large comparison exceeds 100000 lines per side.');
       length = 0;
     } else if (++length > 65536) throw new Error('Large comparison exceeds 65536 characters per line.');

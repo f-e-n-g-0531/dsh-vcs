@@ -101,6 +101,10 @@ export function createDiff(node, { onStats, onComputation, single = false } = {}
     options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});if(!single)reportComputation();},
     revealLine(line) {if(!single||!Number.isInteger(line)||line<1||line>models[0]?.getLineCount())return false;editor.setSelection({startLineNumber:line,startColumn:1,endLineNumber:line,endColumn:models[0].getLineMaxColumn(line)});editor.revealLineInCenter(line);return true;},
     navigate(direction) {if(!single)editor.goToDiff(direction);},
+    snapshot() {
+      if(disposed)return null;
+      return {lengths:models.map(model=>model.getValueLength()),lines:models.map(model=>model.getLineCount()),computation:diffStatus(viewModel),changes:single?null:editor.getLineChanges()};
+    },
     dispose
   };
   } catch (error) {
