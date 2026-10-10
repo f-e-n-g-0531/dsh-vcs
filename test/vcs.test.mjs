@@ -45,7 +45,7 @@ test('local references enumerate branches and commit tags without changing repos
  const blob=cmd(root,'git',['rev-parse','HEAD:file.txt']).stdout.trim();cmd(root,'git',['tag','blob-tag',blob]);cmd(root,'git',['update-ref','refs/remotes/origin/main',first]);
  await write(root,'file.txt','two');commit(root);const head=cmd(root,'git',['rev-parse','HEAD']).stdout.trim();await write(root,'file.txt','working');
  const before=cmd(root,'git',['status','--porcelain']).stdout,index=cmd(root,'git',['ls-files','--stage']).stdout;
- const result=await listReferences(repo);assert.deepEqual(result.references.map(r=>[r.name,r.kind,r.commit]),[['refs/heads/main','branch',head],['refs/heads/主题','branch',first],['refs/tags/annotated','tag',first],['refs/tags/light','tag',first]]);
+ const result=await listReferences(repo);assert.deepEqual(result.references.map(r=>[r.name,r.kind,r.commit]),[['refs/heads/main','branch',head],['refs/heads/主题','branch',first],['refs/remotes/origin/main','remote',first],['refs/tags/annotated','tag',first],['refs/tags/light','tag',first]]);
  const controller=new AbortController();controller.abort();await assert.rejects(listReferences(repo,{signal:controller.signal}),{name:'AbortError'});
  assert.equal(cmd(root,'git',['status','--porcelain']).stdout,before);assert.equal(cmd(root,'git',['ls-files','--stage']).stdout,index);assert.equal(cmd(root,'git',['rev-parse','HEAD']).stdout.trim(),head);
 });

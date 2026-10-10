@@ -6,7 +6,7 @@
 
 - HistoryPanel已有服务端历史搜索：提交说明、作者、路径，并固定快照分页；另有仅筛选已加载窗口的输入。不能将项目描述为只有局部搜索。
 - 已有本地分支／标签选择和固定版本A/B入口、引用标签、历史图、文件历史和Blame基础导航。
-- listReferences当前仅枚举refs/heads和refs/tags，最多1001条探测；尚未枚举本地已有refs/remotes。
+- listReferences原先仅枚举refs/heads和refs/tags。本地缓存的refs/remotes已在6e07dc7加入，仍受总计1000条与2MiB限制，不连接远端。
 
 ## 第一批冻结范围：本地远程跟踪引用
 
