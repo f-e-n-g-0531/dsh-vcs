@@ -12,7 +12,7 @@ export async function checkConflictStages(){
   const t=k=>locales[lang][k];let mode='normal',pending=[],calls=[],rediscovered=0,tick=1;
   const overLimit='File exceeds the 2 MiB preview limit.',binaryNotice='Binary file; text preview unavailable.';
   const stages=()=>({id,path:'file',snapshot,stages:[
-   {stage:1,mode:'100644',oid:a,kind:'file',present:true,text:'base\n'},
+   mode==='binary'?{stage:1,mode:'100644',oid:a,kind:'file',present:true,text:'',binary:true,notice:binaryNotice}:{stage:1,mode:'100644',oid:a,kind:'file',present:true,text:'base\n'},
    mode==='notices'?{stage:2,mode:'100644',oid:a,kind:'file',present:true,text:'',notice:overLimit}:{stage:2,mode:'120000',oid:a,kind:'symlink',present:true,text:'target\n',notice:'Symbolic link target text; not followed.'},
    mode==='binary'?{stage:3,mode:'100644',oid:a,kind:'file',present:true,text:'',binary:true,notice:binaryNotice}:{stage:3,present:false,text:''}]});
   const rpc=async(endpoint,p,signal)=>{if(endpoint!=='vcs/conflict-stages')throw Error('Unexpected conflict endpoint');calls.push({p,signal});
