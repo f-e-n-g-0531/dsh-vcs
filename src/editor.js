@@ -1,4 +1,5 @@
 import {createEnvironmentOwner} from './editor-environment.mjs';
+import {diffStatus} from './diff-status.mjs';
 const acquireEnvironment=createEnvironmentOwner(globalThis,(url,label)=>new Worker(url??new URL('./editor.worker.js',import.meta.url),{name:label}));
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
 import 'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution.js';
@@ -40,17 +41,18 @@ function updateTheme() {
   }).filter(([, value]) => value !== undefined))});
   monaco.editor.setTheme('dsh-vcs');
 }
-export function createDiff(node, { onStats, single = false } = {}) {
+export function createDiff(node, { onStats, onComputation, single = false } = {}) {
   const releaseEnvironment = acquireEnvironment();
   let editor, observer, subscription;
-  let models = [], key = '', disposed = false;
+  let models = [], key = '', disposed = false, viewModel, computationTimer;
+  const reportComputation = () => {if(!disposed)onComputation?.(diffStatus(viewModel));};
   const states = new Map();
   function dispose() {
     if (disposed) return;
     disposed = true;
     // One failing cleanup must not leave the global worker hook installed.
     const cleanups = [() => observer?.disconnect(), () => subscription?.dispose(),
-      () => editor?.dispose(), ...models.map(model => () => model.dispose())];
+      () => clearTimeout(computationTimer), () => viewModel?.dispose(), () => editor?.dispose(), ...models.map(model => () => model.dispose())];
     try {
       for (const cleanup of cleanups) { try { cleanup(); } catch (error) { console.warn('VCS editor cleanup failed', error); } }
     } finally {
@@ -64,6 +66,7 @@ export function createDiff(node, { onStats, single = false } = {}) {
   observer = new MutationObserver(updateTheme);
   observer.observe(document.body,{attributes:true,attributeFilter:['data-ds-dark-theme','style','class']});
   subscription = single ? undefined : editor.onDidUpdateDiff(() => {
+    reportComputation();
     const changes = editor.getLineChanges() || [];
     const stats = changes.reduce((out,c) => {out.added += c.modifiedEndLineNumber ? c.modifiedEndLineNumber-c.modifiedStartLineNumber+1:0; out.deleted += c.originalEndLineNumber ? c.originalEndLineNumber-c.originalStartLineNumber+1:0; return out;},{added:0,deleted:0,count:changes.length});
     onStats?.(stats);
@@ -73,7 +76,8 @@ export function createDiff(node, { onStats, single = false } = {}) {
       if (disposed) return;
       if(key) states.set(key,editor.saveViewState());
       if(states.size>100) states.delete(states.keys().next().value);
-      editor.setModel(null); models.forEach(m=>m.dispose());
+      clearTimeout(computationTimer);
+      editor.setModel(null); viewModel?.dispose(); viewModel=undefined; models.forEach(m=>m.dispose());
       const language = languages[data.path?.split('.').pop()?.toLowerCase()] || 'plaintext';
       models = [];
       try {
@@ -83,10 +87,18 @@ export function createDiff(node, { onStats, single = false } = {}) {
         models.forEach(model => model.dispose()); models = [];
         throw error;
       }
-      editor.setModel(single?models[0]:{original:models[0],modified:models[1]}); key=nextKey;
+      if(single)editor.setModel(models[0]);
+      else {
+        viewModel=editor.createViewModel({original:models[0],modified:models[1]});
+        onComputation?.('pending');
+        editor.setModel(viewModel);
+        // Worker may never return a usable result: never imply equality on silence.
+        computationTimer=setTimeout(()=>{if(!disposed&&diffStatus(viewModel)!=='complete')onComputation?.('incomplete');},10000);
+      }
+      key=nextKey;
       if(states.has(key)) editor.restoreViewState(states.get(key));
     },
-    options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});},
+    options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});if(!single)reportComputation();},
     revealLine(line) {if(!single||!Number.isInteger(line)||line<1||line>models[0]?.getLineCount())return false;editor.setSelection({startLineNumber:line,startColumn:1,endLineNumber:line,endColumn:models[0].getLineMaxColumn(line)});editor.revealLineInCenter(line);return true;},
     navigate(direction) {if(!single)editor.goToDiff(direction);},
     dispose

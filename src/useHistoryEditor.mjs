@@ -9,9 +9,11 @@ export function useHistoryEditor({comparison, identity, enabled, single, line, s
   const viewer = useRef(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [computation, setComputation] = useState('pending');
 
   useEffect(() => {
     setReady(false);
+    setComputation('pending');
     setError('');
     if (!enabled) return;
     const asset = name => new URL('vcs-assets/' + name, document.baseURI).href;
@@ -24,6 +26,7 @@ export function useHistoryEditor({comparison, identity, enabled, single, line, s
       load: signal => loadEditor(asset('editor.js') + '?v=' + encodeURIComponent(version) + '&retry=0', {signal}),
       onReady: instance => { viewer.current = instance; setReady(true); },
       onError: failure => setError(failure.message),
+      onComputation: setComputation,
     });
     return () => {
       viewer.current = null;
@@ -38,5 +41,5 @@ export function useHistoryEditor({comparison, identity, enabled, single, line, s
     if (ready) viewer.current?.options({sideBySide, ignoreWhitespace, wrap});
   }, [ready, sideBySide, ignoreWhitespace, wrap]);
 
-  return {node, viewer, ready, error};
+  return {node, viewer, ready, error, computation};
 }
