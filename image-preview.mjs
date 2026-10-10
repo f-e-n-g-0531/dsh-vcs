@@ -40,6 +40,11 @@ export function prepareSimpleWebp(buffer) {
     if (w >>> 14 || h >>> 14) throw Error('WebP scaled frame unsupported');
     width = w & 16383;
     height = h & 16383;
+  } else if (kind === 'VP8L') {
+    if(size<5||buffer[20]!==0x2f)throw Error('Invalid WebP lossless signature');
+    const bits=buffer.readUInt32LE(21);
+    if(bits>>>29)throw Error('Unsupported WebP lossless version');
+    width=(bits&0x3fff)+1;height=((bits>>>14)&0x3fff)+1;
   } else {
     throw Error('Only simple static WebP is supported');
   }
@@ -47,7 +52,7 @@ export function prepareSimpleWebp(buffer) {
     throw Error('WebP dimensions exceed limit');
   }
   return {mime: 'image/webp', width, height, bytes: buffer.length, originalBytes: buffer.length,
-    data: Buffer.from(buffer), metadataStripped: false};
+    data: Buffer.from(buffer), metadataStripped: false, encoding:kind==='VP8L'?'VP8L':'VP8'};
 }
 export function prepareBaselineJpeg(buffer){
  if(!Buffer.isBuffer(buffer)||buffer.length<4||buffer.length>2097152||buffer[0]!==255||buffer[1]!==216)throw Error('Invalid JPEG input or byte limit');

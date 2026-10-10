@@ -36,6 +36,10 @@ try{
  // Product adapters still reject the original extended canvas output, not silently strip it.
  const simpleWebp=Buffer.concat([Buffer.from('RIFF'),Buffer.alloc(4),Buffer.from('WEBP'),imageChunk.data]);simpleWebp.writeUInt32LE(simpleWebp.length-8,4);
  const preparedWebp=prepareSimpleWebp(simpleWebp);if(preparedWebp.width!==3||preparedWebp.height!==2)throw Error('Prepared WebP geometry');await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(preparedWebp.data.toString('base64'))+"))");await writeFile('test-results/webp-prepared-report.json',JSON.stringify({pass:true,bytes:preparedWebp.bytes,width:preparedWebp.width,height:preparedWebp.height}));
+ const lossless=Buffer.from('UklGRh4AAABXRUJQVlA4TBEAAAAvAkAAEAdQqFIUuYCBiOh/AAA=','base64');
+ const preparedLossless=prepareSimpleWebp(lossless);if(preparedLossless.encoding!=='VP8L'||preparedLossless.width!==3||preparedLossless.height!==2)throw Error('Lossless WebP gate failed');
+ await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(preparedLossless.data.toString('base64'))+"))");
+ await writeFile('test-results/webp-lossless-report.json',JSON.stringify({pass:true,width:3,height:2,encoding:preparedLossless.encoding,bytes:preparedLossless.bytes}));
  const repository=await mkdtemp(path.join(os.tmpdir(),'vcs-jpeg-repo-'));
  try{
   const git=(...args)=>execFileSync('git',['-C',repository,...args],{encoding:'utf8'});git('init','-q');git('config','user.name','JPEG');git('config','user.email','jpeg@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.jpg'),Buffer.from(jpeg,'base64'));git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.jpg'),'UNCOMMITTED');
