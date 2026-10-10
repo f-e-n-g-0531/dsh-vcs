@@ -200,7 +200,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       if (repository.type === 'svn' && mode !== 'all') throw invalid('SVN supports only all mode.');
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
-      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
+      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/tree-history','vcs/conflict-stages','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
       if(endpoint==='vcs/tree-segment'||(['vcs/compare','vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large===true)){if(activeSegments>=1)return failure('vcs/busy','A text segment is already loading. Please retry.');activeSegments++;segmentSlot=true;}
       if(['vcs/commit-image','vcs/revision-image','vcs/workspace-image'].includes(endpoint)){
         if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');

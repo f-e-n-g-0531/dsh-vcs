@@ -110,6 +110,7 @@ test('explicit historical path history enforces commit path pagination grants an
  h.expire();assert.equal((await h.call('vcs/tree-history',p)).error.code,'vcs/rediscover-required');
  const moved=setup({listPathHistory:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree-history',p)).error.code,'vcs/rediscover-required');
  const cancel=setup({listPathHistory:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree-history',p,controller.signal)).error.code,'vcs/cancelled');
+ const svn=setup({discoverRepositories:async()=>({repositories:[{...repo,type:'svn'}],warnings:[]}),listPathHistory:async()=>{throw Error('Must not call');}});await svn.discover();assert.equal((await svn.call('vcs/tree-history',p)).error.code,'vcs/invalid-request');assert.equal((await svn.call('vcs/conflict-stages',{sessionId:'s',repositoryId:payload.repositoryId,mode:'all',id:'b'.repeat(64)})).error.code,'vcs/invalid-request');
 });
 test('historical tree enforces commit-only grants and rejects stale results',async()=>{
  const p={...payload,commit:'a'.repeat(40)},controller=new AbortController();let count=0;
