@@ -2,7 +2,7 @@ import {createHandler} from '../index.mjs';
 import {createSvnRuntime} from './svn-runtime.mjs';
 import {createSvnRpc} from './svn-rpc.mjs';
 
-const REMOTE_METHODS = new Set(['describe', 'approve', 'log', 'detail', 'compare', 'trace', 'revoke']);
+const REMOTE_METHODS = new Set(['describe', 'approve', 'log', 'detail', 'compare', 'trace', 'copytrace', 'revoke']);
 
 // Shared host authorization; callers must explicitly supply a transport.
 export function createSvnHost(ctx, api, {
