@@ -28,6 +28,6 @@ function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,o
  {!!details.changes.length&&!files.length&&<p role="status">{t('emptySearch')}</p>}
  {!details.changes.length&&<p>{t('commitNoChanges')}</p>}
  {selected&&<HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={commit} parentIndex={parentIndex} id={selected} onSelectCommit={onSelectCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
- <HistoricalTree key={JSON.stringify([sessionId,repositoryId,commit])} {...{sessionId,repositoryId,commit,rpc,t,onRediscover}}/>
+ <HistoricalTree key={JSON.stringify([sessionId,repositoryId,commit])} {...{sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}}/>
  </section>;
 }

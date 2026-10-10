@@ -1,7 +1,7 @@
 import React,{useState,useEffect} from 'react';
 import HistoricalFile from './HistoricalFile.jsx';
 import {filterTreeEntries,treeBreadcrumbs} from './tree-filter.mjs';
-function TreeRows({sessionId,repositoryId,commit,rpc,t,onRediscover}){
+function TreeRows({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0),[directory,setDirectory]=useState(''),[page,setPage]=useState(0),[query,setQuery]=useState(''),[selected,setSelected]=useState(null);
  useEffect(()=>{
   const controller=new AbortController();setData(null);setError('');
@@ -18,7 +18,7 @@ function TreeRows({sessionId,repositoryId,commit,rpc,t,onRediscover}){
  <p>{entries.length} {t('treeEntries')}</p>{!entries.length&&query&&<p role="status">{t('emptySearch')}</p>}
  <ul>{entries.slice(page*100,page*100+100).map(entry=><li key={entry.path}>{entry.type==='tree'?<button onClick={()=>go(entry.path)}>{entry.path.slice(prefix.length)}/</button>:entry.type==='blob'&&['100644','100755'].includes(entry.mode)?<button aria-pressed={selected===entry.path} onClick={()=>setSelected(entry.path)}>{entry.path.slice(prefix.length)}</button>:<span>{entry.path.slice(prefix.length)}</span>} · <code>{entry.mode} {entry.type} <span title={entry.oid}>{entry.oid.slice(0,10)}</span></code></li>)}</ul>
  {page>0&&<button onClick={()=>{setPage(n=>n-1);setSelected(null);}}>{t('treePrevious')}</button>}{(page+1)*100<entries.length&&<button onClick={()=>{setPage(n=>n+1);setSelected(null);}}>{t('treeNext')}</button>}
- {selected&&<HistoricalFile key={JSON.stringify([sessionId,repositoryId,commit,selected])} {...{sessionId,repositoryId,commit,rpc,t,onRediscover}} path={selected} onClose={()=>setSelected(null)}/>}
+ {selected&&<HistoricalFile key={JSON.stringify([sessionId,repositoryId,commit,selected])} {...{sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}} path={selected} onClose={()=>setSelected(null)}/>}
  </section>;
 }
 export default function HistoricalTree(props){return <ScopedTree key={JSON.stringify([props.sessionId,props.repositoryId,props.commit])} {...props}/>;}
