@@ -18,7 +18,7 @@ function ImageSide({side,sessionId,repositoryId,commit,parentIndex,base,target,w
   return()=>{controller.abort();resource?.dispose();};
  },[side,sessionId,repositoryId,commit,parentIndex,base,target,workspace,mode,id,retry]);
  return <section style={{flex:'1 1 280px',minWidth:0}} aria-label={t(side==='left'?'imageBefore':'imageAfter')}><h5>{t(side==='left'?'imageBefore':'imageAfter')}</h5>
- {error?<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role="status">{t('loading')}</p>:<><p><code>{data.commit}</code> · {data.path}</p>{data.absent?<p>{t('imageAbsent')}</p>:<><p>{data.width} × {data.height} · {data.bytes} B</p><img src={data.url} alt={data.path} style={{maxWidth:'100%',maxHeight:480,objectFit:'contain'}}/>{data.metadataStripped&&<p>{t('imageMetadata')}</p>}</>}</>}
+ {error?<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role="status">{t('loading')}</p>:<><p><code>{data.commit}</code> · {data.path}</p>{data.absent?<p>{t('imageAbsent')}</p>:<><p>{data.mime}{data.encoding?' · '+data.encoding:''} · {data.width} × {data.height} · {data.bytes} B</p><img src={data.url} alt={data.path} style={{maxWidth:'100%',maxHeight:480,objectFit:'contain'}}/>{data.metadataStripped&&<p>{t('imageMetadata')}</p>}</>}</>}
  </section>;
 }
 export default function ImageComparison(props){const [open,setOpen]=useState(false);return <div><button aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{props.t('imageCompare')}</button>{open&&<><p>{props.t('imageScope')}</p><div style={{display:'flex',flexWrap:'wrap',gap:16}}>{['left','right'].map(side=><ImageSide key={side} {...props} side={side}/>)}</div></>}</div>;}

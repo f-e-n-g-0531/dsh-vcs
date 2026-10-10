@@ -41,7 +41,7 @@ export function prepareSimpleWebp(buffer) {
     width = w & 16383;
     height = h & 16383;
   } else if (kind === 'VP8L') {
-    if(size<5||buffer[20]!==0x2f)throw Error('Invalid WebP lossless signature');
+    if(size<=5||buffer[20]!==0x2f)throw Error('Invalid WebP lossless signature');
     const bits=buffer.readUInt32LE(21);
     if(bits>>>29)throw Error('Unsupported WebP lossless version');
     width=(bits&0x3fff)+1;height=((bits>>>14)&0x3fff)+1;

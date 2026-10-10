@@ -37,6 +37,7 @@ try{
  const simpleWebp=Buffer.concat([Buffer.from('RIFF'),Buffer.alloc(4),Buffer.from('WEBP'),imageChunk.data]);simpleWebp.writeUInt32LE(simpleWebp.length-8,4);
  const preparedWebp=prepareSimpleWebp(simpleWebp);if(preparedWebp.width!==3||preparedWebp.height!==2)throw Error('Prepared WebP geometry');await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(preparedWebp.data.toString('base64'))+"))");await writeFile('test-results/webp-prepared-report.json',JSON.stringify({pass:true,bytes:preparedWebp.bytes,width:preparedWebp.width,height:preparedWebp.height}));
  const lossless=Buffer.from('UklGRh4AAABXRUJQVlA4TBEAAAAvAkAAEAdQqFIUuYCBiOh/AAA=','base64');
+ const headerOnly=Buffer.from('5249464612000000574542505650384c050000002f0240001000','hex');let refused=false;try{prepareSimpleWebp(headerOnly);}catch{refused=true;}if(!refused)throw Error('Empty lossless compressed data accepted');
  const preparedLossless=prepareSimpleWebp(lossless);if(preparedLossless.encoding!=='VP8L'||preparedLossless.width!==3||preparedLossless.height!==2)throw Error('Lossless WebP gate failed');
  await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(preparedLossless.data.toString('base64'))+"))");
  await evaluate("import('./history-viewer-browser.js').then(m=>m.checkLosslessWebp("+JSON.stringify(preparedLossless.data.toString('base64'))+"))");
