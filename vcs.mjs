@@ -2,7 +2,7 @@ import {parseConflictStages} from './conflict-stages.mjs';
 import {parseSvnIdentity} from './src/svn-identity.mjs';
 import {prepareRaster} from './image-preview.mjs';
 import {git, svn, TIMEOUT} from './local-command.mjs';
-import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT} from './git-history.mjs';
+import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT,validateDateBound} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
 import {constants as fileFlags} from 'node:fs';
 import path from 'node:path';
@@ -385,10 +385,12 @@ export async function getFileBlame(repo,{commit,parentIndex=0,id,startLine=1,lin
  const output=await git(repo.root,['--literal-pathspecs','blame','--ignore-revs-file=','--line-porcelain','--no-textconv','--encoding=UTF-8','-L',startLine+','+endLine,commit,'--',entry.path],MAX_TEXT,{signal});
  return {...result,lines:parseBlame(output.toString('utf8'),limit),totalLines:count,nextLine:endLine<count&&endLine<100001?endLine+1:null,truncated:endLine<count};
 }
-export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,follow=false,signal}={}){
+export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,follow=false,since,until,signal}={}){
   if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid history pagination');
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
   if(typeof follow!=='boolean')throw Error('Invalid rename follow mode');
+  const sinceArg=since===undefined?null:validateDateBound(since),untilArg=until===undefined?null:validateDateBound(until);
+  if((sinceArg||untilArg)&&follow)throw Error('Date-range file history is not combined with rename following.');
   const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected commit');
@@ -415,7 +417,9 @@ export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,lim
    const rows=chain.slice(offset);
    return {...historyPage(rows,commit,offset,limit),path:entry.path,followsRenames:true,followPolicy:'unique-similarity-first-parent'};
   }
-  const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,{signal});
+  if(sinceArg){signal?.throwIfAborted();try{await git(repo.root,['log','--since-as-filter=1970-01-01','-1','--format=%H'],MAX_TEXT,{signal});}catch(e){if(e.code==='VCS_COMMAND')throw new Error('Date-range file history requires Git 2.37 or newer (--since-as-filter).');throw e;}}
+  const dateArgs=[...(sinceArg?['--since-as-filter='+sinceArg]:[]),...(untilArg?['--until='+untilArg]:[])];
+  const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,...dateArgs,commit,'--',entry.path],MAX_TEXT,{signal});
   return {...historyPage(parseHistory(text.toString('utf8'),limit+1),commit,offset,limit),path:entry.path,followsRenames:false};
 }
 

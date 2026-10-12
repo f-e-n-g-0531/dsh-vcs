@@ -23,7 +23,7 @@ export async function resolveSessionCwd(ctx, sessionId, signal) {
 
 const rediscover = () => Object.assign(new Error('Repository authorization is missing, expired, or changed. Rediscover repositories for this Session and retry.'), { code: 'vcs/rediscover-required' });
 
-import {historySearchArgs} from './git-history.mjs';
+import {historySearchArgs,validateDateBound} from './git-history.mjs';
 
 // Exact request fields are a protocol contract, independent of dispatch.
 const REQUEST_FIELDS = {
@@ -36,7 +36,7 @@ const REQUEST_FIELDS = {
   'vcs/history': ['sessionId', 'repositoryId', 'snapshot', 'offset', 'limit', 'search'],
   'vcs/commit': ['sessionId', 'repositoryId', 'commit', 'parentIndex'],
   'vcs/commit-compare': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'large'],
-  'vcs/file-history': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'offset', 'limit', 'follow'],
+  'vcs/file-history': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'offset', 'limit', 'follow', 'since', 'until'],
   'vcs/blame': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'startLine', 'lineLimit'],
   'vcs/revision-changes': ['sessionId', 'repositoryId', 'base', 'target'],
   'vcs/revision-compare': ['sessionId', 'repositoryId', 'base', 'target', 'id', 'large'],
@@ -74,6 +74,7 @@ function validatePayload(endpoint, payload) {
     if(endpoint==='vcs/tree-segment'&&payload.offset!==undefined&&(!Number.isInteger(payload.offset)||payload.offset<0||payload.offset>16777216))throw invalid('Invalid segment offset.');
     if(endpoint==='vcs/blame'&&((payload.startLine!==undefined&&(!Number.isInteger(payload.startLine)||payload.startLine<1||payload.startLine>100001))||(payload.lineLimit!==undefined&&(!Number.isInteger(payload.lineLimit)||payload.lineLimit<1||payload.lineLimit>500))))throw invalid('Invalid blame line window.');
     if(['vcs/file-history','vcs/tree-history'].includes(endpoint)&&payload.follow!==undefined&&typeof payload.follow!=='boolean')throw invalid('Invalid rename follow mode.');
+    if(endpoint==='vcs/file-history'&&(payload.since!==undefined||payload.until!==undefined)){try{if(payload.since!==undefined)validateDateBound(payload.since);if(payload.until!==undefined)validateDateBound(payload.until);}catch{throw invalid('Invalid history date bound.');}}
     if(endpoint==='vcs/history'){try{historySearchArgs(payload.search);}catch{throw invalid('Invalid history search.');}}
     if(['vcs/history','vcs/file-history','vcs/tree-history'].includes(endpoint)){
       if(payload.offset===null||payload.limit===null)throw invalid('Invalid history pagination.');
@@ -112,7 +113,7 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
     case 'vcs/file-history':
       return api.listFileHistory({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id,
         offset: payload.offset ?? 0, limit: payload.limit ?? 50,
-        ...(payload.follow !== undefined ? {follow: payload.follow} : {}), signal});
+        ...(payload.follow !== undefined ? {follow: payload.follow} : {}), ...(payload.since !== undefined ? {since: payload.since} : {}), ...(payload.until !== undefined ? {until: payload.until} : {}), signal});
     case 'vcs/revision-changes':
       return api.getRevisionChanges({...repository}, {base: payload.base, target: payload.target, signal});
     case 'vcs/revision-compare':

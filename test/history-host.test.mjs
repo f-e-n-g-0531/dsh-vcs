@@ -158,10 +158,16 @@ test('file history validates opaque selection pagination and session grants',asy
  const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64)};const controller=new AbortController();let calls=0;
  const h=setup({listFileHistory:async(r,o)=>{calls++;assert.deepEqual(r,repo);assert.deepEqual(o,{commit:p.commit,id:p.id,parentIndex:0,offset:0,limit:50,signal:controller.signal});return {commits:[]};}});
  assert.equal((await h.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');await h.discover();
- for(const extra of [{path:'secret'},{root:'/evil'},{snapshot:p.commit},{commit:'HEAD'},{id:'bad'},{parentIndex:null},{offset:null},{offset:10001},{limit:101}])assert.equal((await h.call('vcs/file-history',{...p,...extra})).error.code,'vcs/invalid-request');
+ for(const extra of [{path:'secret'},{root:'/evil'},{snapshot:p.commit},{commit:'HEAD'},{id:'bad'},{parentIndex:null},{offset:null},{offset:10001},{limit:101},{since:'2 weeks ago'},{since:'2021-02-30'},{until:'@1700000000'},{until:7}])assert.equal((await h.call('vcs/file-history',{...p,...extra})).error.code,'vcs/invalid-request');
  assert.equal(calls,0);assert.equal((await h.call('vcs/file-history',p,controller.signal)).ok,true);assert.equal(calls,1);
  h.expire();assert.equal((await h.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');
  const cancel=setup({listFileHistory:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/file-history',p,controller.signal)).error.code,'vcs/cancelled');
+});
+test('file history forwards validated date bounds under grants',async()=>{
+ const p={...payload,commit:'a'.repeat(40),id:'b'.repeat(64),since:'2021-01-01',until:'2022-12-31'};let received;
+ const h=setup({listFileHistory:async(_r,o)=>{received=o;return {commits:[]};}});
+ assert.equal((await h.call('vcs/file-history',p)).error.code,'vcs/rediscover-required');await h.discover();
+ assert.equal((await h.call('vcs/file-history',p)).ok,true);assert.equal(received.since,'2021-01-01');assert.equal(received.until,'2022-12-31');
 });
 test('history requires per-session grants and rejects roots and invalid arguments',async()=>{
  const h=setup();assert.equal((await h.call('vcs/history',payload)).error.code,'vcs/rediscover-required');await h.discover();
