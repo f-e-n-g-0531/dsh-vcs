@@ -128,7 +128,7 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
     case 'vcs/conflict-stages':
       return api.getConflictStages({...repository},{mode,id:payload.id,signal});
     case 'vcs/compare':
-      return api.getComparison({...repository}, {mode, id: payload.id, ...(payload.large !== undefined ? {large: payload.large,signal} : {})});
+      return api.getComparison({...repository}, {mode, id: payload.id, ...(signal !== undefined ? {signal} : {}), ...(payload.large !== undefined ? {large: payload.large} : {})});
   }
 }
 

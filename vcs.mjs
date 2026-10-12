@@ -474,25 +474,28 @@ function identity(entry, mode) { return createHash('sha256').update(JSON.stringi
 // Never runs Git inside the submodule, never follows its gitdir and never fetches.
 async function annotateSubmodules(repo, entries, options) {
   if (!entries.length) return;
-  let listing;
-  try { listing = (await git(repo.root, ['ls-files', '--stage', '-z'], MAX_TEXT, options)).toString('utf8'); }
-  catch (e) { if (e.code === 'TOO_LARGE') return; throw e; }
   const pointers = new Map();
-  for (const record of listing.split('\0')) {
-    const tab = record.indexOf('\t'); if (tab < 0) continue;
-    const [mode, oid] = record.slice(0, tab).split(' ');
-    if (mode === '160000' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid)) pointers.set(record.slice(tab + 1), oid);
+  const deadline=Date.now()+(options?.timeoutMs??TIMEOUT);
+  const check=()=>{options?.signal?.throwIfAborted();if(Date.now()>=deadline)throw Object.assign(Error('Index metadata timed out'),{code:'TIMEOUT'});};
+  const files=entries.filter(entry=>entry.status!=='conflicted').map(entry=>entry.path);
+  for(let from=0;from<files.length;){
+    check();const batch=[];let bytes=0;
+    while(from<files.length&&batch.length<64){const file=files[from],size=Buffer.byteLength(file,'utf8')+1;if(size>24000)throw Error('Selected path exceeds metadata budget');if(bytes+size>24000)break;batch.push(file);bytes+=size;from++;}
+    const listing=(await git(repo.root,['ls-files','--stage','-z','--',...batch],MAX_TEXT,{...options,timeoutMs:deadline-Date.now()})).toString('utf8');
+    for(const record of listing.split('\0')){const tab=record.indexOf('\t');if(tab<0)continue;const [mode,oid,stage]=record.slice(0,tab).split(' '),file=record.slice(tab+1);if(stage==='0'&&mode==='160000'&&batch.includes(file)&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))pointers.set(file,oid);}
   }
   if (!pointers.size) return;
   for (const entry of entries) {
-    const recorded = pointers.get(entry.path); if (!recorded) continue;
+    check();
+    const recorded = pointers.get(entry.path); if (!recorded || entry.status === 'conflicted') continue;
     let checkout = 'uninitialized';
     try {
       const target = await confined(repo.root, entry.path);
-      const info = await fs.lstat(target);
-      if (info.isDirectory()) { try { await fs.lstat(path.join(target, '.git')); checkout = 'initialized'; } catch (inner) { if (inner.code !== 'ENOENT') checkout = 'unreadable'; } }
+      check();const info = await fs.lstat(target);check();
+      if (info.isDirectory()) { try { const marker = await fs.lstat(path.join(target, '.git')); checkout = marker.isFile() || marker.isDirectory() ? 'initialized' : 'unreadable'; } catch (inner) { if (inner.code !== 'ENOENT') checkout = 'unreadable'; } }
       else checkout = 'uninitialized';
-    } catch (e) { checkout = e.code === 'ENOENT' ? 'absent' : 'unreadable'; }
+    } catch (e) { check();checkout = e.code === 'ENOENT' ? 'absent' : 'unreadable'; }
+    check();
     entry.submodule = { recorded, checkout };
   }
 }
@@ -539,14 +542,23 @@ async function working(root, relative, svnLink = false) {
   const handle = await fs.open(target, 'r');
   try { const info = await handle.stat(); if (!info.isFile()) throw new Error('Not a regular file'); const buffer = Buffer.alloc(MAX_TEXT + 1); const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0); await confined(root, relative); return decode(buffer.subarray(0, bytesRead)); } finally { await handle.close(); }
 }
-async function gitBlob(root, revision, file) { return content(() => git(root, ['show', '--no-ext-diff', '--no-textconv', revision + ':' + file], MAX_TEXT)); }
-// Gitlink pointers are commits, not blobs; read the tree entry instead of `git show`.
-async function gitlinkAt(root, revision, file) {
-  const listing = (await git(root, ['ls-tree','-z',revision,'--',file], MAX_TEXT)).toString('utf8');
-  const record = listing.split('\0').filter(Boolean).find(row => row.slice(row.indexOf('\t') + 1) === file);
-  if (!record) return null;
-  const [mode, , oid] = record.slice(0, record.indexOf('\t')).split(' ');
-  return mode === '160000' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid) ? oid : null;
+async function gitBlob(root, revision, file, options) {
+ let record;
+ if(revision){
+  const raw=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,options)).toString('utf8');
+  const row=raw.split('\0').find(row=>row.includes('\t')&&row.slice(row.indexOf('\t')+1)===file);
+  if(!row)return {text:''};const [mode,type,oid]=row.slice(0,row.indexOf('\t')).split(' ');record={mode,type,oid};
+ }else{
+  const raw=(await git(root,['ls-files','--stage','-z','--',file],MAX_TEXT,options)).toString('utf8');
+  for(const row of raw.split('\0')){const tab=row.indexOf('\t');if(tab<0||row.slice(tab+1)!==file)continue;const [mode,oid,stage]=row.slice(0,tab).split(' ');if(stage==='0')record={mode,oid,type:mode==='160000'?'commit':'blob'};}
+  if(!record)return {text:'',notice:'No stage-0 Index entry; conflict stages are not inferred.'};
+ }
+ if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(record.oid))throw Error('Invalid selected object');
+ if(record.mode==='160000')return {text:'Submodule '+record.oid,notice:'Recorded gitlink pointer; nested checkout commit and contents are not loaded by this preview.'};
+ if(record.type!=='blob'||!['100644','100755','120000'].includes(record.mode))return {text:'',notice:'Unsupported selected object; contents not loaded.'};
+ const body=await content(()=>git(root,['cat-file','blob',record.oid],MAX_TEXT,options));
+ if(record.mode==='120000')body.notice=[body.notice,'Symbolic link target text; not followed.'].filter(Boolean).join(' ');
+ return body;
 }
 async function historicalBlob(root,revision,file,signal,large=false,budget){
   const listing=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,budget?budget():{signal})).toString('utf8');
@@ -653,28 +665,24 @@ export async function getConflictStages(repo,{mode='all',id,signal}={}){
 export async function getComparison(repo, { mode = 'all', id, large=false, signal } = {}) {
   if(typeof large!=='boolean')throw Error('Invalid large comparison mode');
   if(large)return getWorkspaceLargeComparison(repo,{mode,id,signal});
-  repo = await checkedRepo(repo); modeFor(repo, mode);
-  const entry = (await changes(repo, mode)).find(item => item.id === id);
+  signal?.throwIfAborted();
+  repo = await checkedRepo(repo,signal); modeFor(repo, mode);
+  const entry = (await changes(repo, mode,{signal})).find(item => item.id === id);
   if (!entry) throw new Error('Change no longer exists; refresh repository status.');
   await confined(repo.root, entry.path); if (entry.oldPath) await confined(repo.root, entry.oldPath);
   let left = { text: '' }, right = { text: '' }, leftLabel, rightLabel, props, notice;
   if (repo.type === 'git') {
     leftLabel = mode === 'unstaged' ? 'Index' : 'HEAD'; rightLabel = mode === 'staged' ? 'Index' : 'Working tree';
-    if (entry.submodule) {
-      const head = mode === 'unstaged' ? null : await gitlinkAt(repo.root, 'HEAD', entry.oldPath || entry.path).catch(() => null);
-      left = mode === 'unstaged' ? { text: 'Submodule ' + entry.submodule.recorded } : head ? { text: 'Submodule ' + head } : { text: '', notice: 'No recorded submodule pointer in HEAD.' };
-      right = mode === 'unstaged' ? { text: '', notice: 'Working submodule checkout is not read.' } : { text: 'Submodule ' + entry.submodule.recorded };
-      notice = 'Submodule pointer (checkout: ' + entry.submodule.checkout + '); the submodule working tree is not read.';
-    } else if (entry.status === 'conflicted') {
+    if (entry.status === 'conflicted') {
       notice = 'Unmerged conflict: showing HEAD versus working tree (index has conflict stages).'; leftLabel = 'HEAD'; rightLabel = 'Working tree';
-      try { left = await gitBlob(repo.root, 'HEAD', entry.oldPath || entry.path); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; }
+      try { left = await gitBlob(repo.root, 'HEAD', entry.oldPath || entry.path,{signal}); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; }
       right = await working(repo.root, entry.path);
     } else {
       let hasHead = true; try { await git(repo.root, ['rev-parse', '--verify', 'HEAD']); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; hasHead = false; }
       const untracked = entry.indexStatus === '?';
       const addedToHead = entry.indexStatus === 'A' || entry.indexStatus === 'C';
-      if (!untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : (hasHead && !addedToHead))) left = await gitBlob(repo.root, mode === 'unstaged' ? '' : 'HEAD', mode === 'unstaged' ? entry.path : entry.oldPath || entry.path);
-      if (mode === 'staged') { if (entry.indexStatus !== 'D') right = await gitBlob(repo.root, '', entry.path); }
+      if (!untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : (hasHead && !addedToHead))) left = await gitBlob(repo.root, mode === 'unstaged' ? '' : 'HEAD', mode === 'unstaged' ? entry.path : entry.oldPath || entry.path,{signal});
+      if (mode === 'staged') { if (entry.indexStatus !== 'D') right = await gitBlob(repo.root, '', entry.path,{signal}); }
       else right = await working(repo.root, entry.path);
     }
   } else {
@@ -692,6 +700,6 @@ export async function getComparison(repo, { mode = 'all', id, large=false, signa
     if (entry.status !== 'unversioned') props = { left: added ? {} : await properties(repo.root, entry.path, true), right: ['deleted', 'missing'].includes(entry.status) ? {} : await properties(repo.root, entry.path, false) };
     if (entry.status === 'conflicted') notice = 'Conflicted working copy: showing BASE versus working content.';
   }
-  if (entry.submodule) notice = [notice, `Submodule pointer ${entry.submodule.recorded} (checkout: ${entry.submodule.checkout}); the submodule working tree is not read.`].filter(Boolean).join(' ');
+  if (entry.submodule) notice = [notice, `Submodule pointer ${entry.submodule.recorded} (checkout: ${entry.submodule.checkout}); nested commit and contents are not loaded by this preview; Git status may inspect nested state.`].filter(Boolean).join(' ');
   return { ...entry, left: { label: leftLabel, text: left.text, encoding: left.encoding }, right: { label: rightLabel, text: right.text, encoding: right.encoding }, ...(left.binary || right.binary ? { binary: true } : {}), ...([notice, left.notice, right.notice].filter(Boolean).length ? { notice: [...new Set([notice, left.notice, right.notice].filter(Boolean))].join(' ') } : {}), ...(props ? { properties: props } : {}) };
 }

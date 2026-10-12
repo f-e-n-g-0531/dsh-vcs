@@ -15,7 +15,7 @@ test('submodule changes report recorded pointer and checkout state without enter
   const changes=await listChanges(repo);assert.equal(changes.length,1);const entry=changes[0];
   assert.equal(entry.path,'sub');assert.equal(entry.status,'modified');assert.deepEqual(entry.submodule,{recorded,checkout:'initialized'});
   const comparison=await getComparison(repo,{mode:'all',id:entry.id});
-  assert.match(comparison.notice,/checkout: initialized/);assert.match(comparison.notice,/not read/);assert.equal(comparison.left.text,'Submodule '+recorded);assert.equal(comparison.right.text,'Submodule '+recorded);
+  assert.match(comparison.notice,/checkout: initialized/);assert.match(comparison.notice,/not loaded/);assert.equal(comparison.left.text,'Submodule '+recorded);assert.equal(comparison.right.label,'Working tree');assert.equal(comparison.right.text,'');
   assert.equal(run(outer,'ls-files','--stage'),indexBefore);assert.equal(run(sub,'show-ref'),subRefsBefore);assert.equal(run(sub,'rev-parse','HEAD').trim(),subHeadBefore);
   await rm(sub,{recursive:true,force:true});
   const missing=(await listChanges(repo))[0];assert.equal(missing.path,'sub');assert.equal(missing.submodule.checkout,'absent');
@@ -24,5 +24,16 @@ test('submodule changes report recorded pointer and checkout state without enter
   assert.equal((await listChanges(repo,'unstaged')).length,0);
   const stagedComparison=await getComparison(repo,{mode:'staged',id:staged[0].id});assert.match(stagedComparison.notice,/checkout: uninitialized/);assert.equal(stagedComparison.right.text,'Submodule '+first);
   assert.equal(run(outer,'ls-files','--stage').includes(first),true);
+  const abort=new AbortController();abort.abort();await assert.rejects(getComparison(repo,{mode:'staged',id:staged[0].id,signal:abort.signal}),{name:'AbortError'});
+  run(outer,'update-index','--force-remove','sub');
+  let selected=(await listChanges(repo,'staged')).find(row=>row.path==='sub');
+  let preview=await getComparison(repo,{mode:'staged',id:selected.id});assert.equal(preview.left.text,'Submodule '+second);assert.equal(preview.right.text,'');
+  await rm(sub,{recursive:true,force:true});await writeFile(sub,'ordinary file\n');run(outer,'add','sub');
+  selected=(await listChanges(repo,'staged')).find(row=>row.path==='sub');preview=await getComparison(repo,{mode:'staged',id:selected.id});assert.equal(preview.left.text,'Submodule '+second);assert.equal(preview.right.text,'ordinary file\n');
+  run(outer,'commit','-qm','replace gitlink with file');await rm(sub);await mkdir(sub);run(outer,'update-index','--cacheinfo','160000,'+first+',sub');
+  selected=(await listChanges(repo,'staged')).find(row=>row.path==='sub');preview=await getComparison(repo,{mode:'staged',id:selected.id});assert.equal(preview.left.text,'ordinary file\n');assert.equal(preview.right.text,'Submodule '+first);
+  run(outer,'update-index','--force-remove','sub');
+  execFileSync('git',['-C',outer,'update-index','--index-info'],{input:'160000 '+first+' 1\tsub\n160000 '+second+' 2\tsub\n160000 '+first+' 3\tsub\n',encoding:'utf8',windowsHide:true});
+  selected=(await listChanges(repo)).find(row=>row.path==='sub');assert.equal(selected.status,'conflicted');assert.equal(selected.submodule,undefined);preview=await getComparison(repo,{id:selected.id});assert.match(preview.notice,/Unmerged conflict/);
  }finally{await rm(base,{recursive:true,force:true});}
 });
