@@ -19,6 +19,7 @@ function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,o
  const files=filterCommitFiles(details.changes,query);
  return <section aria-label={t('commitDetails')}><h3>{details.subject}</h3><code>{details.id}</code>
  <p>{details.author} · {details.date}</p>
+ {details.committer&&details.committer!==details.author&&<p>{t('commitCommitter')} {details.committer}{details.committerDate?` · ${details.committerDate}`:''}</p>}
  {details.signature?.signed===true&&<p><span title={t('commitSignatureUnverified')}>{t('commitSigned',{format:details.signature.format})}</span></p>}
  {details.messageTruncated&&<p role="status">{t('commitMessageLimit')}</p>}
  {details.message&&<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:240,overflow:'auto'}}>{details.message}</pre>}

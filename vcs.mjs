@@ -243,10 +243,16 @@ async function commitDetails(repo,{commit,parentIndex=0,signal}={},includeMessag
   try{message=(await git(repo.root,['log','--no-show-signature','--encoding=UTF-8','--max-count=1','--format=%B',commit,'--'],MAX_TEXT,{signal})).toString('utf8');}
   catch(error){if(error.code!=='TOO_LARGE')throw error;messageTruncated=true;}
   signal?.throwIfAborted();
+  let committer=null,committerDate=null;
+  try{
+    const identity=(await git(repo.root,['log','--no-show-signature','--encoding=UTF-8','--max-count=1','--format=%cn%x00%cI',commit,'--'],MAX_TEXT,{signal})).toString('utf8');
+    const cut=identity.indexOf('\0');
+    committer=cut===-1?identity.trim()||null:identity.slice(0,cut)||null;committerDate=cut===-1?null:identity.slice(cut+1);
+  }catch(error){if(error.code!=='TOO_LARGE')throw error;}
   let signature=null;
   try{signature=parseCommitSignature((await git(repo.root,['cat-file','commit',commit],MAX_TEXT,{signal})).toString('utf8'));}
   catch(error){if(error.code!=='TOO_LARGE')throw error;}
-  return {...metadata,message,messageTruncated,signature,parent,parentIndex,changes};
+  return {...metadata,message,messageTruncated,committer,committerDate,signature,parent,parentIndex,changes};
 }
 function parseCommitChanges(text,scope){
   const fields=text.split(String.fromCharCode(0));
