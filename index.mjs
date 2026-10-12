@@ -30,6 +30,7 @@ const REQUEST_FIELDS = {
   'vcs/repositories': ['sessionId', 'subdirectory'],
   'vcs/svn-identity': ['sessionId', 'repositoryId'],
   'vcs/references': ['sessionId', 'repositoryId'],
+  'vcs/stash-list': ['sessionId', 'repositoryId'],
   'vcs/status': ['sessionId', 'repositoryId', 'mode'],
   'vcs/compare': ['sessionId', 'repositoryId', 'mode', 'id', 'large'],
   'vcs/conflict-stages': ['sessionId', 'repositoryId', 'mode', 'id'],
@@ -100,6 +101,8 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
       return api.getRevisionImage({...repository}, {base: payload.base, target: payload.target, id: payload.id, side: payload.side ?? 'right', signal});
     case 'vcs/references':
       return api.listReferences({...repository}, {signal});
+    case 'vcs/stash-list':
+      return api.listStashes({...repository}, {signal});
     case 'vcs/commit-image':
       return api.getCommitImage({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id, side: payload.side ?? 'right', signal});
     case 'vcs/tree-file':
@@ -150,7 +153,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
   }
   if(bindSvnIdentityResolver!==undefined){if(typeof bindSvnIdentityResolver!=='function')throw new Error('Invalid internal SVN resolver binding');bindSvnIdentityResolver(async(address,signal)=>{validatePayload('vcs/svn-identity',address);signal?.throwIfAborted();const cwd=await resolveSessionCwd(ctx,address.sessionId,signal),entry=current(address.sessionId,cwd),repository=entry?.repositories.get(address.repositoryId);if(!repository)throw rediscover();if(repository.type!=='svn')throw invalid('SVN working copy required.');const identity=await api.getSvnIdentity({...repository},{signal});await assertCurrent(address.sessionId,cwd,entry,signal);if(entry.repositories.get(address.repositoryId)!==repository)throw rediscover();return {...identity,cwd};});}
   return async (endpoint, payload, signal) => {
-    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
+    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references', 'vcs/stash-list'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
     let imageSlot=false,segmentSlot=false;
@@ -201,7 +204,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       if (repository.type === 'svn' && mode !== 'all') throw invalid('SVN supports only all mode.');
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
-      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/tree-history','vcs/conflict-stages','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
+      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/tree-history','vcs/conflict-stages','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references','vcs/stash-list'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
       if(endpoint==='vcs/tree-segment'||(['vcs/compare','vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large===true)){if(activeSegments>=1)return failure('vcs/busy','A text segment is already loading. Please retry.');activeSegments++;segmentSlot=true;}
       if(['vcs/commit-image','vcs/revision-image','vcs/workspace-image'].includes(endpoint)){
         if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');

@@ -222,6 +222,25 @@ export async function listReferences(repo,{signal}={}){
  return {references:parseReferences(raw.toString('utf8'))};
 }
 
+const STASH_FORMAT='%H%x00%gs%x00%gd';
+export async function listStashes(repo,{signal}={}){
+ signal?.throwIfAborted();repo=await checkedRepo(repo,signal);
+ if(repo.type!=='git')throw new Error('Stash supports Git only');
+ const text=(await git(repo.root,['stash','list','--format='+STASH_FORMAT],MAX_TEXT,{signal})).toString('utf8');
+ if(!text.trim())return {stashes:[]};
+ const stashes=[];
+ for(const line of text.split('\n')){
+  if(!line)continue;
+  const fields=line.split('\0');
+  if(fields.length!==3)throw new Error('Invalid stash entry');
+  const [id,message,ref]=fields;
+  if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(id))throw new Error('Invalid stash entry');
+  stashes.push({id,message:message||ref,ref});
+  if(stashes.length>1000)throw new Error('Stash exceeds entry limit');
+ }
+ return {stashes};
+}
+
 export async function getCommitDetails(repo,options={}) {
   return commitDetails(repo,options,true);
 }
