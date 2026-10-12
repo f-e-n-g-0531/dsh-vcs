@@ -27,7 +27,7 @@ export async function checkConflictStages(){
   if(host.querySelectorAll('select').length!==2||host.querySelectorAll('li').length!==3)throw Error('Conflict stage selectors or inventory missing');
   if(!host.textContent.includes(t('conflictStageSymlink'))||!host.textContent.includes(t('conflictStageMissing')))throw Error('Symlink or missing-stage disclosure absent');
   const editor=await (async()=>{await wait(()=>host.querySelector('.monaco-diff-editor'),'monaco-editor');return host.querySelector('.monaco-diff-editor');})();
-  if(![...host.querySelectorAll('.view-line')].map(n=>n.textContent).join('|').includes('base'))throw Error('Stage text missing from the rendered diff editor');
+  await wait(()=>[...host.querySelectorAll('.view-line')].map(n=>n.textContent).join('|').includes('base'),'view-line-content');
   tick=2;render(lang);await new Promise(r=>setTimeout(r,60));
   if(host.querySelector('.monaco-diff-editor')!==editor)throw Error('Ancestor re-render rebuilt the conflict diff editor');
   tick=3;mode='notices';render(lang+'-notices');await wait(()=>host.textContent.includes(overLimit),'inventory-notice');
