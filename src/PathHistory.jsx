@@ -1,11 +1,11 @@
 import React,{useEffect,useState} from 'react';
-function PathHistoryPages({sessionId,repositoryId,commit,path:file,follow,rpc,t,onRediscover,onSelectCommit}){
+function PathHistoryPages({sessionId,repositoryId,commit,path:file,follow,since,until,rpc,t,onRediscover,onSelectCommit}){
  const [page,setPage]=useState({commits:[],nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
-  rpc('vcs/tree-history',{sessionId,repositoryId,commit,path:file,offset,limit:50,follow},controller.signal).then(value=>{if(!controller.signal.aborted)setPage(old=>({...value,commits:offset?[...old.commits,...value.commits]:value.commits}));}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
+  rpc('vcs/tree-history',{sessionId,repositoryId,commit,path:file,offset,limit:50,follow,...(since?{since}:{}),...(until?{until}:{})},controller.signal).then(value=>{if(!controller.signal.aborted)setPage(old=>({...value,commits:offset?[...old.commits,...value.commits]:value.commits}));}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
- },[sessionId,repositoryId,commit,file,offset,retry,follow]);
+ },[sessionId,repositoryId,commit,file,offset,retry,follow,since,until]);
  const boundary=row=>t(row.boundary==='merge-first-parent'?'fileHistoryMergeBoundary':row.boundary==='ambiguous-rename'?'fileHistoryAmbiguous':row.boundary==='rename-check-limit'?'fileHistoryRenameLimit':'fileHistoryBoundary');
  return <section aria-label={t('pathHistory')} aria-busy={busy}><p>{t('pathHistoryScope')}</p><p style={{overflowWrap:'anywhere'}}><code>{page.path||file}</code> · <code>{commit}</code>{page.followsRenames!==undefined&&<> · {t(page.followsRenames?'fileHistoryFollow':'pathHistoryNoFollow')}</>}</p>
  <ol>{page.commits.map(row=><li key={row.id}><code title={row.id}>{row.id.slice(0,10)}</code> · {onSelectCommit?<button onClick={()=>onSelectCommit(row.id,row.path||file)}>{row.subject}</button>:row.subject}<div>{row.boundary&&<span>{boundary(row)} </span>}{row.path&&<code>{row.oldPath?row.oldPath+' → ':''}{row.path}</code>} {row.similarity!==undefined&&<span>{t('fileHistorySimilarity')}: {row.similarity}% · </span>}{row.author} · <time dateTime={row.date}>{row.date}</time></div></li>)}</ol>
@@ -18,6 +18,6 @@ function PathHistoryPages({sessionId,repositoryId,commit,path:file,follow,rpc,t,
 }
 // Explicit historical path history: manual opt-in, pinned commit, no repository writes.
 export default function PathHistory(props){
- const [open,setOpen]=useState(false),[follow,setFollow]=useState(false);
- return <div><button aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{props.t('pathHistory')}</button>{open&&<><label><input type="checkbox" checked={follow} onChange={e=>setFollow(e.target.checked)}/>{props.t('fileHistoryFollow')}</label><p>{props.t('pathHistoryFollowScope')}</p><PathHistoryPages key={String(follow)} follow={follow} {...props}/></>}</div>;
+ const [open,setOpen]=useState(false),[follow,setFollow]=useState(false),[since,setSince]=useState(''),[until,setUntil]=useState('');
+ return <div><button aria-expanded={open} onClick={()=>setOpen(v=>!v)}>{props.t('pathHistory')}</button>{open&&<><label><input type="checkbox" checked={follow} onChange={e=>setFollow(e.target.checked)}/>{props.t('fileHistoryFollow')}</label><p>{props.t('pathHistoryFollowScope')}</p><p>{props.t('fileHistoryDateScope')}</p>{['historyServer_since','historyServer_until'].map((key,index)=><label key={key}>{props.t(key)} <input maxLength={40} placeholder="YYYY-MM-DD[THH:MM[:SS][±HH:MM]]" aria-label={props.t(key)} value={index?until:since} onChange={e=>index?setUntil(e.target.value):setSince(e.target.value)}/></label>)}<PathHistoryPages key={String(follow)} follow={follow} since={since.trim()||null} until={until.trim()||null} {...props}/></>}</div>;
 }

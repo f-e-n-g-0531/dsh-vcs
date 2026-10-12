@@ -44,7 +44,7 @@ const REQUEST_FIELDS = {
   'vcs/tree': ['sessionId', 'repositoryId', 'commit'],
   'vcs/tree-file': ['sessionId', 'repositoryId', 'commit', 'path'],
   'vcs/tree-segment': ['sessionId', 'repositoryId', 'commit', 'path', 'offset'],
-  'vcs/tree-history': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'limit', 'follow'],
+  'vcs/tree-history': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'limit', 'follow', 'since', 'until'],
   'vcs/commit-image': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'side'],
   'vcs/workspace-image': ['sessionId', 'repositoryId', 'mode', 'id', 'side'],
 };
@@ -74,7 +74,7 @@ function validatePayload(endpoint, payload) {
     if(endpoint==='vcs/tree-segment'&&payload.offset!==undefined&&(!Number.isInteger(payload.offset)||payload.offset<0||payload.offset>16777216))throw invalid('Invalid segment offset.');
     if(endpoint==='vcs/blame'&&((payload.startLine!==undefined&&(!Number.isInteger(payload.startLine)||payload.startLine<1||payload.startLine>100001))||(payload.lineLimit!==undefined&&(!Number.isInteger(payload.lineLimit)||payload.lineLimit<1||payload.lineLimit>500))))throw invalid('Invalid blame line window.');
     if(['vcs/file-history','vcs/tree-history'].includes(endpoint)&&payload.follow!==undefined&&typeof payload.follow!=='boolean')throw invalid('Invalid rename follow mode.');
-    if(endpoint==='vcs/file-history'&&(payload.since!==undefined||payload.until!==undefined)){try{if(payload.since!==undefined)validateDateBound(payload.since);if(payload.until!==undefined)validateDateBound(payload.until);}catch{throw invalid('Invalid history date bound.');}}
+    if(['vcs/file-history','vcs/tree-history'].includes(endpoint)&&(payload.since!==undefined||payload.until!==undefined)){try{if(payload.since!==undefined)validateDateBound(payload.since);if(payload.until!==undefined)validateDateBound(payload.until);}catch{throw invalid('Invalid history date bound.');}}
     if(endpoint==='vcs/history'){try{historySearchArgs(payload.search);}catch{throw invalid('Invalid history search.');}}
     if(['vcs/history','vcs/file-history','vcs/tree-history'].includes(endpoint)){
       if(payload.offset===null||payload.limit===null)throw invalid('Invalid history pagination.');
@@ -91,7 +91,7 @@ function validatePayload(endpoint, payload) {
 async function readRepository(api, endpoint, repository, payload, {cwd, mode, signal}) {
   switch (endpoint) {
     case 'vcs/tree-history':
-      return api.listPathHistory({...repository},{commit:payload.commit,path:payload.path,offset:payload.offset??0,limit:payload.limit??50,follow:payload.follow??false,signal});
+      return api.listPathHistory({...repository},{commit:payload.commit,path:payload.path,offset:payload.offset??0,limit:payload.limit??50,follow:payload.follow??false, ...(payload.since !== undefined ? {since: payload.since} : {}), ...(payload.until !== undefined ? {until: payload.until} : {}), signal});
     case 'vcs/tree-segment':
       return api.getHistoricalSegment({...repository}, {commit: payload.commit, path: payload.path, offset: payload.offset ?? 0, signal});
     case 'vcs/workspace-image':

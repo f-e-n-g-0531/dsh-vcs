@@ -446,10 +446,12 @@ async function followHistoricalPath(repo,{commit,file,offset,limit,signal}){
 }
 
 // Explicit historical path history; the path must exist in the selected commit.
-export async function listPathHistory(repo,{commit,path:file,offset=0,limit=50,follow=false,signal}={}){
+export async function listPathHistory(repo,{commit,path:file,offset=0,limit=50,follow=false,since,until,signal}={}){
  if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw Error('Invalid commit id');
  if(typeof file!=='string'||!file||file.length>32768||file.includes('\0')||file.startsWith('/')||file.split('/').some(part=>!part||part==='.'||part==='..'))throw Error('Invalid historical path');
  if(typeof follow!=='boolean')throw Error('Invalid rename follow mode');
+ const sinceArg=since===undefined?null:validateDateBound(since),untilArg=until===undefined?null:validateDateBound(until);
+ if((sinceArg||untilArg)&&follow)throw Error('Date-range path history is not combined with rename following.');
  if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw Error('Invalid history pagination');
  repo=await checkedRepo(repo,signal);
  if(repo.type!=='git')throw Error('Historical path history supports Git only');
@@ -458,7 +460,9 @@ export async function listPathHistory(repo,{commit,path:file,offset=0,limit=50,f
  if(!record)throw Error('Path does not exist in the selected commit');
  const mode=record.slice(0,record.indexOf('\t')).split(' ')[0];
  if(follow&&!['100644','100755','120000'].includes(mode))throw Error('Rename following requires a committed regular file or link');
- return follow?followHistoricalPath(repo,{commit,file,offset,limit,signal}):{...historyPage(parseHistory((await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,commit,'--',file],MAX_TEXT,{signal})).toString('utf8'),limit+1),commit,offset,limit),path:file,followsRenames:false};
+ if(sinceArg){signal?.throwIfAborted();try{await git(repo.root,['log','--since-as-filter=1970-01-01','-1','--format=%H'],MAX_TEXT,{signal});}catch(e){if(e.code==='VCS_COMMAND')throw new Error('Date-range path history requires Git 2.37 or newer (--since-as-filter).');throw e;}}
+ const dateArgs=[...(sinceArg?['--since-as-filter='+sinceArg]:[]),...(untilArg?['--until='+untilArg]:[])];
+ return follow?followHistoricalPath(repo,{commit,file,offset,limit,signal}):{...historyPage(parseHistory((await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,...dateArgs,commit,'--',file],MAX_TEXT,{signal})).toString('utf8'),limit+1),commit,offset,limit),path:file,followsRenames:false};
 }
 
 export async function getRevisionChanges(repo,{base,target,signal}={}){

@@ -28,6 +28,8 @@ export async function checkPathHistory(){
   follow.click();await wait(()=>calls.length===3&&calls[2].p.follow===true,'follow-toggle');
   await wait(()=>host.textContent.includes(t('fileHistoryAmbiguous'))&&host.textContent.includes('旧.txt → '+file),'follow-render');
   if(!host.textContent.includes(t('pathHistoryFollowScope')))throw Error('Follow scope not disclosed');
+  const sinceInput=host.querySelector('[aria-label="'+t('historyServer_since')+'"]');if(!sinceInput)throw Error('Path history date input missing');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(sinceInput,'2024-01-01');sinceInput.dispatchEvent(new Event('input',{bubbles:true}));
+  await wait(()=>calls.at(-1)?.p?.since==='2024-01-01','date-forward');
   mode='error';render(lang+'-error');await openPanel('error');await wait(()=>host.querySelector('[role=alert]'),'error-alert');
   mode='normal';const before=calls.length,retry=[...host.querySelectorAll('button')].find(b=>b.textContent===t('retry'));if(!retry)throw Error('Path history retry button missing');
   retry.click();await wait(()=>calls.length===before+1,'retry-refetch');await wait(()=>host.textContent.includes('edited'),'error-recovery');

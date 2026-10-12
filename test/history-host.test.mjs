@@ -107,6 +107,8 @@ test('explicit historical path history enforces commit path pagination grants an
  for(const extra of [{root:'/evil'},{path:'../secret'},{path:'/secret'},{path:''},{path:null},{path:'a//b'},{path:'x\0'},{follow:'yes'},{follow:1},{offset:-1},{offset:1.5},{offset:10001},{limit:0},{limit:101},{limit:null},{commit:'HEAD'},{id:'b'.repeat(64)},{mode:'staged'}])assert.equal((await h.call('vcs/tree-history',{...p,...extra})).error.code,'vcs/invalid-request',JSON.stringify(extra));
  assert.equal(count,0);assert.equal((await h.call('vcs/tree-history',p,controller.signal)).ok,true);assert.equal(count,1);
  assert.equal((await h.call('vcs/tree-history',{...p,follow:true})).ok,true);assert.equal(count,2);
+ for(const extra of [{since:'2 weeks ago'},{until:'@1700000000'},{since:'2021-02-30'}])assert.equal((await h.call('vcs/tree-history',{...p,...extra})).error.code,'vcs/invalid-request',JSON.stringify(extra));
+ assert.equal(count,2);assert.equal((await h.call('vcs/tree-history',{...p,since:'2021-01-01',until:'2022-01-01'})).ok,true);assert.equal(count,3);
  h.expire();assert.equal((await h.call('vcs/tree-history',p)).error.code,'vcs/rediscover-required');
  const moved=setup({listPathHistory:async()=>{moved.move();return {};}});await moved.discover();assert.equal((await moved.call('vcs/tree-history',p)).error.code,'vcs/rediscover-required');
  const cancel=setup({listPathHistory:async()=>{controller.abort();return {};}});await cancel.discover();assert.equal((await cancel.call('vcs/tree-history',p,controller.signal)).error.code,'vcs/cancelled');
