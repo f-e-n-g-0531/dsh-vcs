@@ -64,7 +64,8 @@ try{
  phase='commit-signature';await (await import('./history-viewer-browser.js')).checkCommitSignature();
  phase='commit-committer';await (await import('./history-viewer-browser.js')).checkCommitCommitter();
  phase='stash-list';await (await import('./history-viewer-browser.js')).checkStashList();
+ phase='grep';await (await import('./history-viewer-browser.js')).checkGrep();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation','svn-history-date','commit-signature','commit-committer','stash-list']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation','svn-history-date','commit-signature','commit-committer','stash-list','grep']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);

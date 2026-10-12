@@ -31,6 +31,7 @@ const REQUEST_FIELDS = {
   'vcs/svn-identity': ['sessionId', 'repositoryId'],
   'vcs/references': ['sessionId', 'repositoryId'],
   'vcs/stash-list': ['sessionId', 'repositoryId'],
+  'vcs/grep': ['sessionId', 'repositoryId', 'commit', 'query'],
   'vcs/status': ['sessionId', 'repositoryId', 'mode'],
   'vcs/compare': ['sessionId', 'repositoryId', 'mode', 'id', 'large'],
   'vcs/conflict-stages': ['sessionId', 'repositoryId', 'mode', 'id'],
@@ -74,6 +75,7 @@ function validatePayload(endpoint, payload) {
     if(['vcs/compare','vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large!==undefined&&typeof payload.large!=='boolean')throw invalid('Invalid large comparison mode.');
     if(endpoint==='vcs/tree-segment'&&payload.offset!==undefined&&(!Number.isInteger(payload.offset)||payload.offset<0||payload.offset>16777216))throw invalid('Invalid segment offset.');
     if(endpoint==='vcs/blame'&&((payload.startLine!==undefined&&(!Number.isInteger(payload.startLine)||payload.startLine<1||payload.startLine>100001))||(payload.lineLimit!==undefined&&(!Number.isInteger(payload.lineLimit)||payload.lineLimit<1||payload.lineLimit>500))))throw invalid('Invalid blame line window.');
+    if(endpoint==='vcs/grep'){if(typeof payload.query!=='string'||!payload.query||payload.query.length>1024||/[\0\r\n]/.test(payload.query))throw invalid('Invalid content search query.');if(payload.commit!==undefined&&(typeof payload.commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(payload.commit)))throw invalid('Invalid content search commit.');}
     if(['vcs/file-history','vcs/tree-history'].includes(endpoint)&&payload.follow!==undefined&&typeof payload.follow!=='boolean')throw invalid('Invalid rename follow mode.');
     if(['vcs/file-history','vcs/tree-history'].includes(endpoint)&&(payload.since!==undefined||payload.until!==undefined)){try{if(payload.since!==undefined)validateDateBound(payload.since);if(payload.until!==undefined)validateDateBound(payload.until);}catch{throw invalid('Invalid history date bound.');}}
     if(endpoint==='vcs/history'){try{historySearchArgs(payload.search);}catch{throw invalid('Invalid history search.');}}
@@ -103,6 +105,8 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
       return api.listReferences({...repository}, {signal});
     case 'vcs/stash-list':
       return api.listStashes({...repository}, {signal});
+    case 'vcs/grep':
+      return api.searchRepositoryContent({...repository}, {commit: payload.commit, query: payload.query, signal});
     case 'vcs/commit-image':
       return api.getCommitImage({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id, side: payload.side ?? 'right', signal});
     case 'vcs/tree-file':
@@ -153,7 +157,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
   }
   if(bindSvnIdentityResolver!==undefined){if(typeof bindSvnIdentityResolver!=='function')throw new Error('Invalid internal SVN resolver binding');bindSvnIdentityResolver(async(address,signal)=>{validatePayload('vcs/svn-identity',address);signal?.throwIfAborted();const cwd=await resolveSessionCwd(ctx,address.sessionId,signal),entry=current(address.sessionId,cwd),repository=entry?.repositories.get(address.repositoryId);if(!repository)throw rediscover();if(repository.type!=='svn')throw invalid('SVN working copy required.');const identity=await api.getSvnIdentity({...repository},{signal});await assertCurrent(address.sessionId,cwd,entry,signal);if(entry.repositories.get(address.repositoryId)!==repository)throw rediscover();return {...identity,cwd};});}
   return async (endpoint, payload, signal) => {
-    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references', 'vcs/stash-list'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
+    if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references', 'vcs/stash-list', 'vcs/grep'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
     let imageSlot=false,segmentSlot=false;
@@ -204,7 +208,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       if (repository.type === 'svn' && mode !== 'all') throw invalid('SVN supports only all mode.');
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
-      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/tree-history','vcs/conflict-stages','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references','vcs/stash-list'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
+      if(['vcs/history','vcs/commit','vcs/commit-compare','vcs/revision-changes','vcs/revision-compare','vcs/file-history','vcs/blame','vcs/tree','vcs/tree-file','vcs/tree-segment','vcs/tree-history','vcs/conflict-stages','vcs/commit-image','vcs/revision-image','vcs/workspace-image','vcs/references','vcs/stash-list','vcs/grep'].includes(endpoint)&&repository.type!=='git')throw invalid('History currently supports Git only.');
       if(endpoint==='vcs/tree-segment'||(['vcs/compare','vcs/commit-compare','vcs/revision-compare'].includes(endpoint)&&payload.large===true)){if(activeSegments>=1)return failure('vcs/busy','A text segment is already loading. Please retry.');activeSegments++;segmentSlot=true;}
       if(['vcs/commit-image','vcs/revision-image','vcs/workspace-image'].includes(endpoint)){
         if(activeImages>=2)return failure('vcs/busy','Too many image requests. Please retry.');

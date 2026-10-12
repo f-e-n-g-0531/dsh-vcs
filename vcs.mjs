@@ -241,6 +241,37 @@ export async function listStashes(repo,{signal}={}){
  return {stashes};
 }
 
+export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
+ signal?.throwIfAborted();
+ if(typeof query!=='string'||!query||query.length>1024||/[\0\r\n]/.test(query))throw new Error('Invalid content search query');
+ repo=await checkedRepo(repo,signal);
+ if(repo.type!=='git')throw new Error('Content search supports Git only');
+ let snapshot=commit;
+ if(!snapshot){
+  try{snapshot=(await git(repo.root,['rev-parse','--verify','HEAD^{commit}'],MAX_TEXT,{signal})).toString('utf8').trim();}
+  catch{throw new Error('Content search requires a resolved HEAD commit');}
+ }
+ if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(snapshot))throw new Error('Invalid content search commit');
+ let text;
+ try{text=(await git(repo.root,['grep','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
+ catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {matches:[]};throw error;}
+ signal?.throwIfAborted();
+ const matches=[];
+ for(const record of text.split('\n')){
+  if(!record)continue;
+  const fields=record.split('\0');
+  if(fields.length!==3)throw new Error('Invalid content search result');
+  const [treePath,lineNo,lineText]=fields;
+  const cut=treePath.indexOf(':');
+  if(cut<0)throw new Error('Invalid content search result');
+  const path=treePath.slice(cut+1);
+  if(!path||!/^\d+$/.test(lineNo))throw new Error('Invalid content search result');
+  matches.push({path,line:Number(lineNo),text:lineText});
+  if(matches.length>500)throw new Error('Content search exceeds match limit');
+ }
+ return {matches};
+}
+
 export async function getCommitDetails(repo,options={}) {
   return commitDetails(repo,options,true);
 }
