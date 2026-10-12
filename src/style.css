@@ -55,7 +55,7 @@
 .vcs-root .vcs-commit-oid{display:block;font-size:11px;color:var(--dsw-alias-label-secondary)}
 .vcs-root .vcs-commit-details>pre{padding:12px;border-radius:8px;background:var(--dsw-alias-bg-layer-1,#222);border:1px solid var(--dsw-alias-border-l2,#444)}
 .vcs-root .vcs-commit-files{border:1px solid var(--dsw-alias-border-l2,#444);border-radius:8px;overflow:hidden}
-.vcs-root .vcs-commit-files button{display:flex;width:100%;gap:12px;text-align:left;border:0;border-radius:0;background:transparent;padding:9px 12px}
+.vcs-root .vcs-commit-files button{display:flex;width:100%;max-width:100%;min-width:0;box-sizing:border-box;gap:12px;text-align:left;border:0;border-radius:0;background:transparent;padding:9px 12px}
 .vcs-root .vcs-commit-files>li+li{border-top:1px solid var(--dsw-alias-border-l2,#444)}
 .vcs-root .vcs-file-status{flex:0 0 64px;font-size:11px;color:var(--dsw-alias-label-secondary)}
 .vcs-root .vcs-file-path{min-width:0;overflow-wrap:anywhere}
