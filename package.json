@@ -1,6 +1,6 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.3.91",
+  "version": "0.3.92",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
@@ -25,6 +25,7 @@
     "src/svn-target.mjs",
     "src/svn-path.mjs",
     "src/svn-revision.mjs",
+    "src/commit-signature.mjs",
     "dist",
     "locale",
     "icon.svg",

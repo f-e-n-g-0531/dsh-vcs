@@ -1,4 +1,5 @@
 import {parseConflictStages} from './conflict-stages.mjs';
+import {parseCommitSignature} from './src/commit-signature.mjs';
 import {parseSvnIdentity} from './src/svn-identity.mjs';
 import {prepareRaster} from './image-preview.mjs';
 import {git, svn, TIMEOUT} from './local-command.mjs';
@@ -242,7 +243,10 @@ async function commitDetails(repo,{commit,parentIndex=0,signal}={},includeMessag
   try{message=(await git(repo.root,['log','--no-show-signature','--encoding=UTF-8','--max-count=1','--format=%B',commit,'--'],MAX_TEXT,{signal})).toString('utf8');}
   catch(error){if(error.code!=='TOO_LARGE')throw error;messageTruncated=true;}
   signal?.throwIfAborted();
-  return {...metadata,message,messageTruncated,parent,parentIndex,changes};
+  let signature=null;
+  try{signature=parseCommitSignature((await git(repo.root,['cat-file','commit',commit],MAX_TEXT,{signal})).toString('utf8'));}
+  catch(error){if(error.code!=='TOO_LARGE')throw error;}
+  return {...metadata,message,messageTruncated,signature,parent,parentIndex,changes};
 }
 function parseCommitChanges(text,scope){
   const fields=text.split(String.fromCharCode(0));
