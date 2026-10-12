@@ -27,7 +27,7 @@ export async function checkHistoryLayout(){
     if(a.left<b.left-1||a.right>b.right+1||a.width<20)throw Error('History input overflow at '+width);
    }
    const row=host.querySelector('.vcs-commit-files button'),list=row.parentElement.parentElement;
-   if(row.getBoundingClientRect().width>list.getBoundingClientRect().width+1)throw Error('File row overflow at '+width);
+   if(row.getBoundingClientRect().width>list.getBoundingClientRect().width+1)throw Error('File row overflow at '+width+' row='+row.getBoundingClientRect().width+' list='+list.getBoundingClientRect().width);
   }
   if([...host.querySelectorAll('.vcs-help')].some(node=>node.open))throw Error('Help expanded by default');
   const help=host.querySelector('.vcs-help');help.querySelector('summary').click();if(!help.open)throw Error('Help cannot expand');
