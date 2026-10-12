@@ -1,7 +1,12 @@
 // Search values are literal, bounded and never revision/options or pathspec expressions.
+export function validateDateBound(value){
+  if(typeof value!=='string'||!value||value.length>40)throw new Error('Invalid history date bound');
+  if(!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(?:[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?)?$/.test(value))throw new Error('Invalid history date bound');
+  return value;
+}
 export function historySearchArgs(search) {
   if (search === undefined) return {args: [], paths: []};
-  const keys = ['message', 'author', 'path'];
+  const keys = ['message', 'author', 'path', 'since', 'until'];
   if (!search || typeof search !== 'object' || Array.isArray(search) ||
       Object.keys(search).some(key => !keys.includes(key))) {
     throw new Error('Invalid history search');
@@ -21,6 +26,10 @@ export function historySearchArgs(search) {
         throw new Error('Invalid history search path');
       }
       paths.push(value);
+    } else if (key === 'since') {
+      args.push('--since-as-filter=' + validateDateBound(value));
+    } else if (key === 'until') {
+      args.push('--until=' + validateDateBound(value));
     } else {
       args.push((key === 'message' ? '--grep=' : '--author=') + value);
     }

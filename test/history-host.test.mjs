@@ -59,8 +59,8 @@ test('rename follow discards in-flight cancellation and cwd changes',async()=>{
 test('history search validates strict query fields and forwards literal search under grants',async()=>{
  const search={message:'--all .*',author:'作者',path:':(glob)*.txt'};let received;
  const h=setup({listHistory:async(_r,o)=>{received=o;return {commits:[]};}});await h.discover();
- for(const search of [null,[],{url:'https://example.com'},{path:'../escape'},{message:'x'.repeat(1025)},{author:4}])assert.equal((await h.call('vcs/history',{...payload,search})).error.code,'vcs/invalid-request');
- assert.equal(received,undefined);assert.equal((await h.call('vcs/history',{...payload,search})).ok,true);assert.deepEqual(received.search,search);
+ for(const search of [null,[],{url:'https://example.com'},{path:'../escape'},{message:'x'.repeat(1025)},{author:4},{since:'2 weeks ago'},{until:'@1700000000'},{since:'2021-13-01'},{since:'2021-06-15T25:00'},{until:'-2021-01-01'}])assert.equal((await h.call('vcs/history',{...payload,search})).error.code,'vcs/invalid-request');
+ assert.equal(received,undefined);assert.equal((await h.call('vcs/history',{...payload,search})).ok,true);assert.deepEqual(received.search,search);assert.equal((await h.call('vcs/history',{...payload,search:{since:'2021-01-01',until:'2022-01-01'}})).ok,true);assert.deepEqual(received.search,{since:'2021-01-01',until:'2022-01-01'});
 });
 test('references RPC requires grants rejects options and discards stale results',async()=>{
  const controller=new AbortController();let calls=0;

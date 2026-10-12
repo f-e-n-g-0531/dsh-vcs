@@ -20,6 +20,9 @@ export async function checkHistorySearch(){
   if(calls[2].p.snapshot!==a||calls[2].p.offset!==50||calls[2].p.search.message!=='needle .*')throw Error('Search pagination lost scope');
   button('historyServerClear').click();await wait(()=>calls.length===4&&!host.querySelector('fieldset').disabled);
   if(calls[3].p.offset!==0||calls[3].p.snapshot!==a||Object.keys(calls[3].p.search).length||input.value)throw Error('Clear query lost pinned snapshot');
+  const sinceInput=host.querySelector('[aria-label="'+t('historyServer_since')+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(sinceInput,'2024-01-01');sinceInput.dispatchEvent(new Event('input',{bubbles:true}));
+  button('historyServerApply').click();await wait(()=>calls.length===5&&!host.querySelector('fieldset').disabled);
+  if(calls[4].p.search.since!=='2024-01-01'||calls[4].p.offset!==0||calls[4].p.snapshot!==a)throw Error('Date bound not forwarded to the pinned search');
  }
  const t=k=>k;let fail=true,late,oldSignal,requests=0,rediscoveries=0;
  const rpc=async(_endpoint,p,signal)=>{requests++;if(p.search&&fail){fail=false;throw Error('QUERY FAILURE');}if(p.search?.message==='pending'){oldSignal=signal;return new Promise(resolve=>late=resolve);}return {snapshot:a,commits:[],nextOffset:null};};
