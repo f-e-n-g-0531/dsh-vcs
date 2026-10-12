@@ -16,6 +16,7 @@ export {checkConflictStages} from './conflict-stages-browser.jsx';
 export {checkPathHistory} from './path-history-browser.jsx';
 export {checkSubmoduleBadge} from './submodule-browser.jsx';
 export {checkFileHistoryDate} from './file-history-date-browser.jsx';
+export {checkHistoryBackNavigation} from './history-back-navigation-browser.jsx';
 export {checkImage} from './image-browser.mjs';
 export {checkGraph} from './graph-browser.jsx';
 export {checkTree} from './tree-browser.jsx';

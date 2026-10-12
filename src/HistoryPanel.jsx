@@ -10,6 +10,7 @@ export default function HistoryPanel(props){
 }
 function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const [selection,setSelection]=useState({id:null,path:null,revision:0}),[query,setQuery]=useState('');
+ const [navStack,setNavStack]=useState([]);
  const [references,setReferences]=useState(null),[historyTip,setHistoryTip]=useState(''),[historyRef,setHistoryRef]=useState('');
  const navigateReference=value=>{const ref=(references||[]).find(row=>JSON.stringify([row.name,row.commit])===value);const tip=ref?.commit||'';setHistoryRef(value);setHistoryTip(tip);setSearch(old=>old?{...old,snapshot:tip||null}:null);setOffset(0);setQuery('');setSelected(null);setPage({commits:[],snapshot:null,nextOffset:null});};
  const [draft,setDraft]=useState({message:'',author:'',path:'',since:'',until:''}),[search,setSearch]=useState(null);
@@ -17,7 +18,8 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const goBack=()=>{if(!offset)return;setPage(old=>({commits:[],snapshot:old.snapshot,nextOffset:null}));setSelected(null);setQuery('');setOffset(Math.max(0,offset-50));};
  const referenceIndex=useMemo(()=>indexHistoryReferences(references||[]),[references]);
  const selected=selection.id;
- const navigateCommit=(id,path=null)=>setSelection(old=>({id,path,revision:old.revision+1}));
+ const navigateCommit=(id,path=null)=>{ if(selection.id)setNavStack(stack=>[...stack,selection]); setSelection(old=>({id,path,revision:old.revision+1})); };
+ const navigationBack=()=>{ if(!navStack.length)return; const prev=navStack[navStack.length-1]; setNavStack(stack=>stack.slice(0,-1)); setSelection(old=>({id:prev.id,path:prev.path,revision:old.revision+1})); };
  const setSelected=(id,path=null)=>setSelection(old=>({id,path,revision:old.revision+(path||old.path?1:0)}));
  const [page,setPage]=useState({commits:[],snapshot:null,nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  // Scope changes remount locally; parent still remounts for refresh. Pagination pins first snapshot.
@@ -46,6 +48,6 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  {!!page.commits.length&&<HistoryGraph commits={page.commits} selected={selected} onSelect={setSelected} t={t}/>}
  <RevisionPanel onReferencesLoaded={setReferences} commits={page.commits} {...{sessionId,repositoryId,rpc,t,onRediscover}}/>
- </div><div className="vcs-history-details">{selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+ </div><div className="vcs-history-details">{navStack.length>0&&<p><button onClick={navigationBack} aria-label={t('historyNavigationBack')}>{t('historyNavigationBack')} · {navStack[navStack.length-1].id.slice(0,10)}</button></p>}{selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </div></section>;
 }
