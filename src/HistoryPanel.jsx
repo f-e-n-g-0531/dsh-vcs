@@ -14,6 +14,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const navigateReference=value=>{const ref=(references||[]).find(row=>JSON.stringify([row.name,row.commit])===value);const tip=ref?.commit||'';setHistoryRef(value);setHistoryTip(tip);setSearch(old=>old?{...old,snapshot:tip||null}:null);setOffset(0);setQuery('');setSelected(null);setPage({commits:[],snapshot:null,nextOffset:null});};
  const [draft,setDraft]=useState({message:'',author:'',path:'',since:'',until:''}),[search,setSearch]=useState(null);
  const submitSearch=value=>{setSearch({values:value,snapshot:page.snapshot});setOffset(0);setQuery('');setSelected(null);setPage(old=>({...old,commits:[],nextOffset:null}));};
+ const goBack=()=>{if(!offset)return;setPage(old=>({commits:[],snapshot:old.snapshot,nextOffset:null}));setSelected(null);setQuery('');setOffset(Math.max(0,offset-50));};
  const referenceIndex=useMemo(()=>indexHistoryReferences(references||[]),[references]);
  const selected=selection.id;
  const navigateCommit=(id,path=null)=>setSelection(old=>({id,path,revision:old.revision+1}));
@@ -22,7 +23,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  // Scope changes remount locally; parent still remounts for refresh. Pagination pins first snapshot.
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
-  rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||historyTip||offset)?{snapshot:search?.snapshot||historyTip||page.snapshot}:{})},controller.signal).then(value=>{
+  rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||historyTip||page.snapshot)?{snapshot:search?.snapshot||historyTip||page.snapshot}:{})},controller.signal).then(value=>{
    if(!controller.signal.aborted){setPage(old=>mergeHistoryWindow(old,value,offset));if(offset>=200){setSelected(null);setQuery('');}}
   }).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
@@ -41,6 +42,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
  {page.truncated&&<p role="status">{t('historyLimit')}</p>}
+ {!!offset&&<button disabled={busy} onClick={goBack}>{t('historyBack')}</button>}
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  {!!page.commits.length&&<HistoryGraph commits={page.commits} selected={selected} onSelect={setSelected} t={t}/>}
  <RevisionPanel onReferencesLoaded={setReferences} commits={page.commits} {...{sessionId,repositoryId,rpc,t,onRediscover}}/>
