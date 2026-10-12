@@ -1,7 +1,13 @@
 // Search values are literal, bounded and never revision/options or pathspec expressions.
 export function validateDateBound(value){
   if(typeof value!=='string'||!value||value.length>40)throw new Error('Invalid history date bound');
-  if(!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(?:[T ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?:Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?)?$/.test(value))throw new Error('Invalid history date bound');
+  const m=/^(\d{4})-(\d{2})-(\d{2})(?:[T ]([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?(Z|[+-](?:[01]\d|2[0-3]):?[0-5]\d)?)?$/.exec(value);
+  if(!m)throw new Error('Invalid history date bound');
+  const year=+m[1],month=+m[2],day=+m[3];
+  if(year<1||year>9999)throw new Error('Invalid history date bound');
+  const leap=year%4===0&&(year%100!==0||year%400===0);
+  const dim=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+  if(month<1||month>12||day<1||day>dim[month-1])throw new Error('Invalid history date bound');
   return value;
 }
 export function historySearchArgs(search) {

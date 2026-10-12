@@ -194,7 +194,7 @@ export async function listHistory(repo, {snapshot,offset=0,limit=50,search,signa
   if(signal?.aborted) throw Object.assign(new Error('History cancelled'),{code:'ABORT_ERR'});
   repo=await checkedRepo(repo,signal);
   if(repo.type!=='git') throw new Error('History currently supports Git only');
-  if(search?.since!==undefined){
+  if(query.args.some(a=>a.startsWith('--since-as-filter='))){
     signal?.throwIfAborted();
     try{await git(repo.root,['log','--since-as-filter=1970-01-01','-1','--format=%H'],MAX_TEXT,{signal});}
     catch(e){if(e.code==='VCS_COMMAND')throw new Error('Date-range history search requires Git 2.37 or newer (--since-as-filter).');throw e;}

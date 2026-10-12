@@ -5,7 +5,8 @@ import {detectRepository,listHistory} from '../vcs.mjs';
 const g=(root,env,...args)=>execFileSync('git',['-C',root,...args],{env:{...process.env,...env},encoding:'utf8',windowsHide:true});
 test('date bounds accept exact timestamps and reject free-form git date language',()=>{
  for(const ok of ['2020-01-01','2021-06-15','2021-06-15T10:30','2021-06-15 10:30:00','2021-06-15T10:30:00Z','2021-06-15T10:30:00+08:00','2021-06-15T10:30:00+0800'])assert.equal(validateDateBound(ok),ok);
- for(const bad of ['','2 weeks ago','yesterday','@1700000000','2021-13-01','2021-00-01','2021-06-00','2021-06-32','2021/06/15','-2021-06-15','2021-06-15; rm -rf','2021-06-15\n',' 2021-06-15','2021-06-15T25:00','2021-06-15T10:60','2021-06-15T10:30:00+24:00','x'.repeat(41)])assert.throws(()=>validateDateBound(bad));
+ for(const bad of ['','2 weeks ago','yesterday','@1700000000','2021-13-01','2021-00-01','2021-06-00','2021-06-32','2021-02-29','2021-02-30','2021-02-31','2021-04-31','2021-06-31','2021-09-31','2021-11-31','0000-01-01','2021/06/15','-2021-06-15','2021-06-15; rm -rf','2021-06-15\n',' 2021-06-15','2021-06-15T25:00','2021-06-15T10:60','2021-06-15T10:30:00+24:00','x'.repeat(41)])assert.throws(()=>validateDateBound(bad));
+ for(const ok of ['2024-02-29','2000-02-29','2024-12-31','2021-04-30'])assert.equal(validateDateBound(ok),ok);
 });
 test('history search args append as-filter flags without weakening other filters',()=>{
  const out=historySearchArgs({message:'fix',since:'2021-01-01',until:'2022-01-01'});precise(out.args);
