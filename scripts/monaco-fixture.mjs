@@ -60,7 +60,8 @@ try{
  phase='submodule-badge';await (await import('./history-viewer-browser.js')).checkSubmoduleBadge();
  phase='file-history-date';await (await import('./history-viewer-browser.js')).checkFileHistoryDate();
  phase='history-back-navigation';await (await import('./history-viewer-browser.js')).checkHistoryBackNavigation();
+ phase='svn-history-date';await (await import('./history-viewer-browser.js')).checkSvnHistoryDateFilter();
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation','svn-history-date']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);
