@@ -26,6 +26,15 @@ test('large text refuses oversized binary invalid encoding and pathological line
   const exact=Buffer.from(('x'.repeat(1023)+'\n').repeat(8192));
   assert.equal(exact.length, MAX_LARGE_TEXT);
   assert.equal(decodeLargeText(exact).totalBytes, MAX_LARGE_TEXT);
+  assert.equal(decodeLargeText(Buffer.from('中文文本\n')).encoding, 'UTF-8');
   const controller = new AbortController(); controller.abort();
   assert.throws(() => decodeLargeText(Buffer.from('safe'), controller.signal), {name: 'AbortError'});
+});
+test('large text decodes GBK and BOM UTF-16 without relaxing budgets',()=>{
+ const le=Buffer.concat([Buffer.from([0xff,0xfe]),Buffer.from('行\n同\r\n','utf16le')]);
+ assert.equal(decodeLargeText(le).encoding,'UTF-16LE');assert.equal(decodeLargeText(le).text,'行\n同\r\n');assert.equal(decodeLargeText(le).lineCount,3);
+ const beUnit=Buffer.from('行\n','utf16le');for(let i=0;i<beUnit.length;i+=2){const t=beUnit[i];beUnit[i]=beUnit[i+1];beUnit[i+1]=t;}
+ assert.equal(decodeLargeText(Buffer.concat([Buffer.from([0xfe,0xff]),beUnit])).encoding,'UTF-16BE');
+ const gb=Buffer.from([0xd6,0xd0,0xce,0xc4,0x0a]);const gr=decodeLargeText(gb);assert.equal(gr.encoding,'GBK');assert.equal(gr.text,'中文\n');
+ assert.throws(()=>decodeLargeText(Buffer.from([0xff,0xfe,0x41])),/UTF-16/);
 });

@@ -6,12 +6,28 @@ export const MAX_LARGE_TEXT = 8 * 1024 * 1024;
 export function decodeLargeText(buffer, signal) {
   signal?.throwIfAborted();
   if (buffer.length > MAX_LARGE_TEXT) throw new Error('Large comparison exceeds 8 MiB per side.');
-  if (buffer.some(byte => byte < 32 && ![9, 10, 12, 13].includes(byte))) {
-    throw new Error('Large comparison requires UTF-8 text without binary control bytes.');
+  let text, encoding = 'UTF-8';
+  if (buffer[0] === 0xff && buffer[1] === 0xfe) {
+    if (buffer.length % 2) throw new Error('Large comparison requires valid UTF-16 text.');
+    text = buffer.subarray(2).toString('utf16le'); encoding = 'UTF-16LE';
+  } else if (buffer[0] === 0xfe && buffer[1] === 0xff) {
+    const bytes = Buffer.from(buffer.subarray(2));
+    if (bytes.length % 2) throw new Error('Large comparison requires valid UTF-16 text.');
+    bytes.swap16(); text = bytes.toString('utf16le'); encoding = 'UTF-16BE';
+  } else {
+    if (buffer.includes(0)) throw new Error('Large comparison requires UTF-8 text without binary control bytes.');
+    if (buffer.some(byte => byte < 32 && ![9, 10, 12, 13].includes(byte))) {
+      throw new Error('Large comparison requires UTF-8 text without binary control bytes.');
+    }
+    try { text = new TextDecoder('utf-8', {fatal: true}).decode(buffer); }
+    catch {
+      if (buffer.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) {
+        throw new Error('Large comparison requires valid UTF-8 text.');
+      }
+      try { text = new TextDecoder('gbk', {fatal: true}).decode(buffer); encoding = 'GBK'; }
+      catch { throw new Error('Large comparison requires valid UTF-8, GBK or UTF-16 BOM text.'); }
+    }
   }
-  let text;
-  try { text = new TextDecoder('utf-8', {fatal: true}).decode(buffer); }
-  catch { throw new Error('Large comparison requires valid UTF-8 text.'); }
   let lines = 1, length = 0;
   for (let index = 0; index < text.length; index++) {
     if (index % 65536 === 0) signal?.throwIfAborted();
@@ -22,7 +38,7 @@ export function decodeLargeText(buffer, signal) {
     } else if (++length > 65536) throw new Error('Large comparison exceeds 65536 characters per line.');
   }
   signal?.throwIfAborted();
-  return {text, encoding: 'UTF-8', totalBytes: buffer.length, lineCount: lines};
+  return {text, encoding, totalBytes: buffer.length, lineCount: lines};
 }
 
 export function decode(buffer) {
