@@ -22,6 +22,7 @@ export {checkCommitSignature} from './commit-signature-browser.jsx';
 export {checkCommitCommitter} from './commit-committer-browser.jsx';
 export {checkStashList} from './stash-browser.jsx';
 export {checkGrep} from './grep-browser.jsx';
+export {checkHistoryLayout} from './history-layout-browser.jsx';
 export {checkImage} from './image-browser.mjs';
 export {checkGraph} from './graph-browser.jsx';
 export {checkTree} from './tree-browser.jsx';

@@ -32,6 +32,37 @@
 .vcs-root .vcs-filter input{min-width:0;width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);padding:7px 9px}
 .vcs-root .vcs-clear-filter{font-size:11px;white-space:nowrap;padding:4px 6px}
 .vcs-root .vcs-review-views{display:flex;gap:8px;padding:8px 12px;flex-shrink:0}.vcs-root .vcs-body[hidden]{display:none}.vcs-root .vcs-history{flex:1;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(220px,35%) minmax(0,1fr);overflow:hidden;border-bottom:1px solid currentColor}.vcs-root .vcs-history-list,.vcs-root .vcs-history-details{min-height:0;min-width:0;overflow:auto;padding:8px 12px}.vcs-root .vcs-history-list{border-right:1px solid var(--dsw-alias-border-l2)}.vcs-root .vcs-history-details code{overflow-wrap:anywhere}@media(max-width:760px){.vcs-root .vcs-history{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(100px,35%) minmax(0,1fr)}}.vcs-root .vcs-history li{padding:6px 0;overflow-wrap:anywhere}.vcs-root .vcs-history li div{font-size:12px;opacity:.8}
+/* History review: compact controls, readable rows, and scoped help. */
+.vcs-root .vcs-history{grid-template-columns:minmax(280px,32%) minmax(0,1fr);border-bottom:0;container-type:inline-size}
+.vcs-root .vcs-history-list,.vcs-root .vcs-history-details{padding:16px;scrollbar-gutter:stable}
+.vcs-root .vcs-history-list>p{font-size:12px;color:var(--dsw-alias-label-secondary);margin:8px 0 12px}
+.vcs-root .vcs-history label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.vcs-root .vcs-history input{width:100%;min-width:0;padding:7px 9px;border:1px solid var(--dsw-alias-border-l2,#444);border-radius:6px;background:var(--dsw-alias-bg-base,#181818);color:var(--dsw-alias-label-primary,#eee)}
+.vcs-root .vcs-history select{width:100%;min-width:0}
+.vcs-root .vcs-history-search{margin:14px 0}
+.vcs-root .vcs-history-search fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border:1px solid var(--dsw-alias-border-l2,#444);border-radius:8px;padding:12px;margin:0;min-width:0}
+.vcs-root .vcs-history-search legend{padding:0 5px;font-weight:600}
+.vcs-root .vcs-history-search .vcs-help,.vcs-root .vcs-history-search label:first-of-type,.vcs-root .vcs-history-search label:nth-of-type(3){grid-column:1/-1}
+.vcs-root .vcs-help{font-size:12px;color:var(--dsw-alias-label-secondary);margin:0}
+.vcs-root .vcs-help summary{cursor:pointer}
+.vcs-root .vcs-help p{margin:8px 0;line-height:1.6}
+.vcs-root .vcs-commit-list,.vcs-root .vcs-commit-files{list-style:none;padding:0;margin:12px 0}
+.vcs-root .vcs-commit-list>li,.vcs-root .vcs-commit-files>li{padding:0;margin:0}
+.vcs-root .vcs-commit-row{width:100%;display:flex;flex-direction:column;gap:5px;text-align:left;border:0;border-radius:6px;padding:10px;margin:2px 0;background:transparent}
+.vcs-root .vcs-commit-subject{font-weight:500;overflow-wrap:anywhere}
+.vcs-root .vcs-commit-meta{padding:0 10px 9px;font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.vcs-root .vcs-commit-details h3{font-size:17px;line-height:1.5;margin:0 0 10px;overflow-wrap:anywhere}
+.vcs-root .vcs-commit-oid{display:block;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.vcs-root .vcs-commit-details>pre{padding:12px;border-radius:8px;background:var(--dsw-alias-bg-layer-1,#222);border:1px solid var(--dsw-alias-border-l2,#444)}
+.vcs-root .vcs-commit-files{border:1px solid var(--dsw-alias-border-l2,#444);border-radius:8px;overflow:hidden}
+.vcs-root .vcs-commit-files button{display:flex;width:100%;gap:12px;text-align:left;border:0;border-radius:0;background:transparent;padding:9px 12px}
+.vcs-root .vcs-commit-files>li+li{border-top:1px solid var(--dsw-alias-border-l2,#444)}
+.vcs-root .vcs-file-status{flex:0 0 64px;font-size:11px;color:var(--dsw-alias-label-secondary)}
+.vcs-root .vcs-file-path{min-width:0;overflow-wrap:anywhere}
+.vcs-root .vcs-file-path small{display:block;color:var(--dsw-alias-label-secondary)}
+.vcs-root .vcs-review-views{border-bottom:1px solid var(--dsw-alias-border-l2);flex-wrap:wrap}
+@container(max-width:650px){.vcs-root .vcs-history-list,.vcs-root .vcs-history-details{padding:10px}.vcs-root .vcs-history-search fieldset{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){.vcs-root .vcs-history{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(180px,40%) minmax(0,1fr)}}
 .vcs-root .vcs-status-filter{display:flex;flex-wrap:wrap;flex-shrink:0;gap:4px;overflow:visible;padding:0 10px 8px}
 .vcs-root .vcs-status-filter button{font-size:11px;flex:0 0 auto;white-space:nowrap;padding:3px 6px}
 .vcs-root .vcs-status-filter button[aria-pressed=true]{background:var(--dsw-alias-interactive-bg-active);color:var(--dsw-alias-label-primary)}
