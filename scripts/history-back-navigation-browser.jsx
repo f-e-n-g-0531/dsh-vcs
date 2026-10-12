@@ -16,7 +16,7 @@ export async function checkHistoryBackNavigation(){
   throw Error('Unexpected back-navigation endpoint '+e);
  };
  const t=k=>k,buttons=()=>[...host.querySelectorAll('button')],byText=s=>buttons().find(b=>b.textContent.includes(s));
- const h3=()=>host.querySelector('h3')?.textContent;
+ const h3=()=>host.querySelector('[aria-label="commitDetails"] h3')?.textContent;
  try{
   flushSync(()=>root.render(<HistoryPanel sessionId='s' repositoryId='r' rpc={rpc} t={t} onRediscover={()=>{}}/>));
   await wait(()=>byText('commit A'),'history-load');
