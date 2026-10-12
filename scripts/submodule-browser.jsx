@@ -16,6 +16,12 @@ export async function checkSubmoduleBadge(){
    if(badge.title!==oid+' · '+t('submoduleCheckout_'+state))throw Error('Submodule badge title lost the recorded pointer for '+state);
    if(badge.querySelector('img,script'))throw Error('Submodule badge injected markup');
   }
+  flushSync(()=>root.render(<SubmoduleBadge submodule={{recorded:oid,checkout:'initialized',pointerMoved:true,dirty:true,untracked:true}} t={t}/>));
+  const dirtyBadge=host.querySelector('.vcs-submodule');
+  if(dirtyBadge.getAttribute('data-pointer-moved')!=='true'||dirtyBadge.getAttribute('data-untracked')!=='true')throw Error('Submodule dirty flags not exposed');
+  if(!dirtyBadge.textContent.includes(t('submodulePointerMoved'))||!dirtyBadge.textContent.includes(t('submoduleDirty')))throw Error('Submodule state labels missing');
+  if(dirtyBadge.querySelector('img,script'))throw Error('Submodule badge injected markup in flags');
+  flushSync(()=>root.render(<SubmoduleBadge submodule={{recorded:'<img src=x onerror=alert(1)>',checkout:'initialized',pointerMoved:true}} t={t}/>));
   flushSync(()=>root.render(<SubmoduleBadge submodule={undefined} t={t}/>));
   if(host.querySelector('.vcs-submodule'))throw Error('Absent metadata rendered a submodule badge');
   flushSync(()=>root.render(<SubmoduleBadge submodule={{recorded:'<img src=x onerror=alert(1)>'}} t={t}/>));

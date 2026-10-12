@@ -498,6 +498,7 @@ async function annotateSubmodules(repo, entries, options) {
     for(const record of listing.split('\0')){const tab=record.indexOf('\t');if(tab<0)continue;const [mode,oid,stage]=record.slice(0,tab).split(' '),file=record.slice(tab+1);if(stage==='0'&&mode==='160000'&&batch.includes(file)&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))pointers.set(file,oid);}
   }
   if (!pointers.size) return;
+  const initialized = [];
   for (const entry of entries) {
     check();
     const recorded = pointers.get(entry.path); if (!recorded || entry.status === 'conflicted') continue;
@@ -510,6 +511,20 @@ async function annotateSubmodules(repo, entries, options) {
     } catch (e) { check();checkout = e.code === 'ENOENT' ? 'absent' : 'unreadable'; }
     check();
     entry.submodule = { recorded, checkout };
+    if (checkout === 'initialized') initialized.push(entry);
+  }
+  // Bounded, read-only submodule worktree state from the parent's own `git status`
+  // (never runs Git inside the submodule): --porcelain=v2 exposes `S` fields for new
+  // commits, modified content and untracked content in an initialized checkout.
+  for (let from = 0; from < initialized.length; from += 64) {
+    check();const batch = initialized.slice(from, from + 64);
+    const out = (await git(repo.root, ['status', '--porcelain=v2', '--ignore-submodules=none', '--', ...batch.map(entry => entry.path)], MAX_TEXT, {...options, timeoutMs: deadline - Date.now()})).toString('utf8');
+    for (const line of out.split('\n')) {
+      if (!line) continue;
+      const match = batch.find(entry => line.endsWith(entry.path)); if (!match) continue;
+      const sub = line.split(/\s+/)[2] || ''; if (sub[0] !== 'S') continue;
+      match.submodule = { ...match.submodule, pointerMoved: sub[1] === 'C', dirty: sub[2] === 'M', untracked: sub[3] === 'U' };
+    }
   }
 }
 const statuses = { M: 'modified', A: 'added', D: 'deleted', R: 'renamed', C: 'copied', U: 'conflicted', T: 'typechanged', '?': 'untracked' };

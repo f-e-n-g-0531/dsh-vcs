@@ -13,10 +13,12 @@ test('submodule changes report recorded pointer and checkout state without enter
   run(sub,'checkout','-q',first);
   const indexBefore=run(outer,'ls-files','--stage'),subRefsBefore=run(sub,'show-ref'),subHeadBefore=run(sub,'rev-parse','HEAD').trim();
   const changes=await listChanges(repo);assert.equal(changes.length,1);const entry=changes[0];
-  assert.equal(entry.path,'sub');assert.equal(entry.status,'modified');assert.deepEqual(entry.submodule,{recorded,checkout:'initialized'});
+  assert.equal(entry.path,'sub');assert.equal(entry.status,'modified');assert.deepEqual(entry.submodule,{recorded,checkout:'initialized',pointerMoved:true,dirty:false,untracked:false});
   const comparison=await getComparison(repo,{mode:'all',id:entry.id});
   assert.match(comparison.notice,/checkout: initialized/);assert.match(comparison.notice,/not loaded/);assert.equal(comparison.left.text,'Submodule '+recorded);assert.equal(comparison.right.label,'Working tree');assert.equal(comparison.right.text,'');
   assert.equal(run(outer,'ls-files','--stage'),indexBefore);assert.equal(run(sub,'show-ref'),subRefsBefore);assert.equal(run(sub,'rev-parse','HEAD').trim(),subHeadBefore);
+  await writeFile(path.join(sub,'file.txt'),'two\n');await writeFile(path.join(sub,'extra.txt'),'uncommitted');
+  const dirty=(await listChanges(repo)).find(row=>row.path==='sub');assert.equal(dirty.status,'modified');assert.deepEqual(dirty.submodule,{recorded,checkout:'initialized',pointerMoved:true,dirty:true,untracked:true});
   await rm(sub,{recursive:true,force:true});
   const missing=(await listChanges(repo))[0];assert.equal(missing.path,'sub');assert.equal(missing.submodule.checkout,'absent');
   await mkdir(sub);run(outer,'update-index','--cacheinfo','160000,'+first+',sub');
