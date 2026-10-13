@@ -13,7 +13,7 @@ export async function checkHistoryLayout(){
  const rpc=async(e)=>{
   if(e==='vcs/history')return {snapshot:id,nextOffset:null,commits:[{id,parents:[parent],subject:'整理历史面板与查询字段',author:'测试作者',date:'2026-10-12T12:00:00+08:00'}]};
   if(e==='vcs/commit')return {id,parents:[parent],parent,subject:'整理历史面板与查询字段',author:'测试作者',date:'2026-10-12T12:00:00+08:00',changes:Array.from({length:120},(_,i)=>({id:i.toString(16).padStart(64,'0'),status:'modified',path:'src/非常长的目录名称/file-'+i+'.jsx'}))};
-  if(e==='vcs/commit-compare')return {path:'selected-file.jsx',left:{label:'parent',text:'before'},right:{label:'commit',text:'after'}};
+  if(e==='vcs/commit-compare')return {path:'selected-file.jsx',left:{label:'parent',text:Array.from({length:200},(_,i)=>'before '+i).join('\n')},right:{label:'commit',text:Array.from({length:200},(_,i)=>'after '+i).join('\n')}};
    throw Error('Unexpected layout endpoint '+e);
  };
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('History layout timeout');};
@@ -37,6 +37,15 @@ export async function checkHistoryLayout(){
    const row=host.querySelector('.vcs-commit-files button'),list=row.parentElement.parentElement;
    if(row.getBoundingClientRect().width>list.getBoundingClientRect().width+1)throw Error('File row overflow at '+width+' row='+row.getBoundingClientRect().width+' list='+list.getBoundingClientRect().width);
   }
+  host.style.width='1400px';host.style.height='950px';await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const editor=host.querySelector('.vcs-history-editor-host'),before=editor.getBoundingClientRect();
+  if(before.height<=360)throw Error('Editor did not grow beyond old fixed height: '+before.height);
+  host.querySelector('.vcs-comparison-focus').click();await wait(()=>host.querySelector('.vcs-commit-focused'));
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const focused=editor.getBoundingClientRect();
+  if(focused.width<=before.width||focused.height<=before.height)throw Error('Focus did not enlarge editor');
+  if(getComputedStyle(host.querySelector('.vcs-commit-picker')).display!=='none')throw Error('Focus did not hide file picker');
+  host.querySelector('.vcs-comparison-focus').click();await wait(()=>!host.querySelector('.vcs-commit-focused'));
   if([...host.querySelectorAll('.vcs-help')].some(node=>node.open))throw Error('Help expanded by default');
   const help=host.querySelector('.vcs-help');help.querySelector('summary').click();if(!help.open)throw Error('Help cannot expand');
  }finally{root.unmount();host.remove();}

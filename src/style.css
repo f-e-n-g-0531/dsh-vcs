@@ -42,6 +42,23 @@
 .vcs-root .vcs-commit-picker,.vcs-root .vcs-commit-comparison{min-height:0;min-width:0;overflow:auto;scrollbar-gutter:stable}
 .vcs-root .vcs-commit-comparison h4{margin:0 0 8px;overflow-wrap:anywhere}
 @container(max-width:1000px){.vcs-root .vcs-commit-review{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(70px,30%) minmax(0,1fr)}.vcs-root .vcs-commit-summary{max-height:22%}}
+/* Comparison viewport fills available space; default heights only apply standalone. */
+.vcs-root .vcs-history-viewer{display:flex;flex-direction:column;min-width:0;min-height:0}
+.vcs-root .vcs-history-viewer-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex-shrink:0}
+.vcs-root .vcs-history-viewer-toolbar label{display:inline-flex;flex-direction:row;align-items:center;gap:4px}
+.vcs-root .vcs-history-viewer-toolbar input[type=checkbox]{width:auto}
+.vcs-history-editor-host{position:relative;height:360px;min-height:100px;overflow:auto}
+.vcs-root .vcs-commit-comparison{display:flex;flex-direction:column}
+.vcs-root .vcs-commit-comparison>.vcs-history-comparison{flex:1;min-height:0;display:flex;flex-direction:column}
+.vcs-root .vcs-commit-comparison .vcs-history-viewer{flex:1;min-height:180px}
+.vcs-root .vcs-commit-comparison .vcs-history-editor-host{--vcs-history-editor-height:auto;flex:1;min-height:140px}
+.vcs-root .vcs-comparison-heading{flex-shrink:0;max-height:22%;overflow:auto}
+.vcs-root .vcs-comparison-heading p{margin:4px 0;overflow-wrap:anywhere}
+.vcs-root .vcs-comparison-extras{display:flex;flex-wrap:wrap;gap:6px;flex:0 0 auto;max-height:25%;overflow:auto;padding-top:6px}
+.vcs-root .vcs-comparison-focus{align-self:flex-end;flex-shrink:0;margin-bottom:6px}
+.vcs-root .vcs-commit-focused .vcs-commit-summary,.vcs-root .vcs-commit-focused .vcs-commit-picker{display:none}
+.vcs-root .vcs-commit-focused .vcs-commit-review{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);padding-top:0}
+@container(max-width:1000px){.vcs-root .vcs-commit-focused .vcs-commit-review{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}}
 /* History review: compact controls, readable rows, and scoped help. */
 .vcs-root .vcs-history{grid-template-columns:minmax(280px,32%) minmax(0,1fr);border-bottom:0}
 .vcs-root{container-type:inline-size}

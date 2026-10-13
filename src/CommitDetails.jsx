@@ -7,7 +7,7 @@ export default function CommitDetails(props){
 }
 function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit,initialPath}){
  const navigationPending=useRef(true);
- const [selected,setSelected]=useState(null),[query,setQuery]=useState('');
+ const [selected,setSelected]=useState(null),[query,setQuery]=useState(''),[focused,setFocused]=useState(false);
  const [parentIndex,setParentIndex]=useState(0),[details,setDetails]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
  useEffect(()=>{
   const controller=new AbortController();setDetails(null);setError('');
@@ -17,7 +17,7 @@ function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,o
  if(error)return <p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>;
  if(!details)return <p role="status">{t('loading')}</p>;
  const files=filterCommitFiles(details.changes,query);
- return <section className="vcs-commit-details" aria-label={t('commitDetails')}><header className="vcs-commit-summary"><h3>{details.subject}</h3><code className="vcs-commit-oid">{details.id}</code>
+ return <section className={'vcs-commit-details'+(focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}><header className="vcs-commit-summary"><h3>{details.subject}</h3><code className="vcs-commit-oid">{details.id}</code>
  <p>{details.author} · {details.date}</p>
  {details.committer&&details.committer!==details.author&&<p>{t('commitCommitter')} {details.committer}{details.committerDate?` · ${details.committerDate}`:''}</p>}
  {details.signature?.signed===true&&<p><span title={t('commitSignatureUnverified')}>{t('commitSigned',{format:details.signature.format})}</span></p>}
@@ -31,6 +31,7 @@ function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,o
  {!details.changes.length&&<p>{t('commitNoChanges')}</p>}
  <HistoricalTree key={JSON.stringify([sessionId,repositoryId,commit])} {...{sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}}/>
  </aside><div className="vcs-commit-comparison" aria-label={t('comparisonContext')}>
+ {selected&&<button className="vcs-comparison-focus" aria-pressed={focused} onClick={()=>setFocused(v=>!v)}>{t(focused?'comparisonRestore':'comparisonFocus')}</button>}
  {selected?<HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={commit} parentIndex={parentIndex} id={selected} onSelectCommit={onSelectCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>:<p role="status">{t('pick')}</p>}
  </div></div></section>;
 }

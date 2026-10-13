@@ -6,7 +6,7 @@ export default function HistoryViewer({comparison,identity,t,single=false,line=n
  const [sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false);
  const [enabled,setEnabled]=useState(true);
  const {node,viewer,ready,error,computation}=useHistoryEditor({comparison,identity,enabled,single,line,sideBySide,ignoreWhitespace,wrap});
- return <div>
+ return <div className="vcs-history-viewer"><div className="vcs-history-viewer-toolbar">
  <button aria-pressed={enabled} onClick={()=>setEnabled(value=>!value)}>{t(enabled?'historyBasic':'historyAdvanced')}</button>
  {ready&&!single&&<div key="controls" style={{display:'flex',flexWrap:'wrap',gap:8}}>
  <button aria-pressed={sideBySide} onClick={()=>setSide(v=>!v)}>{t(sideBySide?'side':'inline')}</button>
@@ -14,12 +14,12 @@ export default function HistoryViewer({comparison,identity,t,single=false,line=n
  <label><input type="checkbox" checked={wrap} onChange={e=>setWrap(e.target.checked)}/>{t('wrap')}</label>
  <button onClick={()=>viewer.current?.navigate('previous')}>{t('previous')}</button>
  <button onClick={()=>viewer.current?.navigate('next')}>{t('next')}</button>
- </div>}
+ </div>}</div>
  {enabled&&!ready&&!error&&<p role="status">{t('loading')}</p>}
  {comparison.large&&!single&&ready&&<p role="status">{t(computation==='complete'?'diffComplete':computation==='incomplete'?'diffIncomplete':'diffPending')}</p>}
  {comparison.large&&!ready&&<p role="status">{t('largeFallback')}</p>}
  {error&&<p role="status">{t('fallback')} {error}</p>}
- <div key="editor-host" style={{position:'relative',height:360}}>
+ <div key="editor-host" className="vcs-history-editor-host" style={{position:'relative',height:'var(--vcs-history-editor-height, 360px)'}}>
  <div ref={node} style={{position:'absolute',inset:0,visibility:ready?'visible':'hidden'}} aria-hidden={!ready}/>
  {!ready&&<TextComparison comparison={comparison} labels={comparisonLabels(t)}/>}
  </div></div>;
