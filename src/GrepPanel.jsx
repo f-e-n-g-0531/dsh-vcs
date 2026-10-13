@@ -1,5 +1,9 @@
 import React,{useState,useEffect,useRef} from 'react';
-export default function GrepPanel({sessionId,repositoryId,rpc,t,onRediscover}){
+// Repository/Session changes create a fresh request owner and empty view state.
+export default function GrepPanel(props){
+ return <ScopedGrepPanel key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;
+}
+function ScopedGrepPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const [draft,setDraft]=useState(''),[lastQuery,setLastQuery]=useState(null),[matches,setMatches]=useState(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const controller=useRef(null);
  const search=query=>{controller.current?.abort();const c=new AbortController();controller.current=c;setBusy(true);setError('');setMatches(null);setLastQuery(query);rpc('vcs/grep',{sessionId,repositoryId,query},c.signal).then(value=>{if(!c.signal.aborted)setMatches(value.matches);}).catch(e=>{if(c.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!c.signal.aborted)setBusy(false);});};

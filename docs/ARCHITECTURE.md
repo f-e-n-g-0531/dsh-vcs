@@ -22,6 +22,8 @@
 ## 前端组合
 
 - [客户端入口](<../src/client.jsx>)负责DSH页面注册、工作区选择与交互状态；[RPC适配器](<../src/client-rpc.mjs>)仅转换认证响应，保留错误码和取消信号。[状态调度器](<../src/status-limiter.mjs>)跨请求代次限制两项并发，取消在途请求直到结束才释放槽；[列表键盘处理](<../src/file-list-keyboard.mjs>)只管理焦点和目录开合，不自动选择文件。
+- 工作区／历史／Stash／内容搜索使用单一 `reviewView` 状态互斥切换，工作区比较、编辑器与快捷键共用 `reviewActive` 门禁；进入只读辅助视图统一取消工作区比较并清空旧选择，避免新增视图时漏更新依赖。
+- [内容搜索](<../src/GrepPanel.jsx>)按 Session／repositoryId 重新挂载请求所有者，切换时取消在途查询并清空输入和结果，旧响应不能回填新上下文。
 - 历史面板组合提交详情、目录、文件历史、Blame和比较视图；[历史窗口模型](<../src/history-window.mjs>)独立维护最多200行的加载窗口。
 - [历史审阅视图](<../src/HistoryViewer.jsx>)负责展示；[生命周期Hook](<../src/useHistoryEditor.mjs>)管理编辑器与样式资源；[编辑器任务](<../src/history-editor.mjs>)处理异步加载和释放。
 - [Monaco入口](<../src/editor.js>)负责只读模型、Worker与主题；[加载器](<../src/editor-loader.mjs>)负责HTTP／MIME诊断。基础比较是手动选项或失败回退，不是默认审阅。
