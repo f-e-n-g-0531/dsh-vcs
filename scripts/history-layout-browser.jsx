@@ -12,20 +12,28 @@ export async function checkHistoryLayout(){
  const t=k=>dictionaries.zh[k]||k;
  const rpc=async(e)=>{
   if(e==='vcs/history')return {snapshot:id,nextOffset:null,commits:[{id,parents:[parent],subject:'整理历史面板与查询字段',author:'测试作者',date:'2026-10-12T12:00:00+08:00'}]};
-  if(e==='vcs/commit')return {id,parents:[parent],parent,subject:'整理历史面板与查询字段',author:'测试作者',date:'2026-10-12T12:00:00+08:00',changes:[{id:'c'.repeat(64),status:'modified',path:'src/非常长的目录名称/HistoryPanel.jsx'}]};
-  throw Error('Unexpected layout endpoint '+e);
+  if(e==='vcs/commit')return {id,parents:[parent],parent,subject:'整理历史面板与查询字段',author:'测试作者',date:'2026-10-12T12:00:00+08:00',changes:Array.from({length:120},(_,i)=>({id:i.toString(16).padStart(64,'0'),status:'modified',path:'src/非常长的目录名称/file-'+i+'.jsx'}))};
+  if(e==='vcs/commit-compare')return {path:'selected-file.jsx',left:{label:'parent',text:'before'},right:{label:'commit',text:'after'}};
+   throw Error('Unexpected layout endpoint '+e);
  };
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('History layout timeout');};
  try{
   flushSync(()=>root.render(<HistoryPanel sessionId='layout' repositoryId='r' {...{rpc,t}} onRediscover={()=>{}}/>));
   await wait(()=>host.querySelector('.vcs-commit-row'));
   host.querySelector('.vcs-commit-row').click();await wait(()=>host.querySelector('.vcs-commit-files button'));
+  const buttons=[...host.querySelectorAll('.vcs-commit-files button')];
+  buttons.at(-1).click();await wait(()=>host.querySelector('.vcs-commit-comparison .monaco-diff-editor'));
   for(const width of [1100,600,320]){
    host.style.width=width+'px';await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
    for(const input of host.querySelectorAll('.vcs-history-search input')){
     const a=input.getBoundingClientRect(),b=input.closest('fieldset').getBoundingClientRect();
     if(a.left<b.left-1||a.right>b.right+1||a.width<20)throw Error('History input overflow at '+width);
    }
+   const panel=host.querySelector('.vcs-history-details').getBoundingClientRect();
+   const comparison=host.querySelector('.vcs-commit-comparison').getBoundingClientRect();
+   if(comparison.height<80||comparison.top<panel.top-1||comparison.bottom>panel.bottom+1)throw Error('Comparison not visible with 120 files at '+width);
+   const picker=host.querySelector('.vcs-commit-picker');picker.scrollTop=picker.scrollHeight;
+   if(Math.abs(host.querySelector('.vcs-commit-comparison').getBoundingClientRect().top-comparison.top)>1)throw Error('File scroll moved Diff');
    const row=host.querySelector('.vcs-commit-files button'),list=row.parentElement.parentElement;
    if(row.getBoundingClientRect().width>list.getBoundingClientRect().width+1)throw Error('File row overflow at '+width+' row='+row.getBoundingClientRect().width+' list='+list.getBoundingClientRect().width);
   }
