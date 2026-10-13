@@ -43,7 +43,7 @@ function updateTheme() {
 }
 export function createDiff(node, { onStats, onComputation, single = false, maxComputationTime = 3000 } = {}) {
   const releaseEnvironment = acquireEnvironment();
-  let editor, observer, subscription;
+  let editor, observer, subscription, sizeObserver, layoutFrame;
   let models = [], key = '', disposed = false, viewModel, computationTimer;
   const reportComputation = () => {if(!disposed)onComputation?.(diffStatus(viewModel));};
   const states = new Map();
@@ -55,7 +55,7 @@ export function createDiff(node, { onStats, onComputation, single = false, maxCo
     if (disposed) return;
     disposed = true;
     // One failing cleanup must not leave the global worker hook installed.
-    const cleanups = [() => observer?.disconnect(), () => subscription?.dispose(),
+    const cleanups = [() => sizeObserver?.disconnect(), () => cancelAnimationFrame(layoutFrame), () => observer?.disconnect(), () => subscription?.dispose(),
       () => clearTimeout(computationTimer), () => viewModel?.dispose(), () => editor?.dispose(), ...models.map(model => () => model.dispose())];
     try {
       for (const cleanup of cleanups) { try { cleanup(); } catch (error) { console.warn('VCS editor cleanup failed', error); } }
@@ -66,8 +66,20 @@ export function createDiff(node, { onStats, onComputation, single = false, maxCo
   }
   try {
   updateTheme();
-  editor = (single?monaco.editor.create:monaco.editor.createDiffEditor)(node, {readOnly:true,originalEditable:false,domReadOnly:true,automaticLayout:true,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,ignoreTrimWhitespace:false,minimap:{enabled:false},fontSize:13,scrollBeyondLastLine:false,renderOverviewRuler:false,hideUnchangedRegions:{enabled:true,contextLineCount:4,minimumLineCount:8},maxComputationTime,accessibilityVerbose:true});
-  observer = new MutationObserver(updateTheme);
+  editor = (single?monaco.editor.create:monaco.editor.createDiffEditor)(node, {readOnly:true,originalEditable:false,domReadOnly:true,automaticLayout:false,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,ignoreTrimWhitespace:false,minimap:{enabled:false},fontSize:13,scrollBeyondLastLine:false,renderOverviewRuler:false,hideUnchangedRegions:{enabled:true,contextLineCount:4,minimumLineCount:8},maxComputationTime,accessibilityVerbose:true});
+  // Schedule layout outside ResizeObserver delivery to avoid synchronous resize loops.
+   let layoutWidth=-1,layoutHeight=-1;
+   sizeObserver=new ResizeObserver(()=>{
+     cancelAnimationFrame(layoutFrame);
+     layoutFrame=requestAnimationFrame(()=>{
+       if(disposed)return;
+       const width=node.clientWidth,height=node.clientHeight;
+       if(width===layoutWidth&&height===layoutHeight)return;
+       layoutWidth=width;layoutHeight=height;editor.layout({width,height});
+     });
+   });
+   sizeObserver.observe(node);
+   observer = new MutationObserver(updateTheme);
   observer.observe(document.body,{attributes:true,attributeFilter:['data-ds-dark-theme','style','class']});
   subscription = single ? undefined : editor.onDidUpdateDiff(() => {
     reportComputation();
