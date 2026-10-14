@@ -1,7 +1,7 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
-import HistoryPanel from '../src/HistoryPanel.jsx';
+import SearchPanel from '../src/SearchPanel.jsx';
 import locales from '../src/locales.json';
 export {checkBranchHistory} from './branch-history-browser.jsx';
 export async function checkHistorySearch(){
@@ -10,8 +10,10 @@ export async function checkHistorySearch(){
  try{for(const lang of ['zh','en']){
   const calls=[],t=k=>locales[lang][k],row=id=>({id,subject:'result '+id[0],author:'author',date:'2026-10-08',parents:[]});
   const rpc=async(endpoint,p,signal)=>{if(endpoint!=='vcs/history')throw Error('Unexpected search RPC');calls.push({p,signal});return {snapshot:a,commits:[row(p.offset?b:a)],nextOffset:p.search&&!p.offset?50:null};};
-  flushSync(()=>root.render(<HistoryPanel key={lang} sessionId='s' repositoryId='r' {...{rpc,t}} onRediscover={()=>{throw Error('Rediscovery');}}/>));
-  await wait(()=>calls.length===1&&!host.querySelector('fieldset').disabled);
+  flushSync(()=>root.render(<SearchPanel key={lang} sessionId='s' repositoryId='r' {...{rpc,t}} onRediscover={()=>{throw Error('Rediscovery');}}/>));
+  if(calls.length||host.querySelector('fieldset'))throw Error('History search mounted in content mode');
+   [...host.querySelectorAll('button')].find(n=>n.textContent===t('searchHistoryMode')).click();
+   await wait(()=>calls.length===1&&!host.querySelector('fieldset').disabled);
   const input=host.querySelector('[aria-label="'+t('historyServer_message')+'"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'needle .*');input.dispatchEvent(new Event('input',{bubbles:true}));
   await new Promise(r=>setTimeout(r,50));if(calls.length!==1)throw Error('Draft typing queried server');
   const button=k=>[...host.querySelectorAll('button')].find(n=>n.textContent===t(k));button('historyServerApply').click();await wait(()=>calls.length===2&&!host.querySelector('fieldset').disabled);
@@ -26,15 +28,17 @@ export async function checkHistorySearch(){
  }
  const t=k=>k;let fail=true,late,oldSignal,requests=0,rediscoveries=0;
  const rpc=async(_endpoint,p,signal)=>{requests++;if(p.search&&fail){fail=false;throw Error('QUERY FAILURE');}if(p.search?.message==='pending'){oldSignal=signal;return new Promise(resolve=>late=resolve);}return {snapshot:a,commits:[],nextOffset:null};};
- const show=repositoryId=>flushSync(()=>root.render(<HistoryPanel key='failure' sessionId='s' repositoryId={repositoryId} {...{rpc,t}} onRediscover={()=>rediscoveries++}/>));
- show('r');await wait(()=>requests===1&&!host.querySelector('fieldset').disabled);
+ const show=repositoryId=>flushSync(()=>root.render(<SearchPanel key='failure' sessionId='s' repositoryId={repositoryId} {...{rpc,t}} onRediscover={()=>rediscoveries++}/>));
+ show('r');[...host.querySelectorAll('button')].find(n=>n.textContent==='searchHistoryMode').click();await wait(()=>requests===1&&!host.querySelector('fieldset').disabled);
  const input=host.querySelector('[aria-label=historyServer_message]'),set=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));};
  const button=k=>[...host.querySelectorAll('button')].find(n=>n.textContent===k);
  set('retry');await new Promise(r=>setTimeout(r,25));button('historyServerApply').click();await wait(()=>host.querySelector('[role=alert]'));
  const failedCount=requests;await new Promise(r=>setTimeout(r,100));if(requests!==failedCount)throw Error('Query auto retried');
  button('retry').click();await wait(()=>requests===failedCount+1&&!host.querySelector('[role=alert]'));
  set('pending');await new Promise(r=>setTimeout(r,25));button('historyServerApply').click();await wait(()=>late);
- show('new-r');await wait(()=>oldSignal.aborted&&!host.querySelector('fieldset').disabled);
+ show('new-r');await wait(()=>oldSignal.aborted&&!host.querySelector('fieldset'));
+  if(!host.querySelector('[aria-label=grepQuery]'))throw Error('New repository did not reset search mode');
+  [...host.querySelectorAll('button')].find(n=>n.textContent==='searchHistoryMode').click();await wait(()=>host.querySelector('fieldset')&&!host.querySelector('fieldset').disabled);
  late({snapshot:a,commits:[{id:b,subject:'STALE QUERY',author:'x',date:'2026-10-08',parents:[]}],nextOffset:null});await new Promise(r=>setTimeout(r,100));
  if(host.textContent.includes('STALE QUERY')||rediscoveries||host.querySelector('[aria-label=historyServer_message]').value)throw Error('Query scope reset failed');
  }finally{root.unmount();host.remove();}

@@ -11,7 +11,7 @@ export async function checkBranchHistory(){
   const rpc=async(endpoint,p,signal)=>{calls.push({endpoint,p,signal});if(endpoint==='vcs/references')return {references:[{name:reference,commit:++refLoads===1?b:c}]};if(endpoint==='vcs/history')return {snapshot:p.snapshot||a,commits:[],nextOffset:p.snapshot===b&&!p.offset?50:null};throw Error('Unexpected branch RPC');};
   flushSync(()=>root.render(<HistoryPanel key={lang+reference} sessionId='s' repositoryId='r' {...{rpc,t}} onRediscover={()=>{}}/>));
   const button=k=>[...host.querySelectorAll('button')].find(n=>n.textContent===t(k));
-  await wait(()=>!host.querySelector('fieldset').disabled);button('revisionLoadRefs').click();await wait(()=>refLoads===1&&host.querySelector('[aria-label="'+t('historyBranch')+'"]').options.length===2);
+  await wait(()=>!host.querySelector('[aria-label="'+t('historyBranch')+'"]').disabled);button('revisionLoadRefs').click();await wait(()=>refLoads===1&&host.querySelector('[aria-label="'+t('historyBranch')+'"]').options.length===2);
   const select=host.querySelector('[aria-label="'+t('historyBranch')+'"]');select.value=JSON.stringify([reference,b]);select.dispatchEvent(new Event('change',{bubbles:true}));await wait(()=>calls.filter(x=>x.endpoint==='vcs/history').length===2&&!select.disabled);
   if(calls.at(-1).p.snapshot!==b||calls.at(-1).p.offset!==0)throw Error('Reference tip not pinned');
   await wait(()=>button('historyMore')&&!button('historyMore').disabled);button('historyMore').click();await wait(()=>calls.filter(x=>x.endpoint==='vcs/history').length===3&&!select.disabled);if(calls.at(-1).p.snapshot!==b||calls.at(-1).p.offset!==50)throw Error('Branch page moved');

@@ -20,7 +20,8 @@ export async function checkHistoryLayout(){
  try{
   flushSync(()=>root.render(<HistoryPanel sessionId='layout' repositoryId='r' {...{rpc,t}} onRediscover={()=>{}}/>));
   await wait(()=>host.querySelector('.vcs-commit-row'));
-  host.querySelector('.vcs-commit-row').click();await wait(()=>host.querySelector('.vcs-commit-files button'));
+  if(host.querySelector('.vcs-history-search'))throw Error('Advanced search still occupies history browsing');
+   host.querySelector('.vcs-commit-row').click();await wait(()=>host.querySelector('.vcs-commit-files button'));
   const buttons=[...host.querySelectorAll('.vcs-commit-files button')];
   buttons.at(-1).click();await wait(()=>host.querySelector('.vcs-commit-comparison .monaco-diff-editor'));
   for(const width of [1100,600,320]){
