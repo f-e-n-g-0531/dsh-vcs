@@ -253,7 +253,7 @@ export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
  }
  if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(snapshot))throw new Error('Invalid content search commit');
  let text;
- try{text=(await git(repo.root,['grep','--no-color','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
+ try{text=(await git(repo.root,['-c','grep.column=false','grep','--no-color','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
  catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {matches:[]};throw error;}
  signal?.throwIfAborted();
  const matches=[];
