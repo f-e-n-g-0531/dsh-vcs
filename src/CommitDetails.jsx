@@ -17,7 +17,7 @@ function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,o
  if(error)return <p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>;
  if(!details)return <p role="status">{t('loading')}</p>;
  const files=filterCommitFiles(details.changes,query);
- return <section className={'vcs-commit-details'+(focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}><header className="vcs-commit-summary"><h3>{details.subject}</h3><code className="vcs-commit-oid">{details.id}</code>
+ return <section className={'vcs-commit-details'+(focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}><div className="vcs-commit-sidebar"><header className="vcs-commit-summary"><h3>{details.subject}</h3><code className="vcs-commit-oid">{details.id}</code>
  <p>{details.author} · {details.date}</p>
  {details.committer&&details.committer!==details.author&&<p>{t('commitCommitter')} {details.committer}{details.committerDate?` · ${details.committerDate}`:''}</p>}
  {details.signature?.signed===true&&<p><span title={t('commitSignatureUnverified')}>{t('commitSigned',{format:details.signature.format})}</span></p>}
@@ -25,12 +25,12 @@ function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,o
  {details.message&&<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:240,overflow:'auto'}}>{details.message}</pre>}
  {details.parents.length>1&&<label>{t('commitParent')} <select aria-label={t('commitParent')} value={parentIndex} onChange={e=>{setSelected(null);setDetails(null);setParentIndex(Number(e.target.value));}}>{details.parents.map((id,index)=><option key={id} value={index}>{index+1}: {id.slice(0,10)}</option>)}</select></label>}
  <p>{details.parent||t('commitRoot')} → {details.id.slice(0,10)}</p>
- </header><div className="vcs-commit-review"><aside className="vcs-commit-picker"><label>{t('commitFileSearch')} <input aria-label={t('commitFileSearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}}/></label><span> {files.length} / {details.changes.length}</span>
+ </header><aside className="vcs-commit-picker"><label>{t('commitFileSearch')} <input aria-label={t('commitFileSearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}}/></label><span> {files.length} / {details.changes.length}</span>
  <ul className="vcs-commit-files">{files.map(file=><li key={file.id}><button aria-pressed={selected===file.id} onClick={()=>setSelected(file.id)}><span className="vcs-file-status">{file.status} · </span><span className="vcs-file-path" title={file.oldPath?file.oldPath+' → '+file.path:file.path}>{file.path}{file.oldPath&&<small>← {file.oldPath}</small>}</span></button></li>)}</ul>
  {!!details.changes.length&&!files.length&&<p role="status">{t('emptySearch')}</p>}
  {!details.changes.length&&<p>{t('commitNoChanges')}</p>}
  <HistoricalTree key={JSON.stringify([sessionId,repositoryId,commit])} {...{sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit}}/>
- </aside><div className="vcs-commit-comparison" aria-label={t('comparisonContext')}>
+ </aside></div><div className="vcs-commit-review"><div className="vcs-commit-comparison" aria-label={t('comparisonContext')}>
  {selected&&<button className="vcs-comparison-focus" aria-pressed={focused} onClick={()=>setFocused(v=>!v)}>{t(focused?'comparisonRestore':'comparisonFocus')}</button>}
  {selected?<HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} commit={commit} parentIndex={parentIndex} id={selected} onSelectCommit={onSelectCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>:<p role="status">{t('pick')}</p>}
  </div></div></section>;

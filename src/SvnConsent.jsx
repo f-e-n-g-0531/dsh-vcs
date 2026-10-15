@@ -1,6 +1,6 @@
 import {watchSvnExpiry} from './svn-ui-expiry.mjs';
 import React,{useEffect,useState} from 'react';
-// Not mounted in production until a verified remote transport exists.
+// Describe locally before explicitly approving remote history reads.
 export default function SvnConsent(props){return <Scoped key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;}
 function Scoped({sessionId,repositoryId,rpc,t,onApproved,onRediscover}){
  const [open,setOpen]=useState(false),[offer,setOffer]=useState(null),[checked,setChecked]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[retry,setRetry]=useState(0);

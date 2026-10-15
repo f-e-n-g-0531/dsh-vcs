@@ -86,7 +86,7 @@ function Scoped({sessionId, repositoryId, rpc, t, onRediscover}) {
     }
   };
 
-  return <section>
+  return <section className="vcs-svn-remote">
     {!grant && error && <p role="status">{error}</p>}
     {!grant ? <SvnConsent {...{sessionId, repositoryId, rpc, t, onRediscover}} onApproved={onApproved}/> : <>
       <p>{t('svnGrantScope')}</p>

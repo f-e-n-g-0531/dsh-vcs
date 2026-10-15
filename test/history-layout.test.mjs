@@ -13,4 +13,7 @@ test('history review uses scoped rows, a grid form and collapsed explanatory hel
  assert.ok(details.includes('title={file.oldPath?'));
  assert.ok(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))'));
  assert.ok(css.includes('.vcs-root .vcs-commit-files>li+li'));
+ assert.ok(history.includes('vcs-history-browser'));
+ assert.ok(details.includes('className="vcs-commit-sidebar"'));
+ assert.ok(css.includes('grid-column:2;grid-row:1/3'));
 });

@@ -30,9 +30,11 @@ export async function checkHistoryLayout(){
     const a=input.getBoundingClientRect(),b=input.closest('fieldset').getBoundingClientRect();
     if(a.left<b.left-1||a.right>b.right+1||a.width<20)throw Error('History input overflow at '+width);
    }
-   const panel=host.querySelector('.vcs-history-details').getBoundingClientRect();
+   const panel=host.querySelector('.vcs-history').getBoundingClientRect();
    const comparison=host.querySelector('.vcs-commit-comparison').getBoundingClientRect();
    if(comparison.height<80||comparison.top<panel.top-1||comparison.bottom>panel.bottom+1)throw Error('Comparison not visible with 120 files at '+width);
+   const sidebar=host.querySelector('.vcs-commit-sidebar').getBoundingClientRect(),records=host.querySelector('.vcs-history-list').getBoundingClientRect();
+   if(sidebar.right>comparison.left+1||Math.abs(sidebar.left-records.left)>1||sidebar.top<records.bottom-1)throw Error('History navigation not unified on left at '+width);
    const picker=host.querySelector('.vcs-commit-picker');picker.scrollTop=picker.scrollHeight;
    if(Math.abs(host.querySelector('.vcs-commit-comparison').getBoundingClientRect().top-comparison.top)>1)throw Error('File scroll moved Diff');
    const row=host.querySelector('.vcs-commit-files button'),list=row.parentElement.parentElement;
@@ -44,8 +46,8 @@ export async function checkHistoryLayout(){
   host.querySelector('.vcs-comparison-focus').click();await wait(()=>host.querySelector('.vcs-commit-focused'));
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   const focused=editor.getBoundingClientRect();
-  if(focused.width<=before.width||focused.height<=before.height)throw Error('Focus did not enlarge editor');
-  if(getComputedStyle(host.querySelector('.vcs-commit-picker')).display!=='none')throw Error('Focus did not hide file picker');
+  if(focused.width<=before.width||focused.height<before.height)throw Error('Focus did not enlarge editor');
+  if(getComputedStyle(host.querySelector('.vcs-commit-sidebar')).display!=='none')throw Error('Focus did not hide file picker');
   host.querySelector('.vcs-comparison-focus').click();await wait(()=>!host.querySelector('.vcs-commit-focused'));
   if([...host.querySelectorAll('.vcs-help')].some(node=>node.open))throw Error('Help expanded by default');
   if(host.querySelector('.vcs-history-list .vcs-help'))throw Error('History query help remains outside search center');
