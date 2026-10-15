@@ -253,7 +253,7 @@ export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
  }
  if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(snapshot))throw new Error('Invalid content search commit');
  let text;
- try{text=(await git(repo.root,['grep','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
+ try{text=(await git(repo.root,['grep','--no-color','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
  catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {matches:[]};throw error;}
  signal?.throwIfAborted();
  const matches=[];
@@ -578,12 +578,20 @@ async function annotateSubmodules(repo, entries, options) {
   // commits, modified content and untracked content in an initialized checkout.
   for (let from = 0; from < initialized.length; from += 64) {
     check();const batch = initialized.slice(from, from + 64);
-    const out = (await git(repo.root, ['status', '--porcelain=v2', '--ignore-submodules=none', '--', ...batch.map(entry => entry.path)], MAX_TEXT, {...options, timeoutMs: deadline - Date.now()})).toString('utf8');
-    for (const line of out.split('\n')) {
-      if (!line) continue;
-      const match = batch.find(entry => line.endsWith(entry.path)); if (!match) continue;
-      const sub = line.split(/\s+/)[2] || ''; if (sub[0] !== 'S') continue;
-      match.submodule = { ...match.submodule, pointerMoved: sub[1] === 'C', dirty: sub[2] === 'M', untracked: sub[3] === 'U' };
+    const out = (await git(repo.root, ['status', '--porcelain=v2', '-z', '--ignore-submodules=none', '--', ...batch.map(entry => entry.path)], MAX_TEXT, {...options, timeoutMs: deadline - Date.now()})).toString('utf8');
+    const records=out.split(String.fromCharCode(0));
+    for(let i=0;i<records.length;i++){
+      const record=records[i];if(!record)continue;
+      // Porcelain v2 has fixed space-separated headers followed by a raw path.
+      // Type 2 also carries an original path in the next NUL record.
+      const renamed=record.startsWith('2 '),ordinary=record.startsWith('1 ');
+      if(!ordinary&&!renamed)continue;
+      const count=renamed?9:8;let end=-1;const fields=[];
+      for(let n=0;n<count;n++){const start=end+1;end=record.indexOf(' ',start);if(end<0)throw Error('Invalid submodule status header');fields.push(record.slice(start,end));}
+      const file=record.slice(end+1);if(renamed){if(!records[++i])throw Error('Missing submodule rename source');}
+      const match=batch.find(entry=>entry.path===file);if(!match)continue;
+      const sub=fields[2];if(!/^S[.C][.M][.U]$/.test(sub))continue;
+      match.submodule={...match.submodule,pointerMoved:sub[1]==='C',dirty:sub[2]==='M',untracked:sub[3]==='U'};
     }
   }
 }

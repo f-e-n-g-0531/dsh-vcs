@@ -8,6 +8,7 @@ test('grep preserves LF tab colon and Unicode in committed filenames',async()=>{
  const blob=g(['hash-object','-w','--stdin'],'needle'+lf+'needle last').trim(),names=['normal.txt','line'+lf+'break.txt','tab'+tab+'colon:中文.txt'].sort();
  const tree=g(['mktree','-z'],names.map(name=>'100644 blob '+blob+tab+name+nul).join('')).trim();
  const commit=g(['commit-tree',tree],'fixture').trim();g(['update-ref','HEAD',commit]);
+ g(['config','color.grep','always']);g(['config','color.ui','always']);
  const result=await searchRepositoryContent(await detectRepository(root),{commit,query:'needle'});
  assert.equal(result.matches.length,6);for(const name of names)assert.deepEqual(result.matches.filter(x=>x.path===name).map(x=>[x.line,x.text]),[[1,'needle'],[2,'needle last']]);
  }finally{await rm(root,{recursive:true,force:true});}
