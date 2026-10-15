@@ -13,7 +13,7 @@ const rpc=async(endpoint,payload,signal)=>{
  throw Error('Unexpected RPC');
 };
 const root=createRoot(document.querySelector('#root'));
-root.render(<HistoryPanel sessionId="fixture" repositoryId="repo" rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
+root.render(<HistoryPanel showSearch sessionId="fixture" repositoryId="repo" rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
 const wait=async fn=>{for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('Timed out waiting for UI');};
 const button=text=>[...document.querySelectorAll('button')].find(el=>el.textContent===text);
 (async()=>{try{

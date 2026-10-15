@@ -20,7 +20,7 @@ export async function checkHistoryLayout(){
  try{
   flushSync(()=>root.render(<HistoryPanel sessionId='layout' repositoryId='r' {...{rpc,t}} onRediscover={()=>{}}/>));
   await wait(()=>host.querySelector('.vcs-commit-row'));
-  if(host.querySelector('.vcs-history-search'))throw Error('Advanced search still occupies history browsing');
+  if(host.querySelector('.vcs-history-search')||host.querySelector('[aria-label="'+t('historySearch')+'"]')||host.querySelector('.vcs-history-list .vcs-help'))throw Error('Search controls still occupy history browsing');
    host.querySelector('.vcs-commit-row').click();await wait(()=>host.querySelector('.vcs-commit-files button'));
   const buttons=[...host.querySelectorAll('.vcs-commit-files button')];
   buttons.at(-1).click();await wait(()=>host.querySelector('.vcs-commit-comparison .monaco-diff-editor'));
@@ -48,6 +48,6 @@ export async function checkHistoryLayout(){
   if(getComputedStyle(host.querySelector('.vcs-commit-picker')).display!=='none')throw Error('Focus did not hide file picker');
   host.querySelector('.vcs-comparison-focus').click();await wait(()=>!host.querySelector('.vcs-commit-focused'));
   if([...host.querySelectorAll('.vcs-help')].some(node=>node.open))throw Error('Help expanded by default');
-  const help=host.querySelector('.vcs-help');help.querySelector('summary').click();if(!help.open)throw Error('Help cannot expand');
+  if(host.querySelector('.vcs-history-list .vcs-help'))throw Error('History query help remains outside search center');
  }finally{root.unmount();host.remove();}
 }
