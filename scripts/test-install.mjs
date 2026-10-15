@@ -31,7 +31,7 @@ try {
  assert.equal(typeof plugin.apply,'function');assert.ok(plugin.inject.includes('webServer'));
  const routes=[];let handler;let owner;
  const ctx={effect:fn=>fn(),webServer:{register:r=>{routes.push(r);return()=>{};}},connection:{register:(o,c,h)=>{owner=o;assert.equal(c,'/vcs-rpc');handler=h;},fetch:{register:()=>()=>{}},admit:async()=>({ok:false,status:401})}};
- plugin.apply(ctx);assert.equal(owner,ctx);assert.equal(typeof handler,'function');assert.equal(routes.length,3);
+ plugin.apply(ctx);assert.equal(owner,ctx);assert.equal(typeof handler,'function');assert.equal(routes.length,5);
  console.log('Production-only tarball install and host-entry registration passed:',manifest.version);
  console.log('Registration uses a stub host; this is not live DSH or browser acceptance.');
 } finally {await rm(temp,{recursive:true,force:true});}

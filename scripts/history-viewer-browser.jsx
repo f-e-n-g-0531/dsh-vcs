@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkFrontendReload} from './frontend-reload-browser.jsx';
 export {checkSvnHistory,checkRealSvnHistory} from './svn-history-browser.jsx';
 export {checkSvnHistoryDateFilter} from './svn-history-filter-browser.jsx';
 export {checkSvnConsent} from './svn-consent-browser.jsx';

@@ -1,6 +1,6 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.3.103",
+  "version": "0.3.104",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
@@ -13,6 +13,7 @@
   },
   "files": [
     "index.mjs",
+    "frontend-assets.mjs",
     "vcs.mjs",
     "git-history.mjs",
     "conflict-stages.mjs",

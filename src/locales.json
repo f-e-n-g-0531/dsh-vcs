@@ -250,7 +250,16 @@
     "revisionRefsEmpty": "没有可用的本地分支或提交标签。",
     "revisionLoadedCommits": "已加载的提交",
     "revisionLocalRefs": "本地引用（含远程缓存）",
-    "revisionRefsCount": "已加载可选引用"
+    "revisionRefsCount": "已加载可选引用",
+    "updatePlugin": "更新插件",
+    "reloadInterface": "检查并加载已安装更新",
+    "reloadDone": "已重新加载 VCS 界面；旧请求、编辑器及 SVN 授权已清理。",
+    "reloadRestart": "已安装更新涉及后端，请自行重启 DSH 后刷新页面。",
+    "reloadFailed": "加载失败，已保留原界面；请重试或重启 DSH。",
+    "updateScope": "此按钮不自动安装。请在插件管理器中检查安装方式；当前宿主可能要求先卸载再安装。也可在终端按实际 profile 和已核验版本执行以下命令。",
+    "updateRestart": "安装后点击“检查并加载已安装更新”。仅在后端指纹一致时加载新界面；否则提示重启。不自动重启 DSH。",
+    "updateManager": "打开插件管理",
+    "updateRelease": "查看最新发布"
   },
   "en": {
     "svnOfferExpired": "Network access offer expired. Retry manually and check consent again.",
@@ -503,6 +512,15 @@
     "revisionRefsEmpty": "No local branches or commit tags are available.",
     "revisionLoadedCommits": "Loaded commits",
     "revisionLocalRefs": "Local refs (including remote caches)",
-    "revisionRefsCount": "Selectable references loaded"
+    "revisionRefsCount": "Selectable references loaded",
+    "updatePlugin": "Update plugin",
+    "reloadInterface": "Check and load installed update",
+    "reloadDone": "VCS interface reloaded; old requests, editors and SVN grants were cleaned up.",
+    "reloadRestart": "Installed update changes the backend. Restart DSH and refresh the page.",
+    "reloadFailed": "Reload failed. Previous interface retained; retry or restart DSH.",
+    "updateScope": "This button does not install packages. Check installation options in the plugin manager; this host may require uninstalling before reinstalling. Alternatively run this command with your actual profile and verified version.",
+    "updateRestart": "After installation, check and load the installed update. Reload is allowed only when backend fingerprints match; otherwise restart DSH manually. DSH is never restarted automatically.",
+    "updateManager": "Open plugin manager",
+    "updateRelease": "Latest release"
   }
 }

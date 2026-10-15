@@ -13,7 +13,7 @@ test('real references RPC supplies pinned A B targets across branch movement',as
  git(['branch','topic',ids[0]]);git(['-c','tag.gpgSign=false','tag','-a','baseline','-m','tag',ids[0]]);await fs.writeFile(path.join(root,'file.txt'),'working');
  let handler;const routes=[];
  const ctx={sessions:{get:()=>({header:{cwd:root}})},sessionPersistence:{stat:async()=>null},effect:fn=>fn(),webServer:{register:route=>{routes.push(route.path);return()=>{};}},connection:{register:(owner,channel,callback)=>{assert.equal(owner,ctx);assert.equal(channel,RPC_CHANNEL);handler=callback;},fetch:{register:()=>{}}}};
- apply(ctx);assert.equal(typeof handler,'function');assert.equal(routes.length,3);
+ apply(ctx);assert.equal(typeof handler,'function');assert.equal(routes.length,5);
  const scan=await handler('vcs/repositories',{sessionId:'s'});assert.equal(scan.ok,true);
  const p={sessionId:'s',repositoryId:scan.value.repositories.find(r=>r.type==='git').id};const read=async(endpoint,extra={})=>{const result=await handler(endpoint,{...p,...extra});assert.equal(result.ok,true,JSON.stringify(result));return result.value;};
  const refs=(await read('vcs/references')).references;const base=refs.find(r=>r.name==='refs/heads/topic').commit,target=refs.find(r=>r.name==='refs/heads/main').commit;assert.equal(refs.find(r=>r.name==='refs/tags/baseline').commit,base);

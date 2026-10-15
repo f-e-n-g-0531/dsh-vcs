@@ -1,4 +1,7 @@
 import { readFile } from 'node:fs/promises';
+import {readFileSync} from 'node:fs';
+import {registerFrontendAssets} from './frontend-assets.mjs';
+const runningFrontend=JSON.parse(readFileSync(new URL('./dist/frontend.json',import.meta.url),'utf8'));
 import * as adapter from './vcs.mjs';
 import {createSvnHttpsHost} from './dist/svn-host.mjs';
 
@@ -272,4 +275,5 @@ export function apply(ctx) {
   ctx.connection.register(ctx, RPC_CHANNEL, host.handle);
   registerAssets(ctx);
   registerDirectAssets(ctx);
+  registerFrontendAssets(ctx,{running:runningFrontend});
 }

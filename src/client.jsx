@@ -23,8 +23,8 @@ const statusCodes={modified:'M',added:'A',deleted:'D',missing:'D',renamed:'R',co
 const asset = name => new URL('vcs-assets/'+name,document.baseURI).href;
 function Icon(){return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M12 4v16M6 10h3M7.5 8.5v3M15 14h3"/></svg>}
 export const inject=['slots','layout','locale','connection','uiSession'];
-export function apply(ctx){
-  ctx.effect(()=>ctx.locale.register('local.vcs',dictionaries));
+export {dictionaries};
+export function createPage(ctx,{initialView='workspace',onViewChange}={}){
   const t=ctx.locale.bind('local.vcs');
   const scheduleStatus=createStatusLimiter(2);
   const rpc=createClientRpc(ctx.connection,()=>t('error'));
@@ -43,7 +43,7 @@ export function apply(ctx){
     const [mode,setMode]=useState('all'),[refresh,setRefresh]=useState(0),[historyRefresh,setHistoryRefresh]=useState(0),[discovery,setDiscovery]=useState(null),[statuses,setStatuses]=useState({}),[repositoryId,setRepositoryId]=useState(()=>readProject(session?.cwd)),[scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState(''),[selected,setSelected]=useState(null),[comparison,setComparison]=useState(null);
     const [scanning,setScanning]=useState(false),[loading,setLoading]=useState(false),[error,setError]=useState(''),[detailError,setDetailError]=useState(''),[editorError,setEditorError]=useState(''),[copiedPath,setCopiedPath]=useState(false);
     const [query,setQuery]=useState(''),[statusFilter,setStatusFilter]=useState('all'),[tree,setTree]=useState(true),[collapsedDirectories,setCollapsedDirectories]=useState({}),[sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false),[tab,setTab]=useState('content');
-    const [editorRetry,setEditorRetry]=useState(0),[reviewView,setReviewView]=useState('workspace'),[largeSelection,setLargeSelection]=useState(null),[compareRetry,setCompareRetry]=useState(0),[computation,setComputation]=useState('pending');
+    const [editorRetry,setEditorRetry]=useState(0),[reviewView,setReviewView]=useState(initialView),[largeSelection,setLargeSelection]=useState(null),[compareRetry,setCompareRetry]=useState(0),[computation,setComputation]=useState('pending');
     const [stats,setStats]=useState({added:0,deleted:0,count:0}),[editorReady,setEditorReady]=useState(false);
     const panelNode=useRef(null),editorNode=useRef(null),viewer=useRef(null),fileListNode=useRef(null),searchNode=useRef(null),revealChange=useRef(null);
     const statusController=useRef(null),compareController=useRef(null),scanController=useRef(null),previousDiscovery=useRef(null),preserveStatusRefresh=useRef(false),rediscovering=useRef(false);
@@ -55,6 +55,7 @@ export function apply(ctx){
     const stashActive=gitSelected&&reviewView==='stash';
     const grepActive=gitSelected&&reviewView==='grep';
     const reviewActive=historyActive||stashActive||grepActive;
+    useEffect(()=>{onViewChange?.(reviewView);},[reviewView]);
     const openReviewView=view=>{
       compareController.current?.abort();
       setComparison(null);setSelected(null);setDetailError('');
@@ -156,6 +157,12 @@ export function apply(ctx){
         <footer className="vcs-toolbar"><button disabled={!editorReady} aria-pressed={sideBySide} onClick={()=>setSide(!sideBySide)}>{t(sideBySide?'side':'inline')}</button><label><input type="checkbox" disabled={!editorReady} checked={ignoreWhitespace} onChange={e=>setWhitespace(e.target.checked)}/>{t('whitespace')}</label><label><input type="checkbox" disabled={!editorReady} checked={wrap} onChange={e=>setWrap(e.target.checked)}/>{t('wrap')}</label><span className="vcs-spacer"/>{editorReady&&<span>{stats.count} {t('changes')}</span>}<button disabled={!editorReady||!comparison||!!overlay} onClick={()=>viewer.current?.navigate('previous')}>{t('previous')}</button><button disabled={!editorReady||!comparison||!!overlay} onClick={()=>viewer.current?.navigate('next')}>{t('next')}</button>{reviewPosition.index>0&&<span className="vcs-review-position">{t('reviewPosition',{index:reviewPosition.index,total:reviewPosition.total})}</span>}<span className="vcs-toolbar-separator"/><button title={t('fileShortcut')} disabled={!changes.length} onClick={()=>selectAdjacent('previous')}>{t('previousFile')}</button><button title={t('fileShortcut')} disabled={!changes.length} onClick={()=>selectAdjacent('next')}>{t('nextFile')}</button></footer>
       </main></div></section>;
   }
+  return Page;
+}
+export function apply(ctx){
+  ctx.effect(()=>ctx.locale.register('local.vcs',dictionaries));
+  const t=ctx.locale.bind('local.vcs');
+  const Page=createPage(ctx);
   ctx.slots.inject('main',()=>ctx.slots.register({name:'main',key:'local-vcs'},Page));
   ctx.slots.inject('sidebar.panellist',()=>ctx.slots.register({name:'sidebar.panellist',id:'local-vcs',label:()=>t('title'),order:65},Icon));
 }
