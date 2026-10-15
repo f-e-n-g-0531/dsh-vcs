@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import {registerFrontendAssets} from './frontend-assets.mjs';
 const runningFrontend=JSON.parse(readFileSync(new URL('./dist/frontend.json',import.meta.url),'utf8'));
 import * as adapter from './vcs.mjs';
+import {runtimeInfo,checkUpdate} from './dist/updates.mjs';
 import {createSvnHttpsHost} from './dist/svn-host.mjs';
 
 export const name = 'dsh-vcs';
@@ -160,6 +161,15 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
   }
   if(bindSvnIdentityResolver!==undefined){if(typeof bindSvnIdentityResolver!=='function')throw new Error('Invalid internal SVN resolver binding');bindSvnIdentityResolver(async(address,signal)=>{validatePayload('vcs/svn-identity',address);signal?.throwIfAborted();const cwd=await resolveSessionCwd(ctx,address.sessionId,signal),entry=current(address.sessionId,cwd),repository=entry?.repositories.get(address.repositoryId);if(!repository)throw rediscover();if(repository.type!=='svn')throw invalid('SVN working copy required.');const identity=await api.getSvnIdentity({...repository},{signal});await assertCurrent(address.sessionId,cwd,entry,signal);if(entry.repositories.get(address.repositoryId)!==repository)throw rediscover();return {...identity,cwd};});}
   return async (endpoint, payload, signal) => {
+    if (['vcs/runtime-info','vcs/check-update'].includes(endpoint)) {
+      try {
+        signal?.throwIfAborted();
+        if (!payload || typeof payload!=='object' || Array.isArray(payload) || Object.keys(payload).length) throw invalid('Update requests accept no fields.');
+        if (endpoint==='vcs/runtime-info') return {ok:true,value:runtimeInfo()};
+        if (active>=maxActive) return failure('vcs/busy','Too many VCS requests. Please retry.');
+        active++;try { return {ok:true,value:await checkUpdate({signal})}; } finally { active--; }
+      } catch(error) { return failure(signal?.aborted?'vcs/cancelled':'vcs/update-failed',error.message); }
+    }
     if (!['vcs/svn-identity', 'vcs/repositories', 'vcs/status', 'vcs/compare', 'vcs/conflict-stages', 'vcs/history', 'vcs/commit', 'vcs/commit-compare', 'vcs/revision-changes', 'vcs/revision-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image', 'vcs/revision-image', 'vcs/workspace-image', 'vcs/references', 'vcs/stash-list', 'vcs/grep'].includes(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;

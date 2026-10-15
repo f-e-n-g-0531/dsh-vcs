@@ -2,10 +2,13 @@ import React,{useState,useEffect,useRef,useSyncExternalStore} from 'react';
 import * as bundled from './client.jsx';
 import {loadFrontend} from './frontend-loader.mjs';
 import {version} from '../package.json';
-export const inject=bundled.inject;
+import UpdatePanel from './UpdatePanel.jsx';
+import {createClientRpc} from './client-rpc.mjs';
+export const inject=[...bundled.inject,'remote','remote.pluginManager'];
 export function apply(ctx,{loader=loadFrontend}={}){
  ctx.effect(()=>ctx.locale.register('local.vcs',bundled.dictionaries));
  const t=ctx.locale.bind('local.vcs');
+ const updateRpc=createClientRpc(ctx.connection,()=>t('error'));
  class ReloadBoundary extends React.Component{
   state={failed:false};
   static getDerivedStateFromError(){return {failed:true};}
@@ -13,12 +16,12 @@ export function apply(ctx,{loader=loadFrontend}={}){
  }
  function Page(props){
   useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot(),()=>ctx.locale.getSnapshot());
-  const [generation,setGeneration]=useState(0),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[open,setOpen]=useState(false);
+  const [generation,setGeneration]=useState(0),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[open,setOpen]=useState(false),[updating,setUpdating]=useState(false);
   const previous=useRef(null),view=useRef('workspace'),task=useRef(null),alive=useRef(true),lock=useRef(false);
   const [current,setCurrent]=useState(()=>({Component:bundled.createPage(ctx,{initialView:view.current,onViewChange:v=>{view.current=v;}}),version}));
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;task.current?.abort();};},[]);
   const reload=async()=>{
-   if(lock.current)return;lock.current=true;task.current?.abort();const controller=new AbortController();task.current=controller;setBusy(true);setNotice('');
+   if(lock.current||updating)return;lock.current=true;task.current?.abort();const controller=new AbortController();task.current=controller;setBusy(true);setNotice('');
    try{const {ui,manifest}=await loader({base:document.baseURI,signal:controller.signal,requireModule:name=>{if(name==='react')return React;throw Error('Unsupported interface dependency');}});
     if(!alive.current||controller.signal.aborted)return;
     // Locale changes are fingerprinted; retain the stable registration. 用相同字典安全切换。
@@ -29,8 +32,8 @@ export function apply(ctx,{loader=loadFrontend}={}){
   };
   const Component=current.Component;
   return <div style={{display:'flex',flexDirection:'column',height:'100%',minHeight:0}}>
-   <div style={{display:'flex',flexWrap:'wrap',gap:8,padding:8,flexShrink:0}}><span>VCS {current.version}</span><button onClick={()=>setOpen(v=>!v)} aria-expanded={open}>{t('updatePlugin')}</button><button disabled={busy} onClick={reload}>{t(busy?'loading':'reloadInterface')}</button></div>
-   {open&&<section style={{padding:12,flexShrink:0}} aria-label={t('updatePlugin')}><p>{t('updateScope')}</p><code>dsh plugin --profile &lt;profile&gt; add @feng0531/dsh-vcs@&lt;version&gt;</code><p>{t('updateRestart')}</p><button onClick={()=>ctx.layout.selectPanel('plugins')}>{t('updateManager')}</button><a href="https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest" target="_blank" rel="noopener noreferrer">{t('updateRelease')}</a></section>}
+   <div style={{display:'flex',flexWrap:'wrap',gap:8,padding:8,flexShrink:0}}><span>VCS {current.version}</span><button disabled={busy||updating} onClick={()=>setOpen(v=>!v)} aria-expanded={open}>{t('updatePlugin')}</button><button disabled={busy||updating} onClick={reload}>{t(busy?'loading':'reloadInterface')}</button></div>
+   {<div hidden={!open}><UpdatePanel rpc={updateRpc} manager={ctx.remote?.pluginManager} clientVersion={current.version} reloadBusy={busy} onLock={setUpdating} onManager={()=>ctx.layout.selectPanel('plugins')} t={t}/></div>}
    {notice&&<p role="status" style={{padding:'0 12px',flexShrink:0}}>{notice}</p>}
    <div style={{flex:1,minHeight:0}}><ReloadBoundary key={generation} restore={()=>{if(previous.current){setCurrent(previous.current);previous.current=null;}setGeneration(n=>n+1);}}><Component {...props}/></ReloadBoundary></div>
   </div>;

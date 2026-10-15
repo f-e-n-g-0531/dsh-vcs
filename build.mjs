@@ -14,6 +14,7 @@ const hostEntryBoundary = {
 };
 
 const targets = [
+  {entryPoints:['src/updates.mjs'],outfile:'dist/updates.mjs',platform:'node',format:'esm',packages:'external'},
   {entryPoints:['src/client.jsx'],outfile:'dist/interface.js',format:'cjs',external:['react'],loader:{'.css':'text'},banner:{js:'export default function(require) { var module = {exports:{}}; var exports=module.exports;'},footer:{js:'return module.exports; }'}},
   {
     entryPoints: ['src/client-bootstrap.jsx'],
@@ -56,7 +57,7 @@ for (const [source, destination] of [
 for (const target of targets) await build({...common, ...target});
 const pkg=JSON.parse(await readFile('package.json','utf8'));
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
-const backendFiles=pkg.files.filter(name=>name.endsWith('.mjs')).concat('dist/svn-host.mjs').sort();
-const backend=createHash('sha256');for(const file of backendFiles){backend.update(file);backend.update((await readFile(file,'utf8')).replaceAll('\r\n','\n'));}backend.update(JSON.stringify({dependencies:pkg.dependencies,peers:pkg.peerDependencies}));backend.update(await readFile('package-lock.json','utf8').then(text=>{const lock=JSON.parse(text);delete lock.version;delete lock.packages[''].version;return JSON.stringify(lock);}));for(const file of ['src/client-bootstrap.jsx','src/frontend-loader.mjs','build.mjs','dist/editor.js','dist/editor.css','dist/editor.worker.js','src/locales.json'])backend.update((await readFile(file,'utf8')).replaceAll('\r\n','\n'));
+const backendFiles=pkg.files.filter(name=>name.endsWith('.mjs')).concat('dist/svn-host.mjs','dist/updates.mjs').sort();
+const backend=createHash('sha256');for(const file of backendFiles){backend.update(file);backend.update((await readFile(file,'utf8')).replaceAll('\r\n','\n'));}backend.update(JSON.stringify({dependencies:pkg.dependencies,peers:pkg.peerDependencies}));backend.update(await readFile('package-lock.json','utf8').then(text=>{const lock=JSON.parse(text);delete lock.version;delete lock.packages[''].version;return JSON.stringify(lock);}));for(const file of ['src/client-bootstrap.jsx','src/UpdatePanel.jsx','src/update-client.mjs','src/update-protocol.mjs','src/frontend-loader.mjs','build.mjs','dist/editor.js','dist/editor.css','dist/editor.worker.js','src/locales.json'])backend.update((await readFile(file,'utf8')).replaceAll('\r\n','\n'));
 await writeFile('dist/frontend.json',JSON.stringify({protocol:1,version:pkg.version,backend:backend.digest('hex'),interface:hash(await readFile('dist/interface.js'))})+'\n');
 console.log('Built stable loader, versioned interface, editor and backend fingerprint.');
