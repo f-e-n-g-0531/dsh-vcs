@@ -711,8 +711,10 @@ export async function getRevisionComparison(repo,{base,target,id,signal,large=fa
   const right=entry.status!=='deleted'?await historicalBlob(repo.root,target,entry.path,signal,large):{text:''};
   return {...entry,base,target,large,left:{...left,label:base},right:{...right,label:target},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
 }
-async function properties(root, file, base) {
-  const result = parseXML(await svn(root, ['proplist', '--xml', '--verbose', ...(base ? ['--revision', 'BASE'] : []), '--', file + '@']));
+async function properties(root, file, base, signal) {
+  signal?.throwIfAborted();
+  const result = parseXML(await svn(root, ['proplist', '--xml', '--verbose', ...(base ? ['--revision', 'BASE'] : []), '--', file + '@'], undefined, {signal}));
+  signal?.throwIfAborted();
   const props = Object.create(null);
   for (const target of result.properties?.target || []) for (const prop of target.property || []) props[prop.name] = prop.encoding === 'base64' ? '[base64] ' + (prop['#text'] || '') : String(prop['#text'] ?? '');
   return props;
@@ -786,7 +788,7 @@ export async function getComparison(repo, { mode = 'all', id, large=false, signa
       try { left = await gitBlob(repo.root, 'HEAD', entry.oldPath || entry.path,{signal}); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; }
       right = await working(repo.root, entry.path, false, signal);
     } else {
-      let hasHead = true; try { await git(repo.root, ['rev-parse', '--verify', 'HEAD']); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; hasHead = false; }
+      let hasHead = true; try { await git(repo.root, ['rev-parse', '--verify', 'HEAD'], undefined, {signal}); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; hasHead = false; }
       const untracked = entry.indexStatus === '?';
       const addedToHead = entry.indexStatus === 'A' || entry.indexStatus === 'C';
       if (!untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : (hasHead && !addedToHead))) left = await gitBlob(repo.root, mode === 'unstaged' ? '' : 'HEAD', mode === 'unstaged' ? entry.path : entry.oldPath || entry.path,{signal});
@@ -800,14 +802,15 @@ export async function getComparison(repo, { mode = 'all', id, large=false, signa
     let directory = false;
     try { directory = (await fs.lstat(await confined(repo.root, entry.path))).isDirectory(); } catch (e) { if (e.code !== 'ENOENT') throw e; }
     if (!added && !directory) {
-      const info = parseXML(await svn(repo.root, ['info', '--xml', '--', entry.path + '@'])).info.entry[0]; directory = info.kind === 'dir';
-      if (!directory) left = await content(() => svn(repo.root, ['cat', '--revision', 'BASE', '--', entry.path + '@'], MAX_TEXT));
+      const info = parseXML(await svn(repo.root, ['info', '--xml', '--', entry.path + '@'], undefined, {signal})).info.entry[0]; directory = info.kind === 'dir';
+      if (!directory) left = await content(() => svn(repo.root, ['cat', '--revision', 'BASE', '--', entry.path + '@'], MAX_TEXT, {signal}));
     }
     if (directory) notice = 'Directory change; property differences are shown separately.';
     else right = await working(repo.root, entry.path, true, signal);
-    if (entry.status !== 'unversioned') props = { left: added ? {} : await properties(repo.root, entry.path, true), right: ['deleted', 'missing'].includes(entry.status) ? {} : await properties(repo.root, entry.path, false) };
+    if (entry.status !== 'unversioned') props = { left: added ? {} : await properties(repo.root, entry.path, true, signal), right: ['deleted', 'missing'].includes(entry.status) ? {} : await properties(repo.root, entry.path, false, signal) };
     if (entry.status === 'conflicted') notice = 'Conflicted working copy: showing BASE versus working content.';
   }
+  signal?.throwIfAborted();
   if (entry.submodule) notice = [notice, `Submodule pointer ${entry.submodule.recorded} (checkout: ${entry.submodule.checkout}); nested commit and contents are not loaded by this preview; Git status may inspect nested state.`].filter(Boolean).join(' ');
   return { ...entry, left: { label: leftLabel, text: left.text, encoding: left.encoding }, right: { label: rightLabel, text: right.text, encoding: right.encoding }, ...(left.binary || right.binary ? { binary: true } : {}), ...([notice, left.notice, right.notice].filter(Boolean).length ? { notice: [...new Set([notice, left.notice, right.notice].filter(Boolean))].join(' ') } : {}), ...(props ? { properties: props } : {}) };
 }
