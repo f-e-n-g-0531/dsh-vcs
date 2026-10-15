@@ -629,14 +629,26 @@ export async function listChanges(repo, mode = 'all', {signal} = {}) { repo = aw
 // Keep the public adapter decoding export compatible with existing consumers.
 export {decode} from './text-content.mjs';
 async function content(fn) { try { return decode(await fn()); } catch (e) { if (e.code === 'TOO_LARGE') return { text: '', notice: 'File exceeds the 2 MiB preview limit.' }; throw e; } }
-async function working(root, relative, svnLink = false) {
+async function working(root, relative, svnLink = false, signal) {
+  signal?.throwIfAborted();
   const target = await confined(root, relative);
   let stat; try { stat = await fs.lstat(target); } catch (e) { if (e.code === 'ENOENT') return { text: '' }; throw e; }
   if (stat.isSymbolicLink()) return { text: (svnLink ? 'link ' : '') + await fs.readlink(target) };
   if (!stat.isFile()) return { text: '', notice: 'Directory or special file; no file-content preview.' };
   if (stat.size > MAX_TEXT) return { text: '', notice: 'File exceeds the 2 MiB preview limit.' };
-  const handle = await fs.open(target, 'r');
-  try { const info = await handle.stat(); if (!info.isFile()) throw new Error('Not a regular file'); const buffer = Buffer.alloc(MAX_TEXT + 1); const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0); await confined(root, relative); return decode(buffer.subarray(0, bytesRead)); } finally { await handle.close(); }
+  const fingerprint=s=>[s.dev,s.ino,s.size,s.mtimeNs,s.ctimeNs].map(String).join(':');
+  const before=await fs.lstat(target,{bigint:true});
+  if(!before.isFile()||before.size>BigInt(MAX_TEXT))throw Error('Working file changed before read; refresh status');
+  const handle = await fs.open(target,fileFlags.O_RDONLY|(fileFlags.O_NOFOLLOW||0));
+  try {
+    const opened=await handle.stat({bigint:true});if(!opened.isFile()||fingerprint(opened)!==fingerprint(before))throw Error('Working file changed during open');
+    const buffer=Buffer.alloc(Number(before.size)+1);let offset=0;
+    while(offset<buffer.length){signal?.throwIfAborted();const {bytesRead}=await handle.read(buffer,offset,buffer.length-offset,offset);if(!bytesRead)break;offset+=bytesRead;}
+    signal?.throwIfAborted();await confined(root,relative);
+    const after=await handle.stat({bigint:true}),named=await fs.lstat(target,{bigint:true});
+    if(offset!==Number(before.size)||!named.isFile()||named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before))throw Error('Working file changed during read; refresh status');
+    return decode(buffer.subarray(0,offset));
+  } finally { await handle.close(); }
 }
 async function gitBlob(root, revision, file, options) {
  let record;
@@ -772,14 +784,14 @@ export async function getComparison(repo, { mode = 'all', id, large=false, signa
     if (entry.status === 'conflicted') {
       notice = 'Unmerged conflict: showing HEAD versus working tree (index has conflict stages).'; leftLabel = 'HEAD'; rightLabel = 'Working tree';
       try { left = await gitBlob(repo.root, 'HEAD', entry.oldPath || entry.path,{signal}); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; }
-      right = await working(repo.root, entry.path);
+      right = await working(repo.root, entry.path, false, signal);
     } else {
       let hasHead = true; try { await git(repo.root, ['rev-parse', '--verify', 'HEAD']); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; hasHead = false; }
       const untracked = entry.indexStatus === '?';
       const addedToHead = entry.indexStatus === 'A' || entry.indexStatus === 'C';
       if (!untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : (hasHead && !addedToHead))) left = await gitBlob(repo.root, mode === 'unstaged' ? '' : 'HEAD', mode === 'unstaged' ? entry.path : entry.oldPath || entry.path,{signal});
       if (mode === 'staged') { if (entry.indexStatus !== 'D') right = await gitBlob(repo.root, '', entry.path,{signal}); }
-      else right = await working(repo.root, entry.path);
+      else right = await working(repo.root, entry.path, false, signal);
     }
   } else {
     leftLabel = 'BASE'; rightLabel = 'Working copy';
@@ -792,7 +804,7 @@ export async function getComparison(repo, { mode = 'all', id, large=false, signa
       if (!directory) left = await content(() => svn(repo.root, ['cat', '--revision', 'BASE', '--', entry.path + '@'], MAX_TEXT));
     }
     if (directory) notice = 'Directory change; property differences are shown separately.';
-    else right = await working(repo.root, entry.path, true);
+    else right = await working(repo.root, entry.path, true, signal);
     if (entry.status !== 'unversioned') props = { left: added ? {} : await properties(repo.root, entry.path, true), right: ['deleted', 'missing'].includes(entry.status) ? {} : await properties(repo.root, entry.path, false) };
     if (entry.status === 'conflicted') notice = 'Conflicted working copy: showing BASE versus working content.';
   }
