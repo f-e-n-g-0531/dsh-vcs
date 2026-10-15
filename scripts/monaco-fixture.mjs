@@ -40,6 +40,7 @@ try{
  phase='file-history';await (await import('./history-viewer-browser.js')).checkFileHistory();
  phase='blame';await (await import('./history-viewer-browser.js')).checkBlame();
  phase='tree';await (await import('./history-viewer-browser.js')).checkTree();
+ phase='review-fixes';await (await import('./history-viewer-browser.js')).checkReviewFixes();
  phase='svn-history-alignment';await (await import('./history-viewer-browser.js')).checkSvnHistoryAlignment();
  phase='svn-history';await (await import('./history-viewer-browser.js')).checkSvnHistory();
  phase='svn-consent';await (await import('./history-viewer-browser.js')).checkSvnConsent();

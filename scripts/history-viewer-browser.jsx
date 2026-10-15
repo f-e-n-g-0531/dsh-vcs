@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkReviewFixes} from './review-fixes-browser.jsx';
 export {checkSvnHistoryAlignment} from './svn-history-alignment-browser.jsx';
 export {checkFrontendReload} from './frontend-reload-browser.jsx';
 export {checkSvnHistory,checkRealSvnHistory} from './svn-history-browser.jsx';

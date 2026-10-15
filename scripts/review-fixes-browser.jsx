@@ -1,0 +1,21 @@
+import React from 'react';import {createRoot} from 'react-dom/client';import {flushSync} from 'react-dom';
+import FileHistory from '../src/FileHistory.jsx';import PathHistory from '../src/PathHistory.jsx';import HistoryPanel from '../src/HistoryPanel.jsx';import SvnHistory from '../src/SvnHistory.jsx';
+export async function checkReviewFixes(){
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const t=k=>k;
+ const wait=async fn=>{for(let i=0;i<250;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('Review fixes timeout: '+host.textContent.slice(-300));};
+ const button=text=>[...host.querySelectorAll('button')].find(b=>b.textContent===text),id=n=>n.toString(16).padStart(40,'0');
+ try{
+ for(const Component of [FileHistory,PathHistory]){
+ const calls=[];const rpc=async(e,p,signal)=>{calls.push({p,signal});return {path:'a.txt',nextOffset:p.since||p.until?null:p.offset===0?50:null,commits:[{id:id(p.offset+1),subject:p.since||p.until?'FILTERED':'OLD'+p.offset}]};};
+ flushSync(()=>root.render(<Component key={Component.name} sessionId='s' repositoryId='r' commit={id(1)} id='file' path='a.txt' rpc={rpc} t={t}/>));host.querySelector('button').click();await wait(()=>button('historyMore'));button('historyMore').click();await wait(()=>calls.length===2&&host.textContent.includes('OLD50'));
+ const input=host.querySelector('input[aria-label=historyServer_since]');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'2025-01-01');input.dispatchEvent(new Event('input',{bubbles:true}));await wait(()=>calls.length===3&&host.textContent.includes('FILTERED'));if(calls[2].p.offset!==0||host.textContent.includes('OLD')||!calls[1].signal.aborted)throw Error('Date scope retained old pagination');
+ }
+ flushSync(()=>root.render(null));
+ const calls=[];const rpc=async(e,p,signal)=>{calls.push({e,p,signal});if(e==='vcs/history')return {snapshot:id(999),nextOffset:p.offset<250?p.offset+50:null,commits:Array.from({length:50},(_,i)=>({id:id(p.offset+i+1),parents:[],subject:'ROW '+(p.offset+i+1)}))};if(e==='vcs/commit')return {id:p.commit,subject:'DETAIL',parents:[],changes:[]};throw Error(e);};
+ flushSync(()=>root.render(<HistoryPanel sessionId='s' repositoryId='r' rpc={rpc} t={t}/>));await wait(()=>button('ROW 1'));for(let i=0;i<3;i++){button('historyMore').click();await wait(()=>button('ROW '+((i+2)*50)));}button('ROW 175').click();await wait(()=>host.querySelector('.vcs-commit-summary'));const detail=calls.find(c=>c.e==='vcs/commit');button('historyMore').click();await wait(()=>button('ROW 250'));if(!host.querySelector('[aria-pressed=true].vcs-commit-row')||detail.signal.aborted)throw Error('Retained Git selection lost');
+ button('ROW 51').click();await wait(()=>calls.filter(c=>c.e==='vcs/commit').length===2);button('historyMore').click();await wait(()=>button('ROW 300'));await wait(()=>!host.querySelector('.vcs-commit-summary'));
+ flushSync(()=>root.render(null));
+ for(const mode of ['trace','copytrace']){const requests=[];const rpc=async(e,p,signal)=>{requests.push({e,p,signal});if(e==='vcs/svn-log')return {entries:[{revision:'9',message:'commit'}],nextRevision:null};if(e==='vcs/svn-detail')return {message:'detail',changes:[{id:'f',kind:'file',action:'A',path:'/a',copyFromPath:'/b',copyFromRevision:'8'}]};return {path:'/a',pegRevision:'9',entries:[{revision:p.cursor||'9',message:p.cursor?'OLDER':'FIRST'}],nextRevision:p.cursor?null:'4'};};
+ flushSync(()=>root.render(<SvnHistory key={mode} sessionId='s' repositoryId='r' token='t' snapshot='9' rpc={rpc} t={t}/>));await wait(()=>button('r9 · commit'));button('r9 · commit').click();await wait(()=>button('fileHistory'));(mode==='trace'?button('fileHistory'):[...host.querySelectorAll('button')].find(b=>b.textContent.startsWith('svnCopyHistory'))).click();await wait(()=>host.textContent.includes('FIRST'));button('historyMore').click();await wait(()=>host.textContent.includes('OLDER'));button('historyBack').click();await wait(()=>host.textContent.includes('FIRST'));if(requests.at(-1).p.cursor!==undefined)throw Error('Trace back did not restore first cursor');flushSync(()=>root.render(null));}
+ }finally{root.unmount();host.remove();}
+}

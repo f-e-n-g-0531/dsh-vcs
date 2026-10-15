@@ -257,11 +257,11 @@ export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
  catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {matches:[]};throw error;}
  signal?.throwIfAborted();
  const matches=[];
- for(const record of text.split('\n')){
-  if(!record)continue;
-  const fields=record.split('\0');
-  if(fields.length!==3)throw new Error('Invalid content search result');
-  const [treePath,lineNo,lineText]=fields;
+ // -z frames path and line with NUL; legal paths can contain LF.
+ for(let position=0;position<text.length;){
+  const pathEnd=text.indexOf(String.fromCharCode(0),position),lineEnd=text.indexOf(String.fromCharCode(0),pathEnd+1),recordEnd=text.indexOf(String.fromCharCode(10),lineEnd+1);
+  if(pathEnd<position||lineEnd<0||recordEnd<0)throw new Error('Invalid content search result');
+  const treePath=text.slice(position,pathEnd),lineNo=text.slice(pathEnd+1,lineEnd),lineText=text.slice(lineEnd+1,recordEnd);position=recordEnd+1;
   const cut=treePath.indexOf(':');
   if(cut<0)throw new Error('Invalid content search result');
   const path=treePath.slice(cut+1);
@@ -604,7 +604,7 @@ async function changes(repo, mode, options) {
     }
     await annotateSubmodules(repo, entries, options);
   } else {
-    const document = parseXML(await svn(repo.root, ['status', '--xml', '--ignore-externals', '--', '.']));
+    const document = parseXML(await svn(repo.root, ['status', '--xml', '--ignore-externals', '--', '.'], undefined, options));
     entries = [];
     for (const target of document.status?.target || []) for (const item of target.entry || []) {
       const state = item['wc-status'];
@@ -617,7 +617,7 @@ async function changes(repo, mode, options) {
   return entries.map(entry => ({ ...entry, id: identity(entry, mode) }));
 }
 /** Changes have opaque IDs, status words, and repo-relative paths. */
-export async function listChanges(repo, mode = 'all') { repo = await checkedRepo(repo); modeFor(repo, mode); return changes(repo, mode); }
+export async function listChanges(repo, mode = 'all', {signal} = {}) { repo = await checkedRepo(repo,signal); modeFor(repo, mode); const result=await changes(repo, mode,{signal});signal?.throwIfAborted();return result; }
 // Keep the public adapter decoding export compatible with existing consumers.
 export {decode} from './text-content.mjs';
 async function content(fn) { try { return decode(await fn()); } catch (e) { if (e.code === 'TOO_LARGE') return { text: '', notice: 'File exceeds the 2 MiB preview limit.' }; throw e; } }

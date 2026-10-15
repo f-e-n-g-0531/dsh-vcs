@@ -26,7 +26,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover,showSearc
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
   rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||historyTip||page.snapshot)?{snapshot:search?.snapshot||historyTip||page.snapshot}:{})},controller.signal).then(value=>{
-   if(!controller.signal.aborted){setPage(old=>mergeHistoryWindow(old,value,offset));if(offset>=200){setSelected(null);setQuery('');}}
+   if(!controller.signal.aborted){const merged=mergeHistoryWindow(page,value,offset);setPage(merged);const evicted=new Set(page.commits.filter(row=>!merged.commits.some(next=>next.id===row.id)).map(row=>row.id));setSelection(old=>evicted.has(old.id)?{id:null,path:null,revision:old.revision+1}:old);}
   }).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,offset,retry,search,historyTip]);

@@ -1,4 +1,5 @@
 import {parseSvnDavLogPage} from './svn-dav-log.mjs';import {parseSvnDavDetail} from './svn-dav-detail.mjs';
+import {parseSvnNodeKind} from './svn-node-kind.mjs';
 import {validateSvnCommand} from './svn-command-gate.mjs';
 import {parseSvnRevision} from './svn-revision.mjs';
 import {previousSvnRevision} from './svn-revision.mjs';
@@ -34,7 +35,16 @@ export function createSvnRuntime({resolveIdentity,transport,now=Date.now,timeout
   const read=async(side)=>{if(side.empty)return {label:'empty',text:'',absent:true};const current=await resolve(address,signal);grants.assert(token,current);const target=svnHistoryTarget(current.root,side.path,side.pegRevision),options={identity:current,token,signal,maxBytes:2097152,timeoutMs:15000};
    const properties=await dispatch({args:['proplist','--xml','--non-interactive','--no-auth-cache','-r',side.revision,'--',target]},options);signal?.throwIfAborted();grants.assert(token,await resolve(address,signal));if(parseSvnPropertyNames(properties,{target:target.slice(0,target.lastIndexOf('@')),allowEmpty:true}).special)throw Error('SVN special files cannot be compared');
    const bytes=await dispatch({args:['cat','--non-interactive','--no-auth-cache','-r',side.revision,'--',target]},options);signal?.throwIfAborted();grants.assert(token,await resolve(address,signal));const buffer=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes);if(buffer.length>2097152)throw Error('SVN text exceeds 2 MiB');if(buffer.includes(0))return {label:'r'+side.revision,text:'',binary:true};let text;try{text=new TextDecoder('utf-8',{fatal:true}).decode(buffer);}catch{return {label:'r'+side.revision,text:'',binary:true};}return {label:'r'+side.revision,text};};
-  const left=await read(plan.left),right=await read(plan.right);return {path:member.path,revision,snapshot,left,right,binary:!!(left.binary||right.binary)};
+  // R describes the new node kind, not the historical one. Never cat a replaced directory.
+  let leftSide=plan.left;
+  if(member.action==='R'&&!leftSide.empty){
+   const current=await resolve(address,signal);grants.assert(token,current);
+   const target=svnHistoryTarget(current.root,leftSide.path,leftSide.pegRevision);
+   const xml=await dispatch({args:['info','--xml','--non-interactive','--no-auth-cache','-r',leftSide.revision,'--',target]},{identity:current,token,signal,maxBytes:2097152,timeoutMs:15000});
+   signal?.throwIfAborted();grants.assert(token,await resolve(address,signal));
+   if(parseSvnNodeKind(xml,{target:target.slice(0,target.lastIndexOf('@')),revision:leftSide.revision,root:current.root,uuid:current.uuid})==='dir')leftSide={empty:true};
+  }
+  const left=await read(leftSide),right=await read(plan.right);return {path:member.path,revision,snapshot,left,right,binary:!!(left.binary||right.binary)};
  },
  async trace(address,{token,snapshot,revision,id,cursor,limit=50,signal}={}){
   if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid SVN change ID');const detail=await runtime.detail(address,{token,snapshot,revision,signal}),member=detail.changes.find(change=>change.id===id);if(!member||member.kind!=='file')throw Error('SVN tracing requires selected file member');

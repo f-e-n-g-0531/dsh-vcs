@@ -11,7 +11,7 @@ export async function checkSvnHistoryAlignment(){
  button('historyMore').click();await wait(()=>host.querySelectorAll('.vcs-commit-row').length===100);if(late.signal.aborted||!host.textContent.includes('DETAIL 300'))throw Error('Append lost selected detail');
  button('r250 · subject 250').click();await wait(()=>late.signal.aborted&&host.textContent.includes('DETAIL 250'));late.resolve({path:'late',left:{text:'STALE'},right:{text:'STALE'}});await new Promise(r=>setTimeout(r,30));if(host.textContent.includes('STALE'))throw Error('Late old diff accepted');
  for(const [expected,revision] of [[150,'200'],[200,'150'],[200,'100']]){button('historyMore').click();await wait(()=>calls.some(c=>c.e==='vcs/svn-log'&&c.p.cursor===revision)&&host.querySelectorAll('.vcs-commit-row').length===expected&&button('r'+revision+' · subject '+revision)&&!host.querySelector('[aria-busy=true]'));}
- if(button('r300 · subject 300')||host.textContent.includes('DETAIL 250'))throw Error('Bounded window retained old selected detail');
+ if(button('r300 · subject 300')||!host.textContent.includes('DETAIL 250'))throw Error('Bounded window lost retained selected detail');
  button('historyBack').click();await wait(()=>host.querySelectorAll('.vcs-commit-row').length===50);if(calls.at(-1).p.cursor!=='150')throw Error('Back used arithmetic revision offset');
  }finally{root.unmount();host.remove();}if(calls.some(c=>!c.signal.aborted))throw Error('Alignment request leak');
 }

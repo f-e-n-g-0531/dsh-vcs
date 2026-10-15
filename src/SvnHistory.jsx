@@ -12,7 +12,7 @@ function Scoped({sessionId,repositoryId,token,snapshot,rpc,t,onRediscover}){
  useEffect(()=>{
   const c=new AbortController();setBusy(true);setError('');
   rpc('vcs/svn-log',{sessionId,repositoryId,token,snapshot,cursor,limit:50},c.signal).then(value=>{
-   if(!c.signal.aborted){setPage(old=>mergeSvnHistoryWindow(old,value,offset));if(offset>=200)setSelected(null);}
+   if(!c.signal.aborted){const merged=mergeSvnHistoryWindow(page,value,offset);setPage(merged);const evicted=new Set((page?.entries||[]).filter(row=>!merged.entries.some(next=>next.revision===row.revision)).map(row=>row.revision));setSelected(old=>evicted.has(old)?null:old);}
   }).catch(e=>{if(!c.signal.aborted){setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}}).finally(()=>{if(!c.signal.aborted)setBusy(false);});
   return()=>c.abort();
  },[cursor,offset,retry]);
@@ -55,7 +55,8 @@ function Detail({sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscov
  </section>;
 }
 function Selected({sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscover,id,mode}){
- const [data,setData]=useState(null),[cursor,setCursor]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ const [data,setData]=useState(null),[position,setPosition]=useState({cursor:null,trail:[]}),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ const {cursor,trail}=position;
  useEffect(()=>{const c=new AbortController();setData(null);setError('');rpc('vcs/svn-'+mode,{sessionId,repositoryId,token,snapshot,revision,id,...(cursor===null?{}:{cursor})},c.signal).then(v=>{if(!c.signal.aborted)setData(v);}).catch(e=>{if(!c.signal.aborted){setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}});return()=>c.abort();},[cursor,retry]);
- return error?<p role='alert'>{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role='status'>{t('loading')}</p>:mode==='compare'?<section className="vcs-history-comparison"><header className="vcs-comparison-heading"><h4>{data.path}</h4><p>{data.left?.label} ↔ {data.right?.label}</p>{data.notice&&<p role="status">{data.notice}</p>}</header>{data.binary?<p>{t('binary')}</p>:<HistoryViewer comparison={data} identity={JSON.stringify([sessionId,repositoryId,snapshot,revision,id])} t={t}/>}</section>:<section><p>{t(mode==='copytrace'?'svnCopyTraceScope':'svnTraceScope')} · {data.path} · peg r{data.pegRevision}</p><ol>{data.entries.map(e=><li key={e.revision}>r{e.revision} · {e.message}</li>)}</ol>{data.nextRevision!==null&&<button onClick={()=>setCursor(data.nextRevision)}>{t('historyMore')}</button>}</section>;
+ return error?<p role='alert'>{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role='status'>{t('loading')}</p>:mode==='compare'?<section className="vcs-history-comparison"><header className="vcs-comparison-heading"><h4>{data.path}</h4><p>{data.left?.label} ↔ {data.right?.label}</p>{data.notice&&<p role="status">{data.notice}</p>}</header>{data.binary?<p>{t('binary')}</p>:<HistoryViewer comparison={data} identity={JSON.stringify([sessionId,repositoryId,snapshot,revision,id])} t={t}/>}</section>:<section><p>{t(mode==='copytrace'?'svnCopyTraceScope':'svnTraceScope')} · {data.path} · peg r{data.pegRevision}</p><ol>{data.entries.map(e=><li key={e.revision}>r{e.revision} · {e.message}</li>)}</ol>{!!trail.length&&<button onClick={()=>setPosition({cursor:trail.at(-1),trail:trail.slice(0,-1)})}>{t('historyBack')}</button>}{data.nextRevision!==null&&<button onClick={()=>setPosition({cursor:data.nextRevision,trail:[...trail,cursor].slice(-200)})}>{t('historyMore')}</button>}</section>;
 }

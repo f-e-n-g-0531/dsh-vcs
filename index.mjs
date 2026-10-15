@@ -136,7 +136,7 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
     case 'vcs/history':
       return api.listHistory({...repository}, {snapshot: payload.snapshot, search: payload.search, offset: payload.offset ?? 0, limit: payload.limit ?? 50, signal});
     case 'vcs/status':
-      return {cwd, repository: {...repository}, changes: await api.listChanges({...repository}, mode), mode};
+      return {cwd, repository: {...repository}, changes: await api.listChanges({...repository}, mode, {signal}), mode};
     case 'vcs/conflict-stages':
       return api.getConflictStages({...repository},{mode,id:payload.id,signal});
     case 'vcs/compare':
