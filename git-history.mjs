@@ -48,7 +48,7 @@ export function decodeBlamePath(value){
  if(!value.endsWith('"'))throw Error('Invalid quoted blame path');
  const bytes=[];const escapes={a:7,b:8,t:9,n:10,v:11,f:12,r:13,'"':34,'\\':92};
  for(let i=1;i<value.length-1;i++){
-  if(value[i]!=='\\'){bytes.push(...Buffer.from(value[i],'utf8'));continue;}
+  if(value.charCodeAt(i)!==92){const character=String.fromCodePoint(value.codePointAt(i));bytes.push(...Buffer.from(character,'utf8'));i+=character.length-1;continue;}
   const c=value[++i];if(Object.hasOwn(escapes,c)){bytes.push(escapes[c]);continue;}
   const octal=value.slice(i,i+3);if(!/^[0-3][0-7]{2}$/.test(octal))throw Error('Invalid blame path escape');bytes.push(parseInt(octal,8));i+=2;
  }
