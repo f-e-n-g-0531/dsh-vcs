@@ -159,6 +159,7 @@
 .vcs-root .vcs-toolbar{gap:6px}
 .vcs-root .vcs-title{font-size:16px}
 }
+.vcs-root .vcs-commit-files .vcs-svn-file-actions{display:flex;flex-wrap:wrap;gap:4px;padding:4px 8px}.vcs-root .vcs-commit-files .vcs-svn-file-actions button{width:auto;padding:4px 6px;font-size:11px}
 /* One navigation column; the comparison owns the entire right viewport. */
 .vcs-root .vcs-history-browser{grid-template-columns:minmax(280px,32%) minmax(0,1fr);grid-template-rows:minmax(120px,38%) minmax(0,1fr)}
 .vcs-root .vcs-history-browser>.vcs-history-list{grid-column:1;grid-row:1;border-bottom:1px solid var(--dsw-alias-border-l2)}

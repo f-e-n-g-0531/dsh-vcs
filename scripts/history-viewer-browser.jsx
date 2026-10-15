@@ -1,4 +1,5 @@
 import React from 'react';
+export {checkSvnHistoryAlignment} from './svn-history-alignment-browser.jsx';
 export {checkFrontendReload} from './frontend-reload-browser.jsx';
 export {checkSvnHistory,checkRealSvnHistory} from './svn-history-browser.jsx';
 export {checkSvnHistoryDateFilter} from './svn-history-filter-browser.jsx';
