@@ -1,5 +1,10 @@
 # 变更记录
 
+## 0.4.9 — SVN 错误响应宿主合同修复
+
+- 所有 SVN RPC 失败响应补齐 error.details，避免 DSH 将实际错误遮蔽为 invalid server-response failure。
+- 覆盖未知接口、繁忙、参数错误、授权过期、取消及超时的 JSON 传输合同，保留实际错误消息供排查。
+
 ## 0.4.8 — 本地 SVN 比较取消链修复
 
 - 本地 SVN info、cat BASE 与两侧属性读取贯通取消信号，取消后不启动下一条命令，也不返回部分成功。

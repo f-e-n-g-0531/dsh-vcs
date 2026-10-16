@@ -1,5 +1,7 @@
 import {parseSvnRevision} from './svn-revision.mjs';
 
+// DSH connection failures require a record-valued details field.
+const failure=(code,message)=>({ok:false,error:{code,message,details:{}}});
 const FIELDS = {
   revoke: ['token'],
   describe: [],
@@ -56,11 +58,11 @@ export function createSvnRpc(runtime, {timeoutMs = 15000} = {}) {
   return async (endpoint, payload, signal) => {
     const method = endpoint.startsWith('vcs/svn-') ? endpoint.slice(8) : '';
     if (!Object.hasOwn(FIELDS, method)) {
-      return {ok: false, error: {code: 'vcs/not-found', message: 'Unknown SVN endpoint'}};
+      return failure('vcs/not-found','Unknown SVN endpoint');
     }
     // Revoke must remain available even when history slots are saturated.
     if (method !== 'revoke' && active >= 2) {
-      return {ok: false, error: {code: 'vcs/busy', message: 'SVN history requests busy'}};
+      return failure('vcs/busy','SVN history requests busy');
     }
     if (method !== 'revoke') active++;
     const controller = new AbortController();
@@ -88,7 +90,7 @@ export function createSvnRpc(runtime, {timeoutMs = 15000} = {}) {
           : 'vcs/operation-failed';
       const reason = controller.signal.aborted ? controller.signal.reason : error;
       const message = reason instanceof Error ? reason.message : String(reason);
-      return {ok: false, error: {code, message}};
+      return failure(code,message);
     } finally {
       // Awaited runtime completion includes lower-layer cleanup before slot release.
       clearTimeout(timer);
