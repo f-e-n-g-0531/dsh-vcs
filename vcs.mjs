@@ -3,7 +3,7 @@ import {parseCommitSignature} from './src/commit-signature.mjs';
 import {parseSvnIdentity} from './src/svn-identity.mjs';
 import {prepareRaster} from './image-preview.mjs';
 import {git, svn, TIMEOUT} from './local-command.mjs';
-import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT,validateDateBound} from './git-history.mjs';
+import {parseHistory,parseFollowHistory,HISTORY_FORMAT,historyPage,historySearchArgs,parseBlame,parseReferences,REFS_FORMAT,validateDateBound,isObjectId,isChangeId} from './git-history.mjs';
 import * as fs from 'node:fs/promises';
 import {constants as fileFlags} from 'node:fs';
 import path from 'node:path';
@@ -13,6 +13,18 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import {decode, MAX_TEXT, MAX_LARGE_TEXT, decodeLargeText} from './text-content.mjs';
 import {inside, confined} from './repository-path.mjs';
 import {readWorkspaceLargeText} from './workspace-large-text.mjs';
+
+// Shared read-only adapter bounds. Values are part of the public contract:
+// history pagination, per-result entry caps and segmented-preview byte budgets.
+const MAX_HISTORY_OFFSET = 10000;
+const MAX_HISTORY_PAGE = 100;
+const MAX_RESULT_ENTRIES = 10000;
+const MAX_SEGMENT_BYTES = 16 * 1024 * 1024;
+const SEGMENT_CHUNK_BYTES = 64 * 1024;
+const RENAME_CONFIRMATION_LIMIT = 32;
+const METADATA_BATCH_SIZE = 64;
+const METADATA_BATCH_BYTES = 24000;
+
 const xml = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', parseTagValue: false, parseAttributeValue: false, trimValues: false, processEntities: true, isArray: name => ['entry', 'target', 'property'].includes(name) });
 
 
@@ -183,6 +195,34 @@ async function checkedRepo(repo, signal, budget) {
   if (!found || found.type !== repo.type || path.resolve(found.root) !== path.resolve(repo.root)) throw new Error('Repository root changed or is invalid');
   return found;
 }
+function assertGit(repo, message) {
+  if (repo.type !== 'git') throw new Error(message);
+  return repo;
+}
+async function checkedGitRepo(repo, signal, message, budget) {
+  return assertGit(await checkedRepo(repo, signal, budget), message);
+}
+// Probe --since-as-filter support so older Git cannot run a silently unfiltered query.
+async function assertSinceAsFilterSupport(repo, signal, label) {
+  signal?.throwIfAborted();
+  try { await git(repo.root,['log','--since-as-filter=1970-01-01','-1','--format=%H'],MAX_TEXT,{signal}); }
+  catch (e) {
+    if (e.code === 'VCS_COMMAND') throw new Error('Date-range ' + label + ' requires Git 2.37 or newer (--since-as-filter).');
+    throw e;
+  }
+}
+// Resolve HEAD^{commit}; only an unborn symbolic HEAD is absent, never corruption.
+async function resolveHeadCommit(run) {
+  try { return (await run(['rev-parse','--verify','HEAD^{commit}'])).toString('utf8').trim(); }
+  catch (e) {
+    if (e.code !== 'VCS_COMMAND') throw e;
+    // Distinguish an unborn symbolic HEAD from corruption or other command failures.
+    const ref=(await run(['symbolic-ref','-q','HEAD'])).toString('utf8').trim();
+    try { await run(['show-ref','--verify','--quiet',ref]); }
+    catch (missing) { if (missing.code === 'VCS_COMMAND' && missing.exitCode === 1) return null; throw missing; }
+    throw e;
+  }
+}
 export async function getSvnIdentity(repo,{signal}={}){
  repo=await checkedRepo(repo,signal);if(repo.type!=='svn')throw Error('SVN working copy required');
  const result=parseSvnIdentity((await svn(repo.root,['info','--xml','--', '.'],MAX_TEXT,{signal})).toString('utf8'));
@@ -190,42 +230,28 @@ export async function getSvnIdentity(repo,{signal}={}){
 }
 export async function listHistory(repo, {snapshot,offset=0,limit=50,search,signal} = {}) {
   const query=historySearchArgs(search);
-  if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100) throw new Error('Invalid history pagination');
-  if(snapshot!==undefined && (typeof snapshot!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(snapshot))) throw new Error('Invalid history snapshot');
+  if(!Number.isInteger(offset)||offset<0||offset>MAX_HISTORY_OFFSET||!Number.isInteger(limit)||limit<1||limit>MAX_HISTORY_PAGE) throw new Error('Invalid history pagination');
+  if(snapshot!==undefined && (typeof snapshot!=='string'||!isObjectId(snapshot))) throw new Error('Invalid history snapshot');
   if(signal?.aborted) throw Object.assign(new Error('History cancelled'),{code:'ABORT_ERR'});
-  repo=await checkedRepo(repo,signal);
-  if(repo.type!=='git') throw new Error('History currently supports Git only');
-  if(query.args.some(a=>a.startsWith('--since-as-filter='))){
-    signal?.throwIfAborted();
-    try{await git(repo.root,['log','--since-as-filter=1970-01-01','-1','--format=%H'],MAX_TEXT,{signal});}
-    catch(e){if(e.code==='VCS_COMMAND')throw new Error('Date-range history search requires Git 2.37 or newer (--since-as-filter).');throw e;}
-  }
+  repo=await checkedGitRepo(repo,signal,'History currently supports Git only');
+  if(query.args.some(a=>a.startsWith('--since-as-filter='))) await assertSinceAsFilterSupport(repo,signal,'history search');
   if(!snapshot){
-    try{snapshot=(await git(repo.root,['rev-parse','--verify','HEAD^{commit}'],MAX_TEXT,{signal})).toString('utf8').trim();}
-    catch(e){
-      if(e.code!=='VCS_COMMAND')throw e;
-      // Distinguish an unborn symbolic HEAD from corruption or other command failures.
-      const ref=(await git(repo.root,['symbolic-ref','-q','HEAD'],MAX_TEXT,{signal})).toString('utf8').trim();
-      try{await git(repo.root,['show-ref','--verify','--quiet',ref],MAX_TEXT,{signal});}
-      catch(missing){if(missing.code==='VCS_COMMAND'&&missing.exitCode===1)return {snapshot:null,commits:[],nextOffset:null};throw missing;}
-      throw e;
-    }
+    snapshot=await resolveHeadCommit(args=>git(repo.root,args,MAX_TEXT,{signal}));
+    if(snapshot===null)return {snapshot:null,commits:[],nextOffset:null};
   }
   const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,...query.args,snapshot,'--',...query.paths],MAX_TEXT,{signal});
   const rows=parseHistory(text.toString('utf8'),limit+1);
   return historyPage(rows,snapshot,offset,limit);
 }
 export async function listReferences(repo,{signal}={}){
- signal?.throwIfAborted();repo=await checkedRepo(repo,signal);
- if(repo.type!=='git')throw new Error('References support Git only');
+ signal?.throwIfAborted();repo=await checkedGitRepo(repo,signal,'References support Git only');
  const raw=await git(repo.root,['for-each-ref','--sort=refname','--count=1001','--format='+REFS_FORMAT,'refs/heads/','refs/tags/','refs/remotes/'],MAX_TEXT,{signal});
  return {references:parseReferences(raw.toString('utf8'))};
 }
 
 const STASH_FORMAT='%H%x00%gs%x00%gd';
 export async function listStashes(repo,{signal}={}){
- signal?.throwIfAborted();repo=await checkedRepo(repo,signal);
- if(repo.type!=='git')throw new Error('Stash supports Git only');
+ signal?.throwIfAborted();repo=await checkedGitRepo(repo,signal,'Stash supports Git only');
  const text=(await git(repo.root,['stash','list','--format='+STASH_FORMAT],MAX_TEXT,{signal})).toString('utf8');
  if(!text.trim())return {stashes:[]};
  const stashes=[];
@@ -234,7 +260,7 @@ export async function listStashes(repo,{signal}={}){
   const fields=line.split('\0');
   if(fields.length!==3)throw new Error('Invalid stash entry');
   const [id,message,ref]=fields;
-  if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(id))throw new Error('Invalid stash entry');
+  if(!isObjectId(id))throw new Error('Invalid stash entry');
   stashes.push({id,message:message||ref,ref});
   if(stashes.length>1000)throw new Error('Stash exceeds entry limit');
  }
@@ -244,14 +270,13 @@ export async function listStashes(repo,{signal}={}){
 export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
  signal?.throwIfAborted();
  if(typeof query!=='string'||!query||query.length>1024||/[\0\r\n]/.test(query))throw new Error('Invalid content search query');
- repo=await checkedRepo(repo,signal);
- if(repo.type!=='git')throw new Error('Content search supports Git only');
+ repo=await checkedGitRepo(repo,signal,'Content search supports Git only');
  let snapshot=commit;
  if(!snapshot){
   try{snapshot=(await git(repo.root,['rev-parse','--verify','HEAD^{commit}'],MAX_TEXT,{signal})).toString('utf8').trim();}
   catch{throw new Error('Content search requires a resolved HEAD commit');}
  }
- if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(snapshot))throw new Error('Invalid content search commit');
+ if(!isObjectId(snapshot))throw new Error('Invalid content search commit');
  let text;
  try{text=(await git(repo.root,['-c','grep.column=false','grep','--no-color','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
  catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {matches:[]};throw error;}
@@ -276,11 +301,10 @@ export async function getCommitDetails(repo,options={}) {
   return commitDetails(repo,options,true);
 }
 async function commitDetails(repo,{commit,parentIndex=0,signal}={},includeMessage=false) {
-  if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');
+  if(typeof commit!=='string'||!isObjectId(commit))throw new Error('Invalid commit id');
   if(!Number.isInteger(parentIndex)||parentIndex<0)throw new Error('Invalid parent index');
   signal?.throwIfAborted();
-  repo=await checkedRepo(repo,signal);
-  if(repo.type!=='git')throw new Error('Commit details support Git only');
+  repo=await checkedGitRepo(repo,signal,'Commit details support Git only');
   const raw=await git(repo.root,['log','-z','--no-show-signature','--encoding=UTF-8','--max-count=1','--format='+HISTORY_FORMAT,commit,'--'],MAX_TEXT,{signal});
   const metadata=parseHistory(raw.toString('utf8'),1)[0];
   if(!metadata||metadata.id!==commit)throw new Error('Commit object required');
@@ -315,22 +339,30 @@ function parseCommitChanges(text,scope){
     if(!first||!file)throw new Error('Truncated commit path');
     const entry={path:file,...(renamed?{oldPath:first}:{}),status:statuses[code[0]]||'modified'};
     changes.push({...entry,id:identity(entry,scope)});
-    if(changes.length>10000)throw new Error('Commit exceeds file count limit');
+    if(changes.length>MAX_RESULT_ENTRIES)throw new Error('Commit exceeds file count limit');
   }
   return changes;
 }
 export async function getHistoricalSegment(repo,{commit,path:file,offset=0,signal}={}){
- if(!Number.isInteger(offset)||offset<0||offset>16777216)throw Error('Invalid segment offset');
+ if(!Number.isInteger(offset)||offset<0||offset>MAX_SEGMENT_BYTES)throw Error('Invalid segment offset');
  if(typeof file!=='string'||!file||file.includes('\0'))throw Error('Invalid historical path');
- repo=await checkedRepo(repo,signal);const tree=await getHistoricalTree(repo,{commit,signal}),entry=tree.entries.find(row=>row.path===file);
+ repo=await checkedRepo(repo,signal);
+ const tree=await getHistoricalTree(repo,{commit,signal}),entry=tree.entries.find(row=>row.path===file);
  if(!entry||entry.type!=='blob'||!['100644','100755'].includes(entry.mode))throw Error('Segment requires a selected committed regular file');
- const sizeText=(await git(repo.root,['cat-file','-s',entry.oid],MAX_TEXT,{signal})).toString('utf8').trim();if(!/^\d+$/.test(sizeText))throw Error('Invalid object size');const size=Number(sizeText);
- if(size>16777216)throw Error('Segmented file exceeds 16 MiB limit');if(offset>size)throw Error('Segment offset exceeds file size');
- const buffer=await git(repo.root,['cat-file','blob',entry.oid],16777216,{signal});if(buffer.length!==size)throw Error('Historical blob size mismatch');
+ const sizeText=(await git(repo.root,['cat-file','-s',entry.oid],MAX_TEXT,{signal})).toString('utf8').trim();
+ if(!/^\d+$/.test(sizeText))throw Error('Invalid object size');
+ const size=Number(sizeText);
+ if(size>MAX_SEGMENT_BYTES)throw Error('Segmented file exceeds 16 MiB limit');
+ if(offset>size)throw Error('Segment offset exceeds file size');
+ const buffer=await git(repo.root,['cat-file','blob',entry.oid],MAX_SEGMENT_BYTES,{signal});
+ if(buffer.length!==size)throw Error('Historical blob size mismatch');
  if(buffer.includes(0)||buffer.some(byte=>byte<32&&![9,10,12,13].includes(byte)))throw Error('Segments support UTF-8 text only');
- new TextDecoder('utf-8',{fatal:true}).decode(buffer);if(offset<size&&(buffer[offset]&192)===128)throw Error('Segment offset splits UTF-8 character');
- let end=Math.min(size,offset+65536);while(end<size&&(buffer[end]&192)===128)end--;
- const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer.subarray(offset,end));signal?.throwIfAborted();
+ new TextDecoder('utf-8',{fatal:true}).decode(buffer);
+ if(offset<size&&(buffer[offset]&192)===128)throw Error('Segment offset splits UTF-8 character');
+ let end=Math.min(size,offset+SEGMENT_CHUNK_BYTES);
+ while(end<size&&(buffer[end]&192)===128)end--;
+ const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer.subarray(offset,end));
+ signal?.throwIfAborted();
  return {commit,path:file,oid:entry.oid,encoding:'UTF-8',offset,endOffset:end,totalBytes:size,nextOffset:end<size?end:null,text};
 }
 export async function getHistoricalFile(repo,{commit,path:file,signal}={}){
@@ -344,12 +376,12 @@ export async function getHistoricalFile(repo,{commit,path:file,signal}={}){
  return {commit,path:file,oid:entry.oid,...result};
 }
 export async function getHistoricalTree(repo,{commit,signal}={}){
- if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw new Error('Invalid commit id');
- repo=await checkedRepo(repo,signal);if(repo.type!=='git')throw new Error('Historical tree supports Git only');
+ if(typeof commit!=='string'||!isObjectId(commit))throw new Error('Invalid commit id');
+ repo=await checkedGitRepo(repo,signal,'Historical tree supports Git only');
  const type=(await git(repo.root,['cat-file','-t',commit],MAX_TEXT,{signal})).toString('utf8').trim();if(type!=='commit')throw new Error('Commit object required');
  const text=(await git(repo.root,['ls-tree','-r','-t','-z','--full-tree',commit],MAX_TEXT,{signal})).toString('utf8');
  const fields=text.split(String.fromCharCode(0));if(fields.pop()!=='')throw new Error('Truncated historical tree');
- if(fields.length>10000)throw new Error('Historical tree exceeds entry limit');
+ if(fields.length>MAX_RESULT_ENTRIES)throw new Error('Historical tree exceeds entry limit');
  const entries=fields.map(record=>{
   const tab=record.indexOf('\t'),head=record.slice(0,tab),file=record.slice(tab+1);
   const match=/^(040000|100644|100755|120000|160000) (tree|blob|commit) ([a-f0-9]{40}|[a-f0-9]{64})$/.exec(head);
@@ -362,7 +394,7 @@ export async function getHistoricalTree(repo,{commit,signal}={}){
 }
 export async function getCommitImage(repo,{commit,parentIndex=0,id,side='right',signal}={}){
  if(!['left','right'].includes(side))throw new Error('Invalid image side');
- if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+ if(typeof id!=='string'||!isChangeId(id))throw new Error('Invalid historical change id');
  const details=await commitDetails(repo,{commit,parentIndex,signal}),entry=details.changes.find(e=>e.id===id);
  if(!entry)throw new Error('Change is not part of selected commit');
  const revision=side==='left'?details.parent:commit,file=side==='left'?(entry.oldPath||entry.path):entry.path;
@@ -382,8 +414,8 @@ async function historicalImage(repo,revision,file,signal){
 async function workspacePng(buffer,signal){const {data,...metadata}=await prepareRaster(buffer,{signal});return {...metadata,base64:data.toString('base64')};}
 // Workspace image reads use immutable HEAD/index blobs and a checked regular-file handle.
 export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}={}){
- if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id)||!['left','right'].includes(side))throw Error('Invalid workspace image selection');
- repo=await checkedRepo(repo,signal);if(repo.type!=='git')throw Error('Workspace PNG supports Git only');modeFor(repo,mode);
+ if(typeof id!=='string'||!isChangeId(id)||!['left','right'].includes(side))throw Error('Invalid workspace image selection');
+ repo=await checkedGitRepo(repo,signal,'Workspace PNG supports Git only');modeFor(repo,mode);
  const entry=(await changes(repo,mode)).find(row=>row.id===id);if(!entry)throw Error('Change no longer exists; refresh repository status.');
  if(entry.status==='conflicted')throw Error('Conflicted images are not supported');
  const head=async()=>{try{return (await git(repo.root,['rev-parse','--verify','HEAD'],MAX_TEXT,{signal})).toString('utf8').trim();}catch(e){if(e.code==='VCS_COMMAND')return null;throw e;}};
@@ -419,7 +451,7 @@ export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}
 }
 export async function getRevisionImage(repo,{base,target,id,side='right',signal}={}){
  if(!['left','right'].includes(side))throw Error('Invalid image side');
- if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid revision change id');
+ if(typeof id!=='string'||!isChangeId(id))throw Error('Invalid revision change id');
  const details=await getRevisionChanges(repo,{base,target,signal}),entry=details.changes.find(row=>row.id===id);
  if(!entry)throw Error('Change is not part of selected revision pair');
  const revision=side==='left'?base:target,file=side==='left'?(entry.oldPath||entry.path):entry.path;
@@ -428,7 +460,7 @@ export async function getRevisionImage(repo,{base,target,id,side='right',signal}
 }
 export async function getFileBlame(repo,{commit,parentIndex=0,id,startLine=1,lineLimit=500,signal}={}){
  if(!Number.isInteger(startLine)||startLine<1||startLine>100001||!Number.isInteger(lineLimit)||lineLimit<1||lineLimit>500)throw Error('Invalid blame line window');
- if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+ if(typeof id!=='string'||!isChangeId(id))throw new Error('Invalid historical change id');
  const details=await commitDetails(repo,{commit,parentIndex,signal});
  const entry=details.changes.find(row=>row.id===id);if(!entry)throw new Error('Change is not part of selected commit');
  const result={commit,path:entry.path,lines:[],truncated:false,startLine,nextLine:null};
@@ -446,38 +478,16 @@ export async function getFileBlame(repo,{commit,parentIndex=0,id,startLine=1,lin
  return {...result,lines:parseBlame(output.toString('utf8'),limit),totalLines:count,nextLine:endLine<count&&endLine<100001?endLine+1:null,truncated:endLine<count};
 }
 export async function listFileHistory(repo,{commit,parentIndex=0,id,offset=0,limit=50,follow=false,since,until,signal}={}){
-  if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw new Error('Invalid history pagination');
-  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+  if(!Number.isInteger(offset)||offset<0||offset>MAX_HISTORY_OFFSET||!Number.isInteger(limit)||limit<1||limit>MAX_HISTORY_PAGE)throw new Error('Invalid history pagination');
+  if(typeof id!=='string'||!isChangeId(id))throw new Error('Invalid historical change id');
   if(typeof follow!=='boolean')throw Error('Invalid rename follow mode');
   const sinceArg=since===undefined?null:validateDateBound(since),untilArg=until===undefined?null:validateDateBound(until);
   if((sinceArg||untilArg)&&follow)throw Error('Date-range file history is not combined with rename following.');
   const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected commit');
-  if(follow){
-   const count=offset+limit+1,deadline=Date.now()+TIMEOUT;
-   const followOptions=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Rename tracing timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
-   const output=await git(repo.root,['--literal-pathspecs','log','-z','--follow','--first-parent','--diff-merges=first-parent','--find-renames=50%','-l100','--name-status','--no-ext-diff','--no-textconv','--no-show-signature','--encoding=UTF-8','--max-count='+count,'--format='+HISTORY_FORMAT,commit,'--',entry.path],MAX_TEXT,followOptions());
-   const chain=parseFollowHistory(output.toString('utf8'),entry.path,count,{similarity:true});
-   let checks=0;
-   for(let index=0;index<chain.length;index++){
-    const row=chain[index];if(!row.oldPath)continue;
-    let boundary;
-    if(++checks>32)boundary='rename-check-limit';
-    else {
-     // Confirm the whole transition, not Git's selected-path heuristic alone.
-     // A single deletion and addition excludes competing deleted sources.
-     const raw=await git(repo.root,['diff-tree','--no-commit-id','--name-status','-z','-r','--no-renames','--no-ext-diff','--no-textconv',row.parents[0],row.id,'--'],MAX_TEXT,followOptions());
-     const changes=parseCommitChanges(raw.toString('utf8'),row.id);
-     const removed=changes.filter(change=>change.status==='deleted'),added=changes.filter(change=>change.status==='added');
-     if(removed.length!==1||added.length!==1||removed[0].path!==row.oldPath||added[0].path!==row.path)boundary='ambiguous-rename';
-    }
-    if(boundary){chain[index]={...row,boundary};chain.length=index+1;break;}
-   }
-   const rows=chain.slice(offset);
-   return {...historyPage(rows,commit,offset,limit),path:entry.path,followsRenames:true,followPolicy:'unique-similarity-first-parent'};
-  }
-  if(sinceArg){signal?.throwIfAborted();try{await git(repo.root,['log','--since-as-filter=1970-01-01','-1','--format=%H'],MAX_TEXT,{signal});}catch(e){if(e.code==='VCS_COMMAND')throw new Error('Date-range file history requires Git 2.37 or newer (--since-as-filter).');throw e;}}
+  if(follow)return followHistoricalPath(repo,{commit,file:entry.path,offset,limit,signal});
+  if(sinceArg)await assertSinceAsFilterSupport(repo,signal,'file history');
   const dateArgs=[...(sinceArg?['--since-as-filter='+sinceArg]:[]),...(untilArg?['--until='+untilArg]:[])];
   const text=await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,...dateArgs,commit,'--',entry.path],MAX_TEXT,{signal});
   return {...historyPage(parseHistory(text.toString('utf8'),limit+1),commit,offset,limit),path:entry.path,followsRenames:false};
@@ -493,8 +503,10 @@ async function followHistoricalPath(repo,{commit,file,offset,limit,signal}){
  for(let index=0;index<chain.length;index++){
   const row=chain[index];if(!row.oldPath)continue;
   let boundary;
-  if(++checks>32)boundary='rename-check-limit';
+  if(++checks>RENAME_CONFIRMATION_LIMIT)boundary='rename-check-limit';
   else {
+   // Confirm the whole transition, not Git's selected-path heuristic alone.
+   // A single deletion and addition excludes competing deleted sources.
    const raw=await git(repo.root,['diff-tree','--no-commit-id','--name-status','-z','-r','--no-renames','--no-ext-diff','--no-textconv',row.parents[0],row.id,'--'],MAX_TEXT,followOptions());
    const changes=parseCommitChanges(raw.toString('utf8'),row.id);
    const removed=changes.filter(change=>change.status==='deleted'),added=changes.filter(change=>change.status==='added');
@@ -507,28 +519,26 @@ async function followHistoricalPath(repo,{commit,file,offset,limit,signal}){
 
 // Explicit historical path history; the path must exist in the selected commit.
 export async function listPathHistory(repo,{commit,path:file,offset=0,limit=50,follow=false,since,until,signal}={}){
- if(typeof commit!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))throw Error('Invalid commit id');
+ if(typeof commit!=='string'||!isObjectId(commit))throw Error('Invalid commit id');
  if(typeof file!=='string'||!file||file.length>32768||file.includes('\0')||file.startsWith('/')||file.split('/').some(part=>!part||part==='.'||part==='..'))throw Error('Invalid historical path');
  if(typeof follow!=='boolean')throw Error('Invalid rename follow mode');
  const sinceArg=since===undefined?null:validateDateBound(since),untilArg=until===undefined?null:validateDateBound(until);
  if((sinceArg||untilArg)&&follow)throw Error('Date-range path history is not combined with rename following.');
- if(!Number.isInteger(offset)||offset<0||offset>10000||!Number.isInteger(limit)||limit<1||limit>100)throw Error('Invalid history pagination');
- repo=await checkedRepo(repo,signal);
- if(repo.type!=='git')throw Error('Historical path history supports Git only');
+ if(!Number.isInteger(offset)||offset<0||offset>MAX_HISTORY_OFFSET||!Number.isInteger(limit)||limit<1||limit>MAX_HISTORY_PAGE)throw Error('Invalid history pagination');
+ repo=await checkedGitRepo(repo,signal,'Historical path history supports Git only');
  const listing=(await git(repo.root,['ls-tree','-z',commit,'--',file],MAX_TEXT,{signal})).toString('utf8');
  const record=listing.split('\0').filter(Boolean).find(row=>row.slice(row.indexOf('\t')+1)===file);
  if(!record)throw Error('Path does not exist in the selected commit');
  const mode=record.slice(0,record.indexOf('\t')).split(' ')[0];
  if(follow&&!['100644','100755','120000'].includes(mode))throw Error('Rename following requires a committed regular file or link');
- if(sinceArg){signal?.throwIfAborted();try{await git(repo.root,['log','--since-as-filter=1970-01-01','-1','--format=%H'],MAX_TEXT,{signal});}catch(e){if(e.code==='VCS_COMMAND')throw new Error('Date-range path history requires Git 2.37 or newer (--since-as-filter).');throw e;}}
+ if(sinceArg)await assertSinceAsFilterSupport(repo,signal,'path history');
  const dateArgs=[...(sinceArg?['--since-as-filter='+sinceArg]:[]),...(untilArg?['--until='+untilArg]:[])];
  return follow?followHistoricalPath(repo,{commit,file,offset,limit,signal}):{...historyPage(parseHistory((await git(repo.root,['--literal-pathspecs','log','-z','--no-show-signature','--encoding=UTF-8','--topo-order','--max-count='+String(limit+1),'--skip='+String(offset),'--format='+HISTORY_FORMAT,...dateArgs,commit,'--',file],MAX_TEXT,{signal})).toString('utf8'),limit+1),commit,offset,limit),path:file,followsRenames:false};
 }
 
 export async function getRevisionChanges(repo,{base,target,signal}={}){
-  for(const oid of [base,target])if(typeof oid!=='string'||!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))throw new Error('Invalid revision commit id');
-  signal?.throwIfAborted();repo=await checkedRepo(repo,signal);
-  if(repo.type!=='git')throw new Error('Revision comparison supports Git only');
+  for(const oid of [base,target])if(typeof oid!=='string'||!isObjectId(oid))throw new Error('Invalid revision commit id');
+  signal?.throwIfAborted();repo=await checkedGitRepo(repo,signal,'Revision comparison supports Git only');
   for(const oid of new Set([base,target])){
     const type=(await git(repo.root,['cat-file','-t',oid],MAX_TEXT,{signal})).toString('utf8').trim();
     if(type!=='commit')throw new Error('Commit object required');
@@ -553,9 +563,9 @@ async function annotateSubmodules(repo, entries, options) {
   const files=entries.filter(entry=>entry.status!=='conflicted').map(entry=>entry.path);
   for(let from=0;from<files.length;){
     check();const batch=[];let bytes=0;
-    while(from<files.length&&batch.length<64){const file=files[from],size=Buffer.byteLength(file,'utf8')+1;if(size>24000)throw Error('Selected path exceeds metadata budget');if(bytes+size>24000)break;batch.push(file);bytes+=size;from++;}
+    while(from<files.length&&batch.length<METADATA_BATCH_SIZE){const file=files[from],size=Buffer.byteLength(file,'utf8')+1;if(size>METADATA_BATCH_BYTES)throw Error('Selected path exceeds metadata budget');if(bytes+size>METADATA_BATCH_BYTES)break;batch.push(file);bytes+=size;from++;}
     const listing=(await git(repo.root,['ls-files','--stage','-z','--',...batch],MAX_TEXT,{...options,timeoutMs:deadline-Date.now()})).toString('utf8');
-    for(const record of listing.split('\0')){const tab=record.indexOf('\t');if(tab<0)continue;const [mode,oid,stage]=record.slice(0,tab).split(' '),file=record.slice(tab+1);if(stage==='0'&&mode==='160000'&&batch.includes(file)&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(oid))pointers.set(file,oid);}
+    for(const record of listing.split('\0')){const tab=record.indexOf('\t');if(tab<0)continue;const [mode,oid,stage]=record.slice(0,tab).split(' '),file=record.slice(tab+1);if(stage==='0'&&mode==='160000'&&batch.includes(file)&&isObjectId(oid))pointers.set(file,oid);}
   }
   if (!pointers.size) return;
   const initialized = [];
@@ -576,8 +586,8 @@ async function annotateSubmodules(repo, entries, options) {
   // Bounded, read-only submodule worktree state from the parent's own `git status`
   // (never runs Git inside the submodule): --porcelain=v2 exposes `S` fields for new
   // commits, modified content and untracked content in an initialized checkout.
-  for (let from = 0; from < initialized.length; from += 64) {
-    check();const batch = initialized.slice(from, from + 64);
+  for (let from = 0; from < initialized.length; from += METADATA_BATCH_SIZE) {
+    check();const batch = initialized.slice(from, from + METADATA_BATCH_SIZE);
     const out = (await git(repo.root, ['status', '--porcelain=v2', '-z', '--ignore-submodules=none', '--', ...batch.map(entry => entry.path)], MAX_TEXT, {...options, timeoutMs: deadline - Date.now()})).toString('utf8');
     const records=out.split(String.fromCharCode(0));
     for(let i=0;i<records.length;i++){
@@ -661,7 +671,7 @@ async function gitBlob(root, revision, file, options) {
   for(const row of raw.split('\0')){const tab=row.indexOf('\t');if(tab<0||row.slice(tab+1)!==file)continue;const [mode,oid,stage]=row.slice(0,tab).split(' ');if(stage==='0')record={mode,oid,type:mode==='160000'?'commit':'blob'};}
   if(!record)return {text:'',notice:'No stage-0 Index entry; conflict stages are not inferred.'};
  }
- if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(record.oid))throw Error('Invalid selected object');
+ if(!isObjectId(record.oid))throw Error('Invalid selected object');
  if(record.mode==='160000')return {text:'Submodule '+record.oid,notice:'Recorded gitlink pointer; nested checkout commit and contents are not loaded by this preview.'};
  if(record.type!=='blob'||!['100644','100755','120000'].includes(record.mode))return {text:'',notice:'Unsupported selected object; contents not loaded.'};
  const body=await content(()=>git(root,['cat-file','blob',record.oid],MAX_TEXT,options));
@@ -693,7 +703,7 @@ async function historicalBlob(root,revision,file,signal,large=false,budget){
 }
 export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal,large=false}={}){
   if(typeof large!=='boolean')throw new Error('Invalid large comparison mode');
-  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid historical change id');
+  if(typeof id!=='string'||!isChangeId(id))throw new Error('Invalid historical change id');
   const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Historical change is not part of selected commit and parent');
@@ -703,7 +713,7 @@ export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal,l
 }
 export async function getRevisionComparison(repo,{base,target,id,signal,large=false}={}){
   if(typeof large!=='boolean')throw new Error('Invalid large comparison mode');
-  if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw new Error('Invalid revision change id');
+  if(typeof id!=='string'||!isChangeId(id))throw new Error('Invalid revision change id');
   const details=await getRevisionChanges(repo,{base,target,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected revision pair');
@@ -722,13 +732,12 @@ async function properties(root, file, base, signal) {
 async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
  const deadline=Date.now()+TIMEOUT;
  const options=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Workspace comparison timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
- repo=await checkedRepo(repo,signal,options);modeFor(repo,mode);
- if(repo.type!=='git')throw Error('Large workspace comparison supports Git only');
+ repo=await checkedRepo(repo,signal,options);modeFor(repo,mode);assertGit(repo,'Large workspace comparison supports Git only');
  const run=args=>git(repo.root,args,MAX_TEXT,options());
  const status=()=>changes(repo,mode,options());
  const entry=(await status()).find(row=>row.id===id);if(!entry)throw Error('Change no longer exists; refresh repository status');
  if(entry.status==='conflicted')throw Error('Large conflicted comparisons are not supported');
- const head=async()=>{try{return (await run(['rev-parse','--verify','HEAD^{commit}'])).toString('utf8').trim();}catch(e){if(e.code!=='VCS_COMMAND')throw e;const ref=(await run(['symbolic-ref','-q','HEAD'])).toString('utf8').trim();try{await run(['show-ref','--verify','--quiet',ref]);}catch(missing){if(missing.code==='VCS_COMMAND'&&missing.exitCode===1)return null;throw missing;}throw e;}};
+ const head=()=>resolveHeadCommit(run);
  const revision=await head(),indexArgs=['ls-files','--stage','-z','--',entry.path],index=await run(indexArgs);
  const readIndex=async()=>{
   const rows=index.toString('utf8').split('\0').filter(Boolean);if(rows.length!==1)throw Error('Large comparison requires one stage0 Index entry');
@@ -752,8 +761,8 @@ async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
 /** Explicit Index stage snapshot; never reads the selected working file or submodule. */
 export async function getConflictStages(repo,{mode='all',id,signal}={}){
  const deadline=Date.now()+TIMEOUT,budget=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Conflict stage read timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
- if(typeof id!=='string'||!/^[a-f0-9]{64}$/.test(id))throw Error('Invalid conflict change id');
- repo=await checkedRepo(repo,signal,budget);modeFor(repo,mode);if(repo.type!=='git')throw Error('Conflict stages support Git only');
+ if(typeof id!=='string'||!isChangeId(id))throw Error('Invalid conflict change id');
+ repo=await checkedRepo(repo,signal,budget);modeFor(repo,mode);assertGit(repo,'Conflict stages support Git only');
  const entry=(await changes(repo,mode,budget())).find(row=>row.id===id);if(!entry||entry.status!=='conflicted')throw Error('Selected conflict no longer exists; refresh status.');
  await confined(repo.root,entry.path);
  const list=()=>git(repo.root,['ls-files','--unmerged','-z','--',entry.path],MAX_TEXT,budget());

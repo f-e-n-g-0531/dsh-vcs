@@ -10,6 +10,11 @@ export function validateDateBound(value){
   if(month<1||month>12||day<1||day>dim[month-1])throw new Error('Invalid history date bound');
   return value;
 }
+/** Full Git object id: lowercase SHA-1 (40) or SHA-256 (64) hexadecimal. */
+export const isObjectId = value => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
+/** Opaque SHA-256 change id used by this plugin's read-only change selections. */
+export const isChangeId = value => /^[a-f0-9]{64}$/.test(value);
+
 export function historySearchArgs(search) {
   if (search === undefined) return {args: [], paths: []};
   const keys = ['message', 'author', 'path', 'since', 'until'];
@@ -105,7 +110,7 @@ export function parseReferences(text){
 
 // Format for: git log -z --format=<HISTORY_FORMAT>. NUL separates fields/records.
 export const HISTORY_FORMAT = '%H%x00%P%x00%an%x00%aI%x00%s';
-const oid = value => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
+const oid = isObjectId;
 export function historyPage(rows,snapshot,offset,limit){
  const hasMore=rows.length>limit;
  const truncated=hasMore&&offset+limit>10000;
