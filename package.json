@@ -1,6 +1,6 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
@@ -43,10 +43,11 @@
     "prepare": "npm run build",
     "prepack": "npm run check",
     "verify:package": "node scripts/verify-package.mjs",
-    "test:install": "node scripts/test-install.mjs"
+    "test:install": "node scripts/test-install.mjs",
+    "test:host-compat": "node scripts/test-host-compat.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": "0.1.7-rc.2 || 0.2.0-rc.2"
+    "@deepseek-ai/dsh": "0.1.7-rc.2 || 0.2.0-rc.2 || 0.2.1-rc.2"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh": { "optional": true }

@@ -27,7 +27,7 @@
 需要：
 
 - Node.js **22 或更新版本**。
-- DSH Web：声明兼容 **0.1.7-rc.2 或 0.2.0-rc.2**。
+- DSH Web：声明兼容 **0.1.7-rc.2、0.2.0-rc.2 或 0.2.1-rc.2**。
 - 系统 PATH 中有 Git 或 SVN；只使用 Git 时无需安装 SVN。
 
 profile是DSH的配置和插件环境，不是Session。下面的web是示例，请先确认运行中的DSH使用哪个profile；若不同，替换命令中的web。宿主插件命令通过pnpm执行，需确保该工具可用。

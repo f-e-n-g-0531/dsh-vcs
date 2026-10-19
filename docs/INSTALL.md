@@ -1,6 +1,6 @@
 # 安装、升级与回滚
 
-需要 Node.js 22+，DSH Web 0.1.7-rc.2 或 0.2.0-rc.2，以及 PATH 中可用的 Git／SVN。先阅读[非商业许可证](<../LICENSE>)。
+需要 Node.js 22+，DSH Web 0.1.7-rc.2、0.2.0-rc.2 或 0.2.1-rc.2，以及 PATH 中可用的 Git／SVN。先阅读[非商业许可证](<../LICENSE>)。
 
 ## 先确认安装位置
 

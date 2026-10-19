@@ -21,6 +21,14 @@
 
 测试失败或跳过须调查；隔离安装只检查包和宿主注册，不是用户实际 DSH 验收。
 
+新增宿主兼容声明时，还需对精确宿主执行隔离检查：
+
+```sh
+npm run test:host-compat -- "<installed @deepseek-ai/dsh/package.json>"
+```
+
+参数是已安装 DSH 包的清单文件，不是运行时目录。桌面 ASAR 构建使用对应 Electron 的 `ELECTRON_RUN_AS_NODE=1` 执行脚本；若 ui-slots 是 shell 内建种子、未提供 Node 包，可额外传入从同一精确版本包解出的 ui-slots 清单绝对路径。脚本核对种子版本，不静默替换为 mock。宿主测试不启动 profile、监听端口或安装插件；记录实际测试的宿主版本，不能用一个宿主的结果声称整个版本矩阵本次均通过。
+
 ## 2. 固定版本并验证
 
 1. 提交并推送版本修改，创建新标签 `vX.Y.Z`；不移动已有标签。
