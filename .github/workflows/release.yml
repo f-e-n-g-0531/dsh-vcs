@@ -105,6 +105,7 @@ jobs:
           import {readFileSync} from 'node:fs';
           import {createHash} from 'node:crypto';
           import {spawnSync} from 'node:child_process';
+          import {resolve} from 'node:path';
           import assert from 'node:assert/strict';
           const pkg=JSON.parse(readFileSync('package.json','utf8'));
           assert.equal(pkg.name,'@feng0531/dsh-vcs');
@@ -116,7 +117,7 @@ jobs:
             console.log('Exact artifact already published; continuing GitHub release');
           }else{
             assert.equal(response.status,404,'Registry lookup failed; refusing publish');
-            const result=spawnSync('npm',['publish',process.env.ARTIFACT,'--ignore-scripts','--access','public','--registry=https://registry.npmjs.org/'],{stdio:'inherit'});
+            const result=spawnSync('npm',['publish',resolve(process.env.ARTIFACT),'--ignore-scripts','--access','public','--registry=https://registry.npmjs.org/'],{stdio:'inherit'});
             if(result.error)throw result.error;
             assert.equal(result.status,0,'npm publication failed');
           }
