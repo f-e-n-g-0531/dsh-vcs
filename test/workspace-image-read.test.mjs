@@ -10,7 +10,7 @@ import {detectRepository,listChanges,getWorkspaceImage} from '../vcs.mjs';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
 
 test('workspace image handles bounded short reads and still rejects EOF mutation and cancellation',async()=>{
-  const root=await fs.mkdtemp(path.join(os.tmpdir(),'vcs-image-read-')),file=path.join(root,'image.png'),originalOpen=fs.open;
+  const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'vcs-image-read-'))),file=path.join(root,'image.png'),originalOpen=fs.open;
   const git=(...args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8',windowsHide:true});
   let mode='short',reads=0,closes=0,opens=0,controller;
   try {
@@ -18,8 +18,9 @@ test('workspace image handles bounded short reads and still rejects EOF mutation
     await fs.writeFile(path.join(root,'base'),'base');git('add','.');git('commit','-qm','base');await fs.writeFile(file,png);
     const repo=await detectRepository(root),id=(await listChanges(repo)).find(row=>row.path==='image.png').id;
     fs.open=async(target,...args)=>{
+      const selected=await fs.realpath(target)===await fs.realpath(file);
       const handle=await originalOpen(target,...args);
-      if(path.resolve(target)!==file)return handle;
+      if(!selected)return handle;
       opens++;
       return {
         stat:(...args)=>handle.stat(...args),
