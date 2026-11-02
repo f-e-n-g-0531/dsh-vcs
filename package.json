@@ -1,10 +1,10 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
-  "description": "Read-only Git and SVN change preview for DSH",
+  "description": "Git and SVN change preview with confirmed safe local Git branch switching for DSH",
   "exports": {
     ".": "./index.mjs",
     "./client": "./dist/client.js",
@@ -15,6 +15,8 @@
     "index.mjs",
     "frontend-assets.mjs",
     "vcs.mjs",
+    "branch-switch.mjs",
+    "branch-switch-host.mjs",
     "git-history.mjs",
     "conflict-stages.mjs",
     "image-preview.mjs",

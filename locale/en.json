@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "VCS changes",
-    "description": "Read-only Git / SVN changes and side-by-side diff"
+    "description": "Git / SVN read-only review and confirmed local Git branch switching"
   }
 }

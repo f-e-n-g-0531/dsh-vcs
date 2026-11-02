@@ -4,7 +4,7 @@
 
 ## 依赖方向
 
-浏览器视图 → 认证RPC → Session／仓库授权 → 只读适配器 → 有界本地命令或已同意HTTPS。视图不能直接读取文件系统；解析和展示模型不负责发起网络或授予权限。
+浏览器视图 → 认证RPC → Session／仓库授权 → 默认只读适配器 → 有界本地命令或已同意HTTPS。0.6.0增加独立的确认式本地分支切换链，不改变历史引用导航的只读语义。视图不能直接读取文件系统；解析和展示模型不负责发起网络或授予权限。
 
 ## 宿主与本地读取
 
@@ -12,6 +12,12 @@
 - [仓库适配器](<../vcs.mjs>)负责发现、Git／SVN本地状态、对象读取及比较语义；公开导出保持兼容。[本地命令](<../local-command.mjs>)集中环境防护、无shell进程、合并输出预算、取消和15秒默认超时，不与远程DAV传输混用。
 - [历史解析](<../git-history.mjs>)负责Git输出协议及分页／搜索参数；[路径边界](<../repository-path.mjs>)负责词法包含、现存链接和真实祖先校验；[文本解码](<../text-content.mjs>)负责有界字节解码。
 - [图片准备](<../image-preview.mjs>)与浏览器解码共同把关格式和尺寸，不绕过路径或选中ID验证。
+
+## 确认式本地 Git 分支切换（0.6.0）
+
+独立界面经 `vcs/branches` 读取已有本地分支，`vcs/branch-switch-prepare` 预览服务器快照，再用 `vcs/branch-switch-confirm` 提交一次性 token；不接受客户端提供的仓库路径或替代快照。协调器绑定 Session／cwd／发现授权／仓库，默认 60 秒过期、最多 32 个 token，确认即消费；按仓库排斥插件内读写冲突，读取完成前不开始写入。模块为[分支适配器](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch.mjs>)、[确认协调器](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch-host.mjs>)与[独立界面](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/src/BranchSwitcher.jsx>)。
+
+适配器仅切换已有 `refs/heads`，执行前重验固定当前／目标提交和配置、Index、工作区。拒绝任何脏状态（含未跟踪／被忽略内容）、冲突、attributes、过滤器／命令 hooks、稀疏／部分克隆、assume-unchanged／skip-worktree、符号链接／硬链接／gitlink、Git元数据symlink／hardlink或alternates、进行中操作及锁；不支持 linked／分离／符号链接 gitdir、`core.worktree`、detached／unborn HEAD 或与目标分支同名的 tag。实际命令使用 `git switch --no-guess --no-overwrite-ignore --no-recurse-submodules`，禁 hooks 和外部 attributes，不创建分支、不 stash、不 force、不联网。写入开始后失败记为结果未知，不自动重试或回滚；前端要求刷新核对。仓库级互斥不覆盖外部 Git 进程，不保证系统级原子性。
 
 ## SVN HTTPS组合
 
@@ -32,7 +38,7 @@
 
 - 发现默认检查Session目录及一级子目录；定向扫描仍限于Session内。发现的包含仓库可能大于Session目录。
 - 授权最多32个Session、约5分钟；每次请求重新解析cwd，拒绝旧扫描覆盖新状态。过期需手动重新发现。
-- 历史绑定不可变OID和选中ID；Git禁止replace refs、lazy fetch、提示及外部diff／textconv。不checkout、不自动获取对象。
+- 历史读取绑定不可变OID和选中ID；Git禁止replace refs、lazy fetch、提示及外部diff／textconv。只读浏览不checkout、不自动获取对象；实际分支切换仅走上述独立确认链。
 - [操作预算](<../src/operation-budget.mjs>)通过异步上下文为本地 RPC 提供统一截止时间；[本地命令](<../local-command.mjs>)共享剩余预算，取消或超时清理进程树，直到 close 与清理结束才释放请求容量。不是即时终止承诺。
 - 文本每侧2MiB；历史UTF8分段最大16MiB、每片64KiB。历史图最多200节点／1000关系／32泳道，不等于完整无限图。
 - 刷新仅手动或可见window聚焦，无周期刷新。资源路由是固定认证白名单，URL不能成为任意磁盘路径。

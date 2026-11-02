@@ -1,6 +1,6 @@
 # 当前能力与验证入口
 
-此表依据 0.5.0 候选实现整理。它区分代码能力与验证入口，不表示候选已正式发布，也不把隔离测试等同于当前 DSH 页面验收。版本验证状态见[本版记录](<releases/0.5.0.md>)。
+此表依据当前 0.6.0实现整理；0.5.0 的既有读取与发布能力保留。默认只读预览，新增明确确认式本地 Git 分支切换这一写操作例外。它区分代码能力与验证入口，不表示候选已正式发布，也不把隔离测试等同于当前 DSH 页面验收。0.5.0 的既有验证状态见[该版记录](<releases/0.5.0.md>)，不能据此声称新分支切换已通过发布或实机验收。
 
 | 能力 | 实现 | 验证入口 | 主要边界 |
 | --- | --- | --- | --- |
@@ -12,6 +12,7 @@
 | 大仓库文件与目录 | [定点读取及缓存](<../src/historical-access.mjs>)、[目录页](<../src/HistoricalTree.jsx>) | [历史读取](<../test/historical-access.test.mjs>)、[目录交互](<../scripts/history-tree-pages-browser.jsx>) | 单目录最多 10 万项／16MiB 输出；每页最多 100；旧整树 API 上限不变 |
 | 大文件与结构化能力 | [预览能力](<../src/preview-capabilities.mjs>)、[前端适配](<../src/preview-actions.mjs>) | [能力测试](<../test/preview-capabilities.test.mjs>)、[完整比较](<../test/large-compare.test.mjs>) | 普通每侧 2MiB，显式完整比较每侧 8MiB，历史分段 16MiB；不承诺无限文件 |
 | SVN HTTPS 历史 | [生产组合](<../src/svn-https-host.mjs>)、[运行时](<../src/svn-runtime.mjs>) | [TLS 授权链](<../test/svn-dav-chain-tls.test.mjs>) | 显式同意、系统信任、无额外认证；逐步骤授权；不复用磁盘凭据 |
+| 已有本地 Git 分支切换（0.6.0） | [适配器](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch.mjs>)、[一次性确认](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch-host.mjs>) | [适配器用例](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/test/branch-switch.test.mjs>)、[Host 用例](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/test/branch-switch-host.test.mjs>)、[浏览器用例](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/scripts/branch-switch-browser.jsx>)；具体结果以对应测试及同标签发布运行报告为准 | 独立预览和明确确认，约60秒一次性token；仅干净普通仓库，含ignored也拒绝；不支持filters／命令hooks、attributes、sparse／partial、特殊Index flags、链接／子模块或进行中操作；无stage／commit／stash／force／网络；写后失败可能结果未知，手动刷新核对，不盲重试 |
 | 编辑器资源与性能 | [编辑器](<../src/editor.js>)、[采样工具](<../scripts/performance-baseline.mjs>) | [资源循环](<../scripts/performance-browser.jsx>)、[统计测试](<../test/performance-baseline.test.mjs>) | 环境／规模／内容一致才能比较；基线不是通用性能承诺 |
 | 候选包与发布证据 | [预检](<../scripts/release-preflight.mjs>)、[发布工作流](<../.github/workflows/release.yml>) | [证据负例](<../test/release-evidence.test.mjs>)、[CLI 验证](<../test/release-preflight-cli.test.mjs>) | 同标签／SHA／run attempt；四包一致；渠道显式；缺证据阻断 |
 

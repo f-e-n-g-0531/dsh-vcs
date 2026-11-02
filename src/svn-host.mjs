@@ -24,6 +24,6 @@ export function createSvnHost(ctx, api, {
         : local(endpoint, payload, signal);
     },
     revokeSession: sessionId => runtime.revokeSession(sessionId),
-    dispose: () => runtime.dispose(),
+    dispose: () => {local.dispose?.();return runtime.dispose();},
   };
 }

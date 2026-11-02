@@ -10,6 +10,7 @@ import {writeFile} from 'node:fs/promises';
 import {verifyConsumedCandidate} from './release-evidence.mjs';
 import {readFile} from 'node:fs/promises';
 import * as plugin from '../index.mjs';
+import {checkBranchSwitchRpc} from './branch-switch-compat.mjs';
 const {resolveSessionCwd}=plugin;
 // Explicit installed DSH package path; no profile boot, HTTP listener, or user credentials.
 if(process.env.DSH_COMPAT_REPORT){assert.equal(process.env.GITHUB_REF_TYPE,'tag','Compatibility evidence requires a tag');assert.equal(process.env.GITHUB_REF,'refs/tags/'+process.env.RELEASE_TAG,'Compatibility evidence ref mismatch');}
@@ -113,6 +114,7 @@ try{
  assert.equal(await resolveSessionCwd(ctx,'fixture'),process.cwd());
  assert.equal((await invoke('vcs/status',{sessionId:'fixture',repositoryId:'not-granted'})).error.code,'vcs/rediscover-required');
  assert.equal((await invoke('vcs/svn-describe',{sessionId:'fixture',repositoryId:'not-granted'})).error.code,'vcs/rediscover-required');
+ await checkBranchSwitchRpc(ctx,invoke);
  await fiber.dispose();assert.deepEqual([...routes.keys()].sort(),hostRoutes);
  assert.equal((await fetcher.fetch(new Request('http://127.0.0.1:3080/api/vcs-assets/editor.css'),peer)).status,404);
  const reloaded=await ctx.plugin(plugin);assert.equal(routes.size,hostRoutes.length+6);await reloaded.dispose();assert.deepEqual([...routes.keys()].sort(),hostRoutes);
@@ -142,4 +144,4 @@ try{
  console.log('Real client SlotRegistry load/unload passed with fixture shell/locale; not actual page rendering.');
  console.log('Real Cordis/Connection registration, admission, assets and disposal passed; not live GUI acceptance.');
 }finally{await ctx.fiber.dispose();}
-if(process.env.DSH_COMPAT_REPORT)await writeFile(process.env.DSH_COMPAT_REPORT,JSON.stringify({schema:1,...await verifyConsumedCandidate(process.env.DSH_CANDIDATE_RECEIPT||'consumed-candidate.json'),ref:process.env.GITHUB_REF,refType:process.env.GITHUB_REF_TYPE,hostVersion:hostManifest.version,pluginVersion:vcsManifest.version,tag:process.env.RELEASE_TAG,sha:process.env.RELEASE_SHA,runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,tools:{node:process.version,host:hostManifest.version,slots:slotsPackage.version},passed:true,contracts:['peer-gate','registration','authentication','session','assets','rpc','lazy-client','dispose-reload']},null,2)+'\n');
+if(process.env.DSH_COMPAT_REPORT)await writeFile(process.env.DSH_COMPAT_REPORT,JSON.stringify({schema:1,...await verifyConsumedCandidate(process.env.DSH_CANDIDATE_RECEIPT||'consumed-candidate.json'),ref:process.env.GITHUB_REF,refType:process.env.GITHUB_REF_TYPE,hostVersion:hostManifest.version,pluginVersion:vcsManifest.version,tag:process.env.RELEASE_TAG,sha:process.env.RELEASE_SHA,runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,tools:{node:process.version,host:hostManifest.version,slots:slotsPackage.version},passed:true,contracts:['peer-gate','registration','authentication','session','assets','rpc','branch-switch-rpc','lazy-client','dispose-reload']},null,2)+'\n');

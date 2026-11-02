@@ -20,6 +20,14 @@
 
 自动测试使用临时SVN工具，并为它配置UTF-8参数支持；这只适用于测试副本，不修复用户电脑上的SVN，也不随插件分发。维护者细节见[Windows测试脚本](<../scripts/ci-svn-utf8.ps1>)。
 
+## 本地分支切换的额外要求（0.6.0）
+
+默认浏览仍只读，只有独立入口的“预览 → 明确确认”可以切换已有本地 Git 分支；历史引用下拉不写工作区。需要支持 `git switch` 及所用安全选项的 Git，失败时不降级成 checkout／force。仅普通内置 `.git` 目录的非 bare 仓库；linked worktree、分离或符号链接 gitdir、`core.worktree`、detached／unborn HEAD、与目标同名的 tag 均不支持。其他 worktree 占用目标时沿用 Git 拒绝。
+
+工作区必须完全干净，包含未跟踪和被忽略文件；`node_modules`、`dist` 等 ignored 内容也会阻止切换，插件不会替你删除。当前／目标树有符号链接、gitlink 或 `.gitattributes`，工作树路径含符号链接或硬链接、Git元数据含符号链接／硬链接或alternates（本地克隆硬链接对象也不支持），存在 `info/attributes`、过滤器／命令 hooks 配置、稀疏／部分克隆、assume-unchanged／skip-worktree、进行中操作或锁，也会保守拒绝。分支列表最多 1000 条，并受命令输出与整操作时间预算约束。
+
+不提供 stage、commit、stash、force 或网络操作。写入开始后的失败可能结果未知，先手动刷新并核对 HEAD、Index 和工作文件，不能盲重试或假定已回滚。专项测试与同标签发布验证以对应运行报告分别记录，不因新增入口推定当前 GUI 已支持或实机通过。
+
 ## 哪些验证已覆盖
 
 0.4.11 已针对 DSH `0.2.1-rc.2` 完成隔离宿主与客户端加载合同检查；具体层次及未验收事项见[本版记录](<releases/0.4.11.md>)。不将版本门禁接受等同于实际页面验收。

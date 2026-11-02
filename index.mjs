@@ -3,6 +3,8 @@ import {readFileSync} from 'node:fs';
 import {registerFrontendAssets} from './frontend-assets.mjs';
 const runningFrontend=JSON.parse(readFileSync(new URL('./dist/frontend.json',import.meta.url),'utf8'));
 import * as adapter from './vcs.mjs';
+import * as branchAdapter from './branch-switch.mjs';
+import {createBranchSwitchCoordinator,acquireRepositoryAccess} from './branch-switch-host.mjs';
 import {withOperationBudget} from './src/operation-budget.mjs';
 import {runtimeInfo,checkUpdate} from './dist/updates.mjs';
 import {createSvnHttpsHost} from './dist/svn-host.mjs';
@@ -34,6 +36,9 @@ const REQUEST_FIELDS = {
   'vcs/repositories': ['sessionId', 'subdirectory'],
   'vcs/svn-identity': ['sessionId', 'repositoryId'],
   'vcs/references': ['sessionId', 'repositoryId'],
+  'vcs/branches': ['sessionId', 'repositoryId'],
+  'vcs/branch-switch-prepare': ['sessionId', 'repositoryId', 'branch'],
+  'vcs/branch-switch-confirm': ['sessionId', 'repositoryId', 'token'],
   'vcs/stash-list': ['sessionId', 'repositoryId'],
   'vcs/grep': ['sessionId', 'repositoryId', 'commit', 'query'],
   'vcs/status': ['sessionId', 'repositoryId', 'mode'],
@@ -164,6 +169,8 @@ function validateModeAndComparisonId(endpoint, payload) {
 /** The validation order below is part of the protocol: the first failing group wins. */
 function validateRepositoryPayload(endpoint, payload) {
   if (typeof payload.repositoryId !== 'string' || !payload.repositoryId || payload.repositoryId.length > 1024) throw invalid('A discovered repositoryId is required.');
+  if(endpoint==='vcs/branch-switch-prepare'&&(typeof payload.branch!=='string'||!payload.branch||payload.branch.length>1024||/[\0\r\n]/.test(payload.branch)))throw invalid('A local branch name is required.');
+  if(endpoint==='vcs/branch-switch-confirm'&&(typeof payload.token!=='string'||! /^[a-f0-9]{64}$/.test(payload.token)))throw invalid('A valid branch confirmation token is required.');
   validateHistoricalPath(endpoint, payload.path);
   validateImageSide(endpoint, payload.side);
   validateRevisionSelection(endpoint, payload);
@@ -255,11 +262,13 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
 }
 
 /** Limit active adapter operations and retain only bounded, short-lived discovery grants. */
-export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, operationTimeoutMs = 15000, bindSvnIdentityResolver } = {}) {
+export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, operationTimeoutMs = 15000, bindSvnIdentityResolver } = {}) {
   let active = 0, activeImages = 0, activeSegments = 0;
   const sessions = new Map();
+  const branchSwitch=createBranchSwitchCoordinator({api,now});
 
   const clearGrantCache = entry => {
+    branchSwitch.invalidate(entry);
     for (const repository of entry?.repositories.values() ?? []) api.clearHistoricalCache?.(repository.root);
   };
   const revokeSession = id => { clearGrantCache(sessions.get(id)); sessions.delete(id); };
@@ -401,12 +410,23 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       // Both adapter operations revalidate the canonical root; comparison also validates
       // the change ID against fresh status, so do not duplicate a full status scan here.
       if (GIT_ONLY_ENDPOINTS.has(endpoint) && repository.type !== 'git') throw invalid('History currently supports Git only.');
+      const authorize=()=>assertCurrentGrant(payload.sessionId,cwd,entry,payload.repositoryId,repository,signal);
+      if(endpoint==='vcs/branch-switch-confirm'){
+        try{return {ok:true,value:await branchSwitch.confirm(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};}
+        finally{api.clearHistoricalCache?.(repository.root);}
+      }
+      const releaseRepository=acquireRepositoryAccess(repository.root);
+      try{
+      if(endpoint==='vcs/branches'){const value=await api.listLocalBranches({...repository},{signal});await authorize();return {ok:true,value};}
+      if(endpoint==='vcs/branch-switch-prepare')return {ok:true,value:await branchSwitch.prepare(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};
       const admission = admitHeavyOperation(endpoint, payload);
       imageSlot = admission.imageSlot;
       segmentSlot = admission.segmentSlot;
       if (admission.busy) return admission.busy;
       return { ok: true, value: await readGrantedRepository(endpoint, repository, payload, cwd, mode, entry, signal) };
+      }finally{releaseRepository();}
     } catch (error) {
+      if(error?.code==='vcs/branch-outcome-unknown')return failure(error.code,error.message);
       if (signal?.aborted || error?.name === 'AbortError') return failure('vcs/cancelled', 'The request was cancelled.');
       const code = error?.code === 'TIMEOUT' ? 'vcs/timeout' : typeof error?.code === 'string' && error.code.startsWith('vcs/') ? error.code : 'vcs/operation-failed';
       return failure(code, error instanceof Error ? error.message : String(error));
@@ -416,14 +436,18 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       if (segmentSlot) activeSegments--;
     }
   };
-  return async (endpoint, payload, signal) => {
+  const handle=async (endpoint, payload, signal) => {
     try {
       return await withOperationBudget({signal, timeoutMs: operationTimeoutMs}, () => execute(endpoint, payload, signal));
     } catch (error) {
+      if(error?.code==='vcs/branch-outcome-unknown')return failure(error.code,error.message);
+      if(endpoint==='vcs/branch-switch-confirm')return failure('vcs/branch-outcome-unknown','Confirmation did not complete within its request lifetime. Refresh and inspect the current branch before preparing again.');
       if (signal?.aborted || error?.name === 'AbortError') return failure('vcs/cancelled', 'The request was cancelled.');
       return failure(error?.code === 'TIMEOUT' ? 'vcs/timeout' : 'vcs/operation-failed', error.message);
     }
   };
+  handle.dispose=()=>{branchSwitch.clear();for(const id of sessions.keys())revokeSession(id);};
+  return handle;
 }
 
 /** Content type is fixed per build artifact; URL input never chooses it. */
@@ -473,7 +497,7 @@ export function registerDirectAssets(ctx, load = filename => readFile(new URL('.
 export function apply(ctx) {
   // Pass the plugin owner explicitly: the nested rpc getter can retain the
   // connection service context, which does not inject webServer.
-  const host=createSvnHttpsHost(ctx,adapter);
+  const host=createSvnHttpsHost(ctx,{...adapter,...branchAdapter});
   ctx.effect(()=>()=>{ host.dispose(); adapter.clearHistoricalCache?.(); });
   ctx.connection.register(ctx, RPC_CHANNEL, host.handle);
   registerAssets(ctx);
