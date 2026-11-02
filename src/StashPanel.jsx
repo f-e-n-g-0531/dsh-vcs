@@ -7,6 +7,6 @@ export default function StashPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  if(!stashes)return <section aria-label={t('stashTitle')}><h3>{t('stashTitle')}</h3><p role="status">{t('loading')}</p></section>;
  return <section aria-label={t('stashTitle')}><h3>{t('stashTitle')}</h3><p>{t('stashScope')}</p>
   {!stashes.length?<p role="status">{t('stashEmpty')}</p>:<ol>{stashes.map(s=><li key={s.id}><button aria-pressed={selected===s.id} onClick={()=>setSelected(s.id)}><code>{s.ref}</code> · {s.message}</button></li>)}</ol>}
-  {selected&&<CommitDetails sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={()=>{}} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+  {selected&&<CommitDetails sessionId={sessionId} repositoryId={repositoryId} commit={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </section>;
 }

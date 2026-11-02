@@ -1,9 +1,10 @@
 import React,{useEffect,useState} from 'react';
+import {mergeFileHistoryWindow,previousHistoryOffset} from './history-pages.mjs';
 function PathHistoryPages({sessionId,repositoryId,commit,path:file,follow,since,until,rpc,t,onRediscover,onSelectCommit}){
  const [page,setPage]=useState({commits:[],nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
-  rpc('vcs/tree-history',{sessionId,repositoryId,commit,path:file,offset,limit:50,follow,...(since?{since}:{}),...(until?{until}:{})},controller.signal).then(value=>{if(!controller.signal.aborted)setPage(old=>({...value,commits:offset?[...old.commits,...value.commits]:value.commits}));}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
+  rpc('vcs/tree-history',{sessionId,repositoryId,commit,path:file,offset,limit:50,follow,...(since?{since}:{}),...(until?{until}:{})},controller.signal).then(value=>{if(!controller.signal.aborted)setPage(old=>mergeFileHistoryWindow(old,value,offset));}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,commit,file,offset,retry,follow,since,until]);
  const boundary=row=>t(row.boundary==='merge-first-parent'?'fileHistoryMergeBoundary':row.boundary==='ambiguous-rename'?'fileHistoryAmbiguous':row.boundary==='rename-check-limit'?'fileHistoryRenameLimit':'fileHistoryBoundary');
@@ -13,6 +14,7 @@ function PathHistoryPages({sessionId,repositoryId,commit,path:file,follow,since,
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
  {page.truncated&&<p role="status">{t('historyLimit')}</p>}
+ {!!offset&&<button disabled={busy} onClick={()=>setOffset(previousHistoryOffset(offset))}>{t('historyBack')}</button>}
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  </section>;
 }

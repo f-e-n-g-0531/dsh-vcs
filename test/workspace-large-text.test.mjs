@@ -6,7 +6,7 @@ test('workspace reader rejects mutation and active cancellation before read comp
  const root=await fs.realpath(await fs.mkdtemp(path.join(tmpdir(),'vcs-large-race-'))),file=path.join(root,'file.txt');
  try{
   await fs.writeFile(file,'original');let checks=0;
-  await assert.rejects(readWorkspaceLargeText(root,'file.txt',undefined,()=>{if(++checks===2)writeFileSync(file,'mutated longer content');}),/changed/);
+  await assert.rejects(readWorkspaceLargeText(root,'file.txt',undefined,()=>{if(++checks===2)writeFileSync(file,'mutated longer content');}),error=>error.code==='vcs/selection-changed'&&/changed/.test(error.message));
   await fs.writeFile(file,'original');checks=0;const controller=new AbortController();
   await assert.rejects(readWorkspaceLargeText(root,'file.txt',controller.signal,()=>{if(++checks===2)controller.abort();}));
   await fs.writeFile(file,'after abort');assert.equal(await fs.readFile(file,'utf8'),'after abort');
@@ -21,7 +21,7 @@ test('workspace large reader returns complete text and rejects later replacement
  try{
   const text=('unicode 中文 '+ 'x'.repeat(100)+'\n').repeat(25000),file=path.join(root,'file.txt');await fs.writeFile(file,text);
   const result=await readWorkspaceLargeText(root,'file.txt');assert.equal(result.value.text,text);await result.verify();
-  await fs.writeFile(file,'changed');await assert.rejects(result.verify,/changed/);
+  await fs.writeFile(file,'changed');await assert.rejects(result.verify,error=>error.code==='vcs/selection-changed'&&/changed/.test(error.message));
   await fs.writeFile(file,Buffer.from([255]));await assert.rejects(readWorkspaceLargeText(root,'file.txt'),/UTF-8/);
   await fs.writeFile(file,'x'.repeat(8*1024*1024+1));await assert.rejects(readWorkspaceLargeText(root,'file.txt'),/8 MiB/);
   await assert.rejects(readWorkspaceLargeText(root,'../outside'),/escapes/);

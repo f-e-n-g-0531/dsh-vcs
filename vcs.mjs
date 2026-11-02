@@ -13,14 +13,19 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import {decode, MAX_TEXT, MAX_LARGE_TEXT, decodeLargeText} from './text-content.mjs';
 import {inside, confined} from './repository-path.mjs';
 import {readWorkspaceLargeText} from './workspace-large-text.mjs';
+import {createHistoricalAccess,validateHistoricalPath} from './src/historical-access.mjs';
+import {withComparisonPreview} from './src/preview-capabilities.mjs';
+
+const historicalAccess = createHistoricalAccess({run:git});
+/** Host invalidates object bytes on grant replacement, expiry and plugin disposal. */
+export const clearHistoricalCache = root => historicalAccess.clear(root);
+export const historicalCacheStats = () => historicalAccess.stats();
 
 // Shared read-only adapter bounds. Values are part of the public contract:
 // history pagination, per-result entry caps and segmented-preview byte budgets.
 const MAX_HISTORY_OFFSET = 10000;
 const MAX_HISTORY_PAGE = 100;
 const MAX_RESULT_ENTRIES = 10000;
-const MAX_SEGMENT_BYTES = 16 * 1024 * 1024;
-const SEGMENT_CHUNK_BYTES = 64 * 1024;
 const RENAME_CONFIRMATION_LIMIT = 32;
 const METADATA_BATCH_SIZE = 64;
 const METADATA_BATCH_BYTES = 24000;
@@ -277,9 +282,10 @@ export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
   catch{throw new Error('Content search requires a resolved HEAD commit');}
  }
  if(!isObjectId(snapshot))throw new Error('Invalid content search commit');
+ if((await git(repo.root,['cat-file','-t',snapshot],MAX_TEXT,{signal})).toString('utf8').trim()!=='commit')throw Error('Content search requires a commit object');
  let text;
  try{text=(await git(repo.root,['-c','grep.column=false','grep','--no-color','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
- catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {matches:[]};throw error;}
+ catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {snapshot,matches:[]};throw error;}
  signal?.throwIfAborted();
  const matches=[];
  // -z frames path and line with NUL; legal paths can contain LF.
@@ -294,7 +300,7 @@ export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
   matches.push({path,line:Number(lineNo),text:lineText});
   if(matches.length>500)throw new Error('Content search exceeds match limit');
  }
- return {matches};
+ return {snapshot,matches};
 }
 
 export async function getCommitDetails(repo,options={}) {
@@ -343,39 +349,30 @@ function parseCommitChanges(text,scope){
   }
   return changes;
 }
-export async function getHistoricalSegment(repo,{commit,path:file,offset=0,signal}={}){
- if(!Number.isInteger(offset)||offset<0||offset>MAX_SEGMENT_BYTES)throw Error('Invalid segment offset');
- if(typeof file!=='string'||!file||file.includes('\0'))throw Error('Invalid historical path');
- repo=await checkedRepo(repo,signal);
- const tree=await getHistoricalTree(repo,{commit,signal}),entry=tree.entries.find(row=>row.path===file);
- if(!entry||entry.type!=='blob'||!['100644','100755'].includes(entry.mode))throw Error('Segment requires a selected committed regular file');
- const sizeText=(await git(repo.root,['cat-file','-s',entry.oid],MAX_TEXT,{signal})).toString('utf8').trim();
- if(!/^\d+$/.test(sizeText))throw Error('Invalid object size');
- const size=Number(sizeText);
- if(size>MAX_SEGMENT_BYTES)throw Error('Segmented file exceeds 16 MiB limit');
- if(offset>size)throw Error('Segment offset exceeds file size');
- const buffer=await git(repo.root,['cat-file','blob',entry.oid],MAX_SEGMENT_BYTES,{signal});
- if(buffer.length!==size)throw Error('Historical blob size mismatch');
- if(buffer.includes(0)||buffer.some(byte=>byte<32&&![9,10,12,13].includes(byte)))throw Error('Segments support UTF-8 text only');
- new TextDecoder('utf-8',{fatal:true}).decode(buffer);
- if(offset<size&&(buffer[offset]&192)===128)throw Error('Segment offset splits UTF-8 character');
- let end=Math.min(size,offset+SEGMENT_CHUNK_BYTES);
- while(end<size&&(buffer[end]&192)===128)end--;
- const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer.subarray(offset,end));
- signal?.throwIfAborted();
- return {commit,path:file,oid:entry.oid,encoding:'UTF-8',offset,endOffset:end,totalBytes:size,nextOffset:end<size?end:null,text};
+export async function getHistoricalSegment(repo, {commit,path:file,offset = 0,signal} = {}) {
+ const expectedEpoch = historicalAccess.captureEpoch();
+ // Capture before any await: revoked in-flight validation cannot refill object bytes.
+ repo = await checkedGitRepo(repo, signal, 'Historical segments support Git only');
+ return historicalAccess.segment(repo.root, {commit,path:file,offset,signal,expectedEpoch});
 }
-export async function getHistoricalFile(repo,{commit,path:file,signal}={}){
- if(typeof file!=='string'||!file||file.includes('\0'))throw new Error('Invalid historical path');
- repo=await checkedRepo(repo,signal);
- const tree=await getHistoricalTree(repo,{commit,signal}),entry=tree.entries.find(row=>row.path===file);
- if(!entry)throw new Error('Path is not part of selected commit');
- if(entry.type!=='blob'||!['100644','100755'].includes(entry.mode))throw new Error('Historical file preview requires a regular file');
- const result=await content(()=>git(repo.root,['cat-file','blob',entry.oid],MAX_TEXT,{signal}));
+
+export async function getHistoricalFile(repo,{commit,path:file,signal}={}) {
+ if(typeof file !== 'string' || !file || file.includes('\0')) throw Error('Invalid historical path');
+ try {validateHistoricalPath(file);} catch {throw Error('Path is not part of selected commit');}
+ repo = await checkedGitRepo(repo, signal, 'Historical file supports Git only');
+ const entry = await historicalAccess.lookup(repo.root, {commit,path:file,signal});
+ if (entry.type !== 'blob' || !['100644','100755'].includes(entry.mode)) throw Error('Historical file preview requires a regular file');
+ const result = await content(() => git(repo.root, ['cat-file','blob',entry.oid], MAX_TEXT, {signal}));
  signal?.throwIfAborted();
  return {commit,path:file,oid:entry.oid,...result};
 }
-export async function getHistoricalTree(repo,{commit,signal}={}){
+
+export async function getHistoricalTreePage(repo, options = {}) {
+ repo = await checkedGitRepo(repo, options.signal, 'Historical tree supports Git only');
+ return historicalAccess.treePage(repo.root, options);
+}
+
+export async function getHistoricalTree(repo,{commit,signal}={}) {
  if(typeof commit!=='string'||!isObjectId(commit))throw new Error('Invalid commit id');
  repo=await checkedGitRepo(repo,signal,'Historical tree supports Git only');
  const type=(await git(repo.root,['cat-file','-t',commit],MAX_TEXT,{signal})).toString('utf8').trim();if(type!=='commit')throw new Error('Commit object required');
@@ -438,7 +435,9 @@ export async function getWorkspaceImage(repo,{mode='all',id,side='right',signal}
    if(!before.isFile()||before.isSymbolicLink())throw Error('Image preview requires a regular file');if(before.size>MAX_TEXT)throw Error('Image exceeds 2 MiB limit');
    const handle=await fs.open(target,fileFlags.O_RDONLY|(fileFlags.O_NOFOLLOW||0));try{
     const fingerprint=s=>JSON.stringify([s.dev,s.ino,s.size,s.mtimeMs,s.ctimeMs]);const opened=await handle.stat();if(!opened.isFile()||fingerprint(opened)!==fingerprint(before))throw Error('Working image changed during read');
-    const buffer=Buffer.alloc(MAX_TEXT+1);const {bytesRead}=await handle.read(buffer,0,buffer.length,0);signal?.throwIfAborted();const after=await handle.stat(),named=await fs.lstat(target);await confined(repo.root,file);
+    const buffer=Buffer.alloc(before.size+1);let bytesRead=0;
+    while(bytesRead<buffer.length){signal?.throwIfAborted();const result=await handle.read(buffer,bytesRead,buffer.length-bytesRead,bytesRead);if(!result.bytesRead)break;bytesRead+=result.bytesRead;}
+    signal?.throwIfAborted();const after=await handle.stat(),named=await fs.lstat(target);await confined(repo.root,file);
     if(named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before)||bytesRead!==before.size)throw Error('Working image changed during read');
     result={path:file,commit:'Working tree',...await workspacePng(buffer.subarray(0,bytesRead),signal)};
     verifyWorking=async()=>{await confined(repo.root,file);const validated=await fs.lstat(target);if(validated.isSymbolicLink()||fingerprint(validated)!==fingerprint(before))throw Error('Working image changed during validation');};await verifyWorking();
@@ -638,43 +637,47 @@ async function changes(repo, mode, options) {
 export async function listChanges(repo, mode = 'all', {signal} = {}) { repo = await checkedRepo(repo,signal); modeFor(repo, mode); const result=await changes(repo, mode,{signal});signal?.throwIfAborted();return result; }
 // Keep the public adapter decoding export compatible with existing consumers.
 export {decode} from './text-content.mjs';
-async function content(fn) { try { return decode(await fn()); } catch (e) { if (e.code === 'TOO_LARGE') return { text: '', notice: 'File exceeds the 2 MiB preview limit.' }; throw e; } }
+async function content(fn) { try { return decode(await fn()); } catch (e) { if (e.code === 'TOO_LARGE') return { text: '', previewReason:'size-limit', notice: 'File exceeds the 2 MiB preview limit.' }; throw e; } }
 async function working(root, relative, svnLink = false, signal) {
   signal?.throwIfAborted();
   const target = await confined(root, relative);
   let stat; try { stat = await fs.lstat(target); } catch (e) { if (e.code === 'ENOENT') return { text: '' }; throw e; }
-  if (stat.isSymbolicLink()) return { text: (svnLink ? 'link ' : '') + await fs.readlink(target) };
-  if (!stat.isFile()) return { text: '', notice: 'Directory or special file; no file-content preview.' };
-  if (stat.size > MAX_TEXT) return { text: '', notice: 'File exceeds the 2 MiB preview limit.' };
+  if (stat.isSymbolicLink()) return { text:(svnLink ? 'link ' : '') + await fs.readlink(target), largeEligible:false };
+  if (!stat.isFile()) return { text:'', previewReason:'unsupported-type', largeEligible:false, notice:'Directory or special file; no file-content preview.' };
+  if (stat.size > MAX_TEXT) return { text:'', previewReason:'size-limit', largeEligible:stat.size<=MAX_LARGE_TEXT, notice:'File exceeds the 2 MiB preview limit.' };
   const fingerprint=s=>[s.dev,s.ino,s.size,s.mtimeNs,s.ctimeNs].map(String).join(':');
   const before=await fs.lstat(target,{bigint:true});
-  if(!before.isFile()||before.size>BigInt(MAX_TEXT))throw Error('Working file changed before read; refresh status');
+  if(!before.isFile()||before.size>BigInt(MAX_TEXT))throw selectionChanged('Working file changed before read; refresh status');
   const handle = await fs.open(target,fileFlags.O_RDONLY|(fileFlags.O_NOFOLLOW||0));
   try {
-    const opened=await handle.stat({bigint:true});if(!opened.isFile()||fingerprint(opened)!==fingerprint(before))throw Error('Working file changed during open');
+    const opened=await handle.stat({bigint:true});if(!opened.isFile()||fingerprint(opened)!==fingerprint(before))throw selectionChanged('Working file changed during open');
     const buffer=Buffer.alloc(Number(before.size)+1);let offset=0;
     while(offset<buffer.length){signal?.throwIfAborted();const {bytesRead}=await handle.read(buffer,offset,buffer.length-offset,offset);if(!bytesRead)break;offset+=bytesRead;}
     signal?.throwIfAborted();await confined(root,relative);
     const after=await handle.stat({bigint:true}),named=await fs.lstat(target,{bigint:true});
-    if(offset!==Number(before.size)||!named.isFile()||named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before))throw Error('Working file changed during read; refresh status');
+    if(offset!==Number(before.size)||!named.isFile()||named.isSymbolicLink()||fingerprint(after)!==fingerprint(before)||fingerprint(named)!==fingerprint(before))throw selectionChanged('Working file changed during read; refresh status');
     return decode(buffer.subarray(0,offset));
   } finally { await handle.close(); }
 }
-async function gitBlob(root, revision, file, options) {
+const selectionChanged = message => Object.assign(Error(message || 'Workspace selection changed; refresh repository status'), {code:'vcs/selection-changed'});
+
+async function gitBlob(root, revision, file, options, indexSnapshot) {
  let record;
  if(revision){
   const raw=(await git(root,['ls-tree','-z',revision,'--',file],MAX_TEXT,options)).toString('utf8');
   const row=raw.split('\0').find(row=>row.includes('\t')&&row.slice(row.indexOf('\t')+1)===file);
   if(!row)return {text:''};const [mode,type,oid]=row.slice(0,row.indexOf('\t')).split(' ');record={mode,type,oid};
  }else{
-  const raw=(await git(root,['ls-files','--stage','-z','--',file],MAX_TEXT,options)).toString('utf8');
+  const raw=(indexSnapshot ?? await git(root,['ls-files','--stage','-z','--',file],MAX_TEXT,options)).toString('utf8');
   for(const row of raw.split('\0')){const tab=row.indexOf('\t');if(tab<0||row.slice(tab+1)!==file)continue;const [mode,oid,stage]=row.slice(0,tab).split(' ');if(stage==='0')record={mode,oid,type:mode==='160000'?'commit':'blob'};}
   if(!record)return {text:'',notice:'No stage-0 Index entry; conflict stages are not inferred.'};
  }
  if(!isObjectId(record.oid))throw Error('Invalid selected object');
- if(record.mode==='160000')return {text:'Submodule '+record.oid,notice:'Recorded gitlink pointer; nested checkout commit and contents are not loaded by this preview.'};
- if(record.type!=='blob'||!['100644','100755','120000'].includes(record.mode))return {text:'',notice:'Unsupported selected object; contents not loaded.'};
+ if(record.mode==='160000')return {text:'Submodule '+record.oid,largeEligible:false,notice:'Recorded gitlink pointer; nested checkout commit and contents are not loaded by this preview.'};
+ if(record.type!=='blob'||!['100644','100755','120000'].includes(record.mode))return {text:'',previewReason:'unsupported-type',largeEligible:false,notice:'Unsupported selected object; contents not loaded.'};
  const body=await content(()=>git(root,['cat-file','blob',record.oid],MAX_TEXT,options));
+ if(body.previewReason==='size-limit'){const size=(await git(root,['cat-file','-s',record.oid],MAX_TEXT,options)).toString('utf8').trim();body.largeEligible=/^\d+$/.test(size)&&Number(size)<=MAX_LARGE_TEXT;}
+ if(record.mode==='120000')body.largeEligible=false;
  if(record.mode==='120000')body.notice=[body.notice,'Symbolic link target text; not followed.'].filter(Boolean).join(' ');
  return body;
 }
@@ -685,8 +688,8 @@ async function historicalBlob(root,revision,file,signal,large=false,budget){
   if(!record)throw new Error('Historical path missing');
   const [mode,type,oid]=record.slice(0,record.indexOf('	')).split(' ');
   if(large&&(!['100644','100755'].includes(mode)||type!=='blob'))throw new Error('Large comparison requires a committed regular file.');
-  if(mode==='160000')return {text:oid,notice:'Submodule commit reference; repository contents are not loaded.'};
-  if(type!=='blob'||!['100644','100755','120000'].includes(mode))return {text:'',notice:'Unsupported historical object type.'};
+  if(mode==='160000')return {text:oid,largeEligible:false,notice:'Submodule commit reference; repository contents are not loaded.'};
+  if(type!=='blob'||!['100644','100755','120000'].includes(mode))return {text:'',previewReason:'unsupported-type',largeEligible:false,notice:'Unsupported historical object type.'};
   if (large) {
     const rawSize = (await git(root, ['cat-file', '-s', oid], MAX_TEXT, budget?budget():{signal})).toString('utf8').trim();
     if (!/^\d+$/.test(rawSize)) throw new Error('Invalid historical object size.');
@@ -697,7 +700,9 @@ async function historicalBlob(root,revision,file,signal,large=false,budget){
     return decodeLargeText(buffer, signal);
   }
 
-  const result=await content(()=>git(root,['cat-file','blob',oid],MAX_TEXT,{signal}));
+  const result=await content(()=>git(root,['cat-file','blob',oid],MAX_TEXT,budget?budget():{signal}));
+  if(result.previewReason==='size-limit'){const size=(await git(root,['cat-file','-s',oid],MAX_TEXT,budget?budget():{signal})).toString('utf8').trim();result.largeEligible=/^\d+$/.test(size)&&Number(size)<=MAX_LARGE_TEXT;}
+  if(mode==='120000')result.largeEligible=false;
   if(mode==='120000')result.notice=[result.notice,'Symbolic link target text; not followed.'].filter(Boolean).join(' ');
   return result;
 }
@@ -709,7 +714,7 @@ export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal,l
   if(!entry)throw new Error('Historical change is not part of selected commit and parent');
   const left=details.parent&&entry.status!=='added'?await historicalBlob(repo.root,details.parent,entry.oldPath||entry.path,signal,large):{text:''};
   const right=entry.status!=='deleted'?await historicalBlob(repo.root,commit,entry.path,signal,large):{text:''};
-  return {...entry,large,left:{...left,label:details.parent||'Empty tree'},right:{...right,label:commit},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
+  return withComparisonPreview({...entry,large,left:{...left,label:details.parent||'Empty tree'},right:{...right,label:commit},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')},{allowLarge:true});
 }
 export async function getRevisionComparison(repo,{base,target,id,signal,large=false}={}){
   if(typeof large!=='boolean')throw new Error('Invalid large comparison mode');
@@ -719,7 +724,7 @@ export async function getRevisionComparison(repo,{base,target,id,signal,large=fa
   if(!entry)throw new Error('Change is not part of selected revision pair');
   const left=entry.status!=='added'?await historicalBlob(repo.root,base,entry.oldPath||entry.path,signal,large):{text:''};
   const right=entry.status!=='deleted'?await historicalBlob(repo.root,target,entry.path,signal,large):{text:''};
-  return {...entry,base,target,large,left:{...left,label:base},right:{...right,label:target},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')};
+  return withComparisonPreview({...entry,base,target,large,left:{...left,label:base},right:{...right,label:target},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')},{allowLarge:true});
 }
 async function properties(root, file, base, signal) {
   signal?.throwIfAborted();
@@ -735,7 +740,7 @@ async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
  repo=await checkedRepo(repo,signal,options);modeFor(repo,mode);assertGit(repo,'Large workspace comparison supports Git only');
  const run=args=>git(repo.root,args,MAX_TEXT,options());
  const status=()=>changes(repo,mode,options());
- const entry=(await status()).find(row=>row.id===id);if(!entry)throw Error('Change no longer exists; refresh repository status');
+ const entry=(await status()).find(row=>row.id===id);if(!entry)throw selectionChanged('Change no longer exists; refresh repository status');
  if(entry.status==='conflicted')throw Error('Large conflicted comparisons are not supported');
  const head=()=>resolveHeadCommit(run);
  const revision=await head(),indexArgs=['ls-files','--stage','-z','--',entry.path],index=await run(indexArgs);
@@ -751,11 +756,11 @@ async function getWorkspaceLargeComparison(repo,{mode,id,signal}){
  if(mode==='staged'){if(entry.indexStatus!=='D')right=await readIndex();}
  else if(entry.worktreeStatus!=='D'){
   try{const result=await readWorkspaceLargeText(repo.root,entry.path,signal,options);right=result.value;verify=result.verify;}
-  catch(error){if(error.code!=='ENOENT'||entry.indexStatus!=='D')throw error;verify=async()=>{const target=await confined(repo.root,entry.path);try{await fs.lstat(target);throw Error('Working file appeared; refresh repository status');}catch(missing){if(missing.code!=='ENOENT')throw missing;}};await verify();}
+  catch(error){if(error.code!=='ENOENT'||entry.indexStatus!=='D')throw error;verify=async()=>{const target=await confined(repo.root,entry.path);try{await fs.lstat(target);throw selectionChanged('Working file appeared; refresh repository status');}catch(missing){if(missing.code!=='ENOENT')throw missing;}};await verify();}
  }
- options();if(revision!==await head()||!index.equals(await run(indexArgs))||!(await status()).some(row=>row.id===id))throw Error('Workspace selection changed; refresh repository status');
+ options();if(revision!==await head()||!index.equals(await run(indexArgs))||!(await status()).some(row=>row.id===id))throw selectionChanged('Workspace selection changed; refresh repository status');
  await verify?.();options();
- return {...entry,large:true,left:{...left,label:mode==='unstaged'?'Index':'HEAD'},right:{...right,label:mode==='staged'?'Index':'Working tree'}};
+ return withComparisonPreview({...entry,large:true,left:{...left,label:mode==='unstaged'?'Index':'HEAD'},right:{...right,label:mode==='staged'?'Index':'Working tree'}});
 }
 
 /** Explicit Index stage snapshot; never reads the selected working file or submodule. */
@@ -763,10 +768,10 @@ export async function getConflictStages(repo,{mode='all',id,signal}={}){
  const deadline=Date.now()+TIMEOUT,budget=()=>{signal?.throwIfAborted();const timeoutMs=deadline-Date.now();if(timeoutMs<=0)throw Object.assign(Error('Conflict stage read timed out'),{code:'TIMEOUT'});return {signal,timeoutMs};};
  if(typeof id!=='string'||!isChangeId(id))throw Error('Invalid conflict change id');
  repo=await checkedRepo(repo,signal,budget);modeFor(repo,mode);assertGit(repo,'Conflict stages support Git only');
- const entry=(await changes(repo,mode,budget())).find(row=>row.id===id);if(!entry||entry.status!=='conflicted')throw Error('Selected conflict no longer exists; refresh status.');
+ const entry=(await changes(repo,mode,budget())).find(row=>row.id===id);if(!entry||entry.status!=='conflicted')throw selectionChanged('Selected conflict no longer exists; refresh status.');
  await confined(repo.root,entry.path);
  const list=()=>git(repo.root,['ls-files','--unmerged','-z','--',entry.path],MAX_TEXT,budget());
- const before=await list(),metadata=parseConflictStages(before,entry.path);if(!metadata.length)throw Error('Conflict stages no longer exist; refresh status.');
+ const before=await list(),metadata=parseConflictStages(before,entry.path);if(!metadata.length)throw selectionChanged('Conflict stages no longer exist; refresh status.');
  const stages=[];
  for(const stage of [1,2,3]){
   const record=metadata.find(row=>row.stage===stage);if(!record){stages.push({stage,present:false,text:''});continue;}
@@ -774,52 +779,96 @@ export async function getConflictStages(repo,{mode='all',id,signal}={}){
   else{body=await content(()=>git(repo.root,['cat-file','blob',record.oid],MAX_TEXT,budget()));if(record.kind==='symlink')body.notice=[body.notice,'Symbolic link target text; not followed.'].filter(Boolean).join(' ');}
   stages.push({...record,present:true,...body});
  }
- if(!(await list()).equals(before))throw Error('Conflict Index changed while reading; refresh status.');
- if(!(await changes(repo,mode,budget())).some(row=>row.id===id&&row.status==='conflicted'))throw Error('Selected conflict changed while reading; refresh status.');
+ if(!(await list()).equals(before))throw selectionChanged('Conflict Index changed while reading; refresh status.');
+ if(!(await changes(repo,mode,budget())).some(row=>row.id===id&&row.status==='conflicted'))throw selectionChanged('Selected conflict changed while reading; refresh status.');
  await confined(repo.root,entry.path);budget();
  return {id,path:entry.path,stages,snapshot:createHash('sha256').update(before).digest('hex')};
 }
 
-/** Revalidates the opaque ID against fresh status before reading any selected path. */
-export async function getComparison(repo, { mode = 'all', id, large=false, signal } = {}) {
-  if(typeof large!=='boolean')throw Error('Invalid large comparison mode');
-  if(large)return getWorkspaceLargeComparison(repo,{mode,id,signal});
+// SVN emits equivalent XML attributes in different orders; compare semantic fields, not wire bytes.
+function stableSnapshot(value) {
+  const canonical = item => Array.isArray(item) ? item.map(canonical) : item && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map(key => [key,canonical(item[key])])) : item;
+  return JSON.stringify(canonical(value));
+}
+const svnInfoSnapshot = buffer => stableSnapshot(parseXML(buffer));
+
+/** Snapshot selected file metadata without following a symlink or entering a submodule. */
+async function workingIdentity(root, file) {
+  const target = await confined(root, file);
+  try {
+    const stat = await fs.lstat(target,{bigint:true});
+    return [stat.dev,stat.ino,stat.mode,stat.size,stat.mtimeNs,stat.ctimeNs,stat.isSymbolicLink() ? await fs.readlink(target) : ''].map(String).join(':');
+  } catch (error) {if(error.code === 'ENOENT') return null;throw error;}
+}
+
+/** Bind mutable HEAD/Index to immutable objects, then reject any changed selection. */
+export async function getComparison(repo, {mode = 'all',id,large = false,signal} = {}) {
+  if(typeof large !== 'boolean') throw Error('Invalid large comparison mode');
+  if(large) return getWorkspaceLargeComparison(repo,{mode,id,signal});
   signal?.throwIfAborted();
-  repo = await checkedRepo(repo,signal); modeFor(repo, mode);
-  const entry = (await changes(repo, mode,{signal})).find(item => item.id === id);
-  if (!entry) throw new Error('Change no longer exists; refresh repository status.');
-  await confined(repo.root, entry.path); if (entry.oldPath) await confined(repo.root, entry.oldPath);
-  let left = { text: '' }, right = { text: '' }, leftLabel, rightLabel, props, notice;
-  if (repo.type === 'git') {
-    leftLabel = mode === 'unstaged' ? 'Index' : 'HEAD'; rightLabel = mode === 'staged' ? 'Index' : 'Working tree';
-    if (entry.status === 'conflicted') {
-      notice = 'Unmerged conflict: showing HEAD versus working tree (index has conflict stages).'; leftLabel = 'HEAD'; rightLabel = 'Working tree';
-      try { left = await gitBlob(repo.root, 'HEAD', entry.oldPath || entry.path,{signal}); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; }
-      right = await working(repo.root, entry.path, false, signal);
+  repo = await checkedRepo(repo,signal);modeFor(repo,mode);
+  const status = () => changes(repo,mode,{signal});
+  const entry = (await status()).find(item => item.id === id);
+  if(!entry) throw selectionChanged('Change no longer exists; refresh repository status.');
+  await confined(repo.root,entry.path);
+  if(entry.oldPath) await confined(repo.root,entry.oldPath);
+  const readsWorking = repo.type === 'svn' || mode !== 'staged' || entry.status === 'conflicted';
+  const workBefore = readsWorking ? await workingIdentity(repo.root,entry.path) : undefined;
+  let left = {text:''},right = {text:''},leftLabel,rightLabel,props,notice,verify;
+  if(repo.type === 'git') {
+    const run = args => git(repo.root,args,MAX_TEXT,{signal});
+    const head = () => resolveHeadCommit(run);
+    const revision = await head();
+    const indexArgs = ['ls-files','--stage','-z','--',entry.path];
+    const index = await run(indexArgs);
+    verify = async () => {
+      if(revision !== await head() || !index.equals(await run(indexArgs))) throw selectionChanged();
+    };
+    leftLabel = mode === 'unstaged' ? 'Index' : 'HEAD';
+    rightLabel = mode === 'staged' ? 'Index' : 'Working tree';
+    if(entry.status === 'conflicted') {
+      notice = 'Unmerged conflict: showing HEAD versus working tree (index has conflict stages).';
+      leftLabel = 'HEAD';rightLabel = 'Working tree';
+      if(revision) left = await gitBlob(repo.root,revision,entry.oldPath || entry.path,{signal});
+      right = await working(repo.root,entry.path,false,signal);
     } else {
-      let hasHead = true; try { await git(repo.root, ['rev-parse', '--verify', 'HEAD'], undefined, {signal}); } catch (e) { if (e.code !== 'VCS_COMMAND') throw e; hasHead = false; }
       const untracked = entry.indexStatus === '?';
       const addedToHead = entry.indexStatus === 'A' || entry.indexStatus === 'C';
-      if (!untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : (hasHead && !addedToHead))) left = await gitBlob(repo.root, mode === 'unstaged' ? '' : 'HEAD', mode === 'unstaged' ? entry.path : entry.oldPath || entry.path,{signal});
-      if (mode === 'staged') { if (entry.indexStatus !== 'D') right = await gitBlob(repo.root, '', entry.path,{signal}); }
-      else right = await working(repo.root, entry.path, false, signal);
+      if(!untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : revision && !addedToHead)) {
+        left = await gitBlob(repo.root,mode === 'unstaged' ? '' : revision,mode === 'unstaged' ? entry.path : entry.oldPath || entry.path,{signal},index);
+      }
+      if(mode === 'staged') {if(entry.indexStatus !== 'D') right = await gitBlob(repo.root,'',entry.path,{signal},index);}
+      else right = await working(repo.root,entry.path,false,signal);
     }
   } else {
-    leftLabel = 'BASE'; rightLabel = 'Working copy';
-    const added = ['added', 'unversioned', 'replaced'].includes(entry.status);
-    if (entry.status === 'replaced') notice = 'Replaced node: local SVN BASE is unavailable; showing empty versus working content without contacting the server.';
+    leftLabel = 'BASE';rightLabel = 'Working copy';
+    const added = ['added','unversioned','replaced'].includes(entry.status);
+    const info = () => svn(repo.root,['info','--xml','--',entry.path + '@'],undefined,{signal});
+    const before = entry.status === 'unversioned' ? null : await info();
+    verify = async () => {
+      if(before && svnInfoSnapshot(before) !== svnInfoSnapshot(await info())) throw selectionChanged('SVN BASE selection changed; refresh repository status');
+      if(props) {
+        const after = {left:added ? {} : await properties(repo.root,entry.path,true,signal),right:['deleted','missing'].includes(entry.status) ? {} : await properties(repo.root,entry.path,false,signal)};
+        if(stableSnapshot(after) !== stableSnapshot(props)) throw selectionChanged('SVN properties changed; refresh repository status');
+      }
+    };
+    if(entry.status === 'replaced') notice = 'Replaced node: local SVN BASE is unavailable; showing empty versus working content without contacting the server.';
     let directory = false;
-    try { directory = (await fs.lstat(await confined(repo.root, entry.path))).isDirectory(); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-    if (!added && !directory) {
-      const info = parseXML(await svn(repo.root, ['info', '--xml', '--', entry.path + '@'], undefined, {signal})).info.entry[0]; directory = info.kind === 'dir';
-      if (!directory) left = await content(() => svn(repo.root, ['cat', '--revision', 'BASE', '--', entry.path + '@'], MAX_TEXT, {signal}));
+    try {directory = (await fs.lstat(await confined(repo.root,entry.path))).isDirectory();} catch(error) {if(error.code !== 'ENOENT') throw error;}
+    if(!added && !directory) {
+      directory = parseXML(before).info.entry[0].kind === 'dir';
+      if(!directory) left = await content(() => svn(repo.root,['cat','--revision','BASE','--',entry.path + '@'],MAX_TEXT,{signal}));
     }
-    if (directory) notice = 'Directory change; property differences are shown separately.';
-    else right = await working(repo.root, entry.path, true, signal);
-    if (entry.status !== 'unversioned') props = { left: added ? {} : await properties(repo.root, entry.path, true, signal), right: ['deleted', 'missing'].includes(entry.status) ? {} : await properties(repo.root, entry.path, false, signal) };
-    if (entry.status === 'conflicted') notice = 'Conflicted working copy: showing BASE versus working content.';
+    if(directory) {notice = 'Directory change; property differences are shown separately.';right = {text:'',previewReason:'unsupported-type',largeEligible:false};}
+    else right = await working(repo.root,entry.path,true,signal);
+    if(entry.status !== 'unversioned') props = {left:added ? {} : await properties(repo.root,entry.path,true,signal),right:['deleted','missing'].includes(entry.status) ? {} : await properties(repo.root,entry.path,false,signal)};
+    if(entry.status === 'conflicted') notice = 'Conflicted working copy: showing BASE versus working content.';
   }
+  await verify();
+  if(!(await status()).some(row => row.id === id)) throw selectionChanged();
+  if(readsWorking && workBefore !== await workingIdentity(repo.root,entry.path)) throw selectionChanged('Working selection changed; refresh repository status');
   signal?.throwIfAborted();
-  if (entry.submodule) notice = [notice, `Submodule pointer ${entry.submodule.recorded} (checkout: ${entry.submodule.checkout}); nested commit and contents are not loaded by this preview; Git status may inspect nested state.`].filter(Boolean).join(' ');
-  return { ...entry, left: { label: leftLabel, text: left.text, encoding: left.encoding }, right: { label: rightLabel, text: right.text, encoding: right.encoding }, ...(left.binary || right.binary ? { binary: true } : {}), ...([notice, left.notice, right.notice].filter(Boolean).length ? { notice: [...new Set([notice, left.notice, right.notice].filter(Boolean))].join(' ') } : {}), ...(props ? { properties: props } : {}) };
+  if(entry.submodule) notice = [notice,`Submodule pointer ${entry.submodule.recorded} (checkout: ${entry.submodule.checkout}); nested commit and contents are not loaded by this preview; Git status may inspect nested state.`].filter(Boolean).join(' ');
+  const result = {...entry,left:{label:leftLabel,text:left.text,encoding:left.encoding},right:{label:rightLabel,text:right.text,encoding:right.encoding},...(left.binary || right.binary ? {binary:true} : {}),...([notice,left.notice,right.notice].filter(Boolean).length ? {notice:[...new Set([notice,left.notice,right.notice].filter(Boolean))].join(' ')} : {}),...(props ? {properties:props} : {})};
+  return withComparisonPreview(result,{left,right,allowLarge:repo.type === 'git',conflicted:entry.status === 'conflicted'});
 }

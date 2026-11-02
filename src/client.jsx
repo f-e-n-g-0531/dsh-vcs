@@ -7,6 +7,7 @@ import ImageComparison from './ImageComparison.jsx';
 import ConflictStages from './ConflictStages.jsx';
 import SubmoduleBadge from './SubmoduleBadge.jsx';
 import {comparisonLabels} from './comparison-labels.mjs';
+import {canLoadLarge} from './preview-actions.mjs';
 import SvnIdentity from './SvnIdentity.jsx';
 import SvnRemote from './SvnRemote.jsx';
 import HistoryPanel from './HistoryPanel.jsx';
@@ -162,7 +163,7 @@ function RepositoryToolbar({t,gitSelected,historyActive,stashActive,grepActive,r
 // Review view bodies; each panel keys its own request scope so it remounts on scope changes.
 function ReviewPanels({sessionId,repositoryId,historyRefresh,scan,rpc,t,rediscover,historyActive,stashActive,grepActive,svnSelected,gitSelected}){
   return <>
-    {historyActive&&svnSelected&&<SvnRemote key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} {...{sessionId,rpc,t}} onRediscover={rediscover}/>}
+    {historyActive&&svnSelected&&<SvnRemote key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} {...{sessionId,repositoryId,rpc,t}} onRediscover={rediscover}/>}
     {historyActive&&gitSelected&&<HistoryPanel key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
     {stashActive&&<StashPanel sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
     {grepActive&&<SearchPanel sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
@@ -223,7 +224,7 @@ function ComparisonContext({t,comparison}){
 function ComparisonExtras({t,comparison,selected,selectedRepository,selectedStatus,sessionId,mode,discoveryCwd,refresh,rpc,rediscover,large,selectionKey,detailError,editorError,computation,onToggleLarge,onRetryCompare}){
   return <>
     {comparison&&selectedRepository?.type==='git'&&<ImageComparison key={JSON.stringify([sessionId,discoveryCwd,selected.repositoryId,mode,selected.id,refresh,selectedStatus])} workspace sessionId={sessionId} repositoryId={selected.repositoryId} mode={mode} id={selected.id} rpc={rpc} t={t} onRediscover={rediscover}/>}
-    {selectedRepository?.type==='git'&&(large||comparison?.notice?.includes('2 MiB'))&&<div className="vcs-notice"><span>{t('workspaceLargeScope')}</span><button onClick={onToggleLarge}>{t(large?'largeClose':'largeLoad')}</button>{large&&detailError&&<button onClick={onRetryCompare}>{t('retry')}</button>}</div>}
+    {selectedRepository?.type==='git'&&(large||canLoadLarge(comparison))&&<div className="vcs-notice"><span>{t('workspaceLargeScope')}</span><button onClick={onToggleLarge}>{t(large?'largeClose':'largeLoad')}</button>{large&&detailError&&<button onClick={onRetryCompare}>{t('retry')}</button>}</div>}
     {comparison?.large&&<p role="status">{t(editorError?'largeFallback':computation==='complete'?'diffComplete':computation==='incomplete'?'diffIncomplete':'diffPending')}</p>}
     {comparison?.notice&&<div className="vcs-notice">{comparison.notice}</div>}
     {comparison?.submodule&&<p role="status">{t('submoduleScope')}</p>}
@@ -304,7 +305,7 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const {query,setQuery,statusFilter,setStatusFilter,tree,setTree,collapsedDirectories,setCollapsedDirectories,clearFilters}=useFileListState();
     const groups=groupChanges(visibleRepositories,statuses,query,statusFilter);
     const changes=groups.flatMap(group=>group.changes);
-    const statusCounts=countChangeStatuses(selectedStatus?.changes);
+    const statusCounts=countChangeStatuses(statuses[repositoryId]?.changes);
     const chosen=selectedStatus?.changes?.find(c=>c.id===selected?.id);
     const setTreeExpanded=expanded=>setCollapsedDirectories(old=>{const next={...old};for(const group of groups)for(const id of treeDirectoryIds(buildChangeTree(group.changes)))next[group.repository.id+'\0'+id]=!expanded;return next;});
     const busy=scanning||visibleRepositories.some(repo=>!statuses[repo.id]);

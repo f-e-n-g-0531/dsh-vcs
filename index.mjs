@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import {registerFrontendAssets} from './frontend-assets.mjs';
 const runningFrontend=JSON.parse(readFileSync(new URL('./dist/frontend.json',import.meta.url),'utf8'));
 import * as adapter from './vcs.mjs';
+import {withOperationBudget} from './src/operation-budget.mjs';
 import {runtimeInfo,checkUpdate} from './dist/updates.mjs';
 import {createSvnHttpsHost} from './dist/svn-host.mjs';
 import {historySearchArgs,validateDateBound,isObjectId,isChangeId} from './git-history.mjs';
@@ -47,6 +48,7 @@ const REQUEST_FIELDS = {
   'vcs/revision-compare': ['sessionId', 'repositoryId', 'base', 'target', 'id', 'large'],
   'vcs/revision-image': ['sessionId', 'repositoryId', 'base', 'target', 'id', 'side'],
   'vcs/tree': ['sessionId', 'repositoryId', 'commit'],
+  'vcs/tree-page': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'limit', 'query'],
   'vcs/tree-file': ['sessionId', 'repositoryId', 'commit', 'path'],
   'vcs/tree-segment': ['sessionId', 'repositoryId', 'commit', 'path', 'offset'],
   'vcs/tree-history': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'limit', 'follow', 'since', 'until'],
@@ -69,7 +71,7 @@ const HISTORICAL_PATH_ENDPOINTS = new Set(['vcs/tree-file', 'vcs/tree-segment', 
 const REVISION_PAIR_ENDPOINTS = new Set(['vcs/revision-changes', 'vcs/revision-compare', 'vcs/revision-image']);
 const REVISION_CHANGE_ID_ENDPOINTS = new Set(['vcs/revision-compare', 'vcs/revision-image']);
 const SELECTED_CHANGE_ENDPOINTS = new Set(['vcs/commit-compare', 'vcs/file-history', 'vcs/blame', 'vcs/commit-image']);
-const COMMIT_ENDPOINTS = new Set(['vcs/commit', 'vcs/commit-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image']);
+const COMMIT_ENDPOINTS = new Set(['vcs/commit', 'vcs/commit-compare', 'vcs/file-history', 'vcs/blame', 'vcs/tree', 'vcs/tree-page', 'vcs/tree-file', 'vcs/tree-segment', 'vcs/tree-history', 'vcs/commit-image']);
 const LARGE_COMPARISON_ENDPOINTS = new Set(['vcs/compare', 'vcs/commit-compare', 'vcs/revision-compare']);
 const HISTORY_PATH_ENDPOINTS = new Set(['vcs/file-history', 'vcs/tree-history']);
 const PAGINATED_HISTORY_ENDPOINTS = new Set(['vcs/history', 'vcs/file-history', 'vcs/tree-history']);
@@ -88,7 +90,8 @@ function validateRepositoriesPayload(payload) {
 
 /** Historical paths are repository-relative and can never be absolute or escape. */
 function validateHistoricalPath(endpoint, path) {
-  if (!HISTORICAL_PATH_ENDPOINTS.has(endpoint)) return;
+  if (endpoint === 'vcs/tree-page' && (path === undefined || path === '')) return;
+  if (endpoint !== 'vcs/tree-page' && !HISTORICAL_PATH_ENDPOINTS.has(endpoint)) return;
   if (typeof path !== 'string' || !path || path.length > 32768 || path.includes('\0') || path.startsWith('/') || path.split('/').some(part => !part || part === '.' || part === '..')) throw invalid('Invalid historical file path.');
 }
 
@@ -174,6 +177,11 @@ function validateRepositoryPayload(endpoint, payload) {
   validateHistoryDates(endpoint, payload);
   if (endpoint === 'vcs/history') { try { historySearchArgs(payload.search); } catch { throw invalid('Invalid history search.'); } }
   validateHistoryPagination(endpoint, payload);
+  if (endpoint === 'vcs/tree-page') {
+    const {offset = 0, limit = 100} = payload;
+    if (payload.query !== undefined && (typeof payload.query !== 'string' || payload.query.length > 1024 || /[\0\r\n]/.test(payload.query))) throw invalid('Invalid tree query.');
+    if (!Number.isInteger(offset) || offset < 0 || offset > 100000 || !Number.isInteger(limit) || limit < 1 || limit > 100) throw invalid('Invalid tree pagination.');
+  }
   validateWorkspaceChangeId(endpoint, payload);
   validateModeAndComparisonId(endpoint, payload);
 }
@@ -192,6 +200,8 @@ const optionalField = (key, value) => value === undefined ? {} : {[key]: value};
 /** Dispatch only after grants and capacity have been checked by createHandler. */
 async function readRepository(api, endpoint, repository, payload, {cwd, mode, signal}) {
   switch (endpoint) {
+    case 'vcs/tree-page':
+      return api.getHistoricalTreePage({...repository}, {commit: payload.commit, path: payload.path ?? '', offset: payload.offset ?? 0, limit: payload.limit ?? 100, ...optionalField('query', payload.query), signal});
     case 'vcs/tree-history':
       return api.listPathHistory({...repository}, {
         commit: payload.commit, path: payload.path, offset: payload.offset ?? 0, limit: payload.limit ?? 50, follow: payload.follow ?? false,
@@ -245,15 +255,20 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
 }
 
 /** Limit active adapter operations and retain only bounded, short-lived discovery grants. */
-export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, bindSvnIdentityResolver } = {}) {
+export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, operationTimeoutMs = 15000, bindSvnIdentityResolver } = {}) {
   let active = 0, activeImages = 0, activeSegments = 0;
   const sessions = new Map();
 
+  const clearGrantCache = entry => {
+    for (const repository of entry?.repositories.values() ?? []) api.clearHistoricalCache?.(repository.root);
+  };
+  const revokeSession = id => { clearGrantCache(sessions.get(id)); sessions.delete(id); };
+
   /** Resolve a live Session grant, evicting expired entries and cwd-mismatched grants. */
   function current(sessionId, cwd) {
-    for (const [id, entry] of sessions) if (entry.expiresAt <= now()) sessions.delete(id);
+    for (const [id, entry] of sessions) if (entry.expiresAt <= now()) revokeSession(id);
     const entry = sessions.get(sessionId);
-    if (entry && entry.cwd !== cwd) { sessions.delete(sessionId); return undefined; }
+    if (entry && entry.cwd !== cwd) { revokeSession(sessionId); return undefined; }
     return entry;
   }
 
@@ -303,7 +318,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
   /** Discovery creates, replaces or merges grants; a stale scan can never resurrect one. */
   async function discoverRepositories(payload, cwd, entry, signal) {
     if (!entry) {
-      while (sessions.size >= maxSessions) sessions.delete(sessions.keys().next().value);
+      while (sessions.size >= maxSessions) revokeSession(sessions.keys().next().value);
       entry = { cwd, repositories: new Map(), expiresAt: now() + ttlMs, scanSequence: 0, fullScanSequence: 0 };
       sessions.set(payload.sessionId, entry);
     }
@@ -327,6 +342,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       repositories.push({ ...repository });
     }
     if (repositories.length !== result.repositories.length) warnings.push('Repository authorization limit reached; use a new Session or narrow its working directory.');
+    clearGrantCache(entry);
     entry.repositories = grants;
     entry.expiresAt = now() + ttlMs;
     return { cwd, repositories, truncated, warnings };
@@ -364,7 +380,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
     return value;
   }
 
-  return async (endpoint, payload, signal) => {
+  const execute = async (endpoint, payload, signal) => {
     if (UPDATE_ENDPOINTS.has(endpoint)) return handleUpdateRequest(endpoint, payload, signal);
     if (!ACTION_ENDPOINTS.has(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
@@ -392,12 +408,20 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
       return { ok: true, value: await readGrantedRepository(endpoint, repository, payload, cwd, mode, entry, signal) };
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') return failure('vcs/cancelled', 'The request was cancelled.');
-      const code = typeof error?.code === 'string' && error.code.startsWith('vcs/') ? error.code : 'vcs/operation-failed';
+      const code = error?.code === 'TIMEOUT' ? 'vcs/timeout' : typeof error?.code === 'string' && error.code.startsWith('vcs/') ? error.code : 'vcs/operation-failed';
       return failure(code, error instanceof Error ? error.message : String(error));
     } finally {
       active--;
       if (imageSlot) activeImages--;
       if (segmentSlot) activeSegments--;
+    }
+  };
+  return async (endpoint, payload, signal) => {
+    try {
+      return await withOperationBudget({signal, timeoutMs: operationTimeoutMs}, () => execute(endpoint, payload, signal));
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') return failure('vcs/cancelled', 'The request was cancelled.');
+      return failure(error?.code === 'TIMEOUT' ? 'vcs/timeout' : 'vcs/operation-failed', error.message);
     }
   };
 }
@@ -450,7 +474,7 @@ export function apply(ctx) {
   // Pass the plugin owner explicitly: the nested rpc getter can retain the
   // connection service context, which does not inject webServer.
   const host=createSvnHttpsHost(ctx,adapter);
-  ctx.effect(()=>()=>host.dispose());
+  ctx.effect(()=>()=>{ host.dispose(); adapter.clearHistoricalCache?.(); });
   ctx.connection.register(ctx, RPC_CHANNEL, host.handle);
   registerAssets(ctx);
   registerDirectAssets(ctx);

@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {comparisonPreview} from './preview-capabilities.mjs';
 
 import {validateSvnCommand} from './svn-command-gate.mjs';
 import {planSvnComparison} from './svn-comparison-plan.mjs';
@@ -313,6 +314,7 @@ export function createSvnRuntime({
         left,
         right,
         binary: !!(left.binary || right.binary),
+        preview: comparisonPreview({left,right,allowLarge:false}),
       };
     },
 

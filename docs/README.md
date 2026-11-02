@@ -14,6 +14,7 @@
 
 - [贡献指南](<../CONTRIBUTING.md>)：准备环境、运行检查、提交要求。
 - [架构说明](<ARCHITECTURE.md>)：模块分工和调用方向。
+- [当前能力与验证入口](<CURRENT-CAPABILITIES.md>)：实现、测试、边界及旧计划的区别。
 - [维护者发布流程](<RELEASING.md>)：测试、标签、发布与失败恢复。
 - [常用术语](<GLOSSARY.md>)：Session、OID、RPC等词的含义。
 - [第三方许可](<../THIRD_PARTY_NOTICES.md>)。

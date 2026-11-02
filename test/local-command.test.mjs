@@ -11,6 +11,14 @@ test('local runner shares stream budget and preserves command errors', async () 
   assert.equal((await node("process.stdout.write('recovered')")).toString(), 'recovered');
 });
 
+test('local runner rejects missing commands and terminates a stubborn process tree', async () => {
+  await assert.rejects(run('dsh-vcs-missing-executable', [], process.cwd()), {code: 'ENOENT'});
+  const script = "const {spawn}=require('node:child_process');process.on('SIGTERM',()=>{});spawn(process.execPath,['-e',\"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)\"],{stdio:['ignore','inherit','inherit']});setInterval(()=>{},1000);";
+  const began = Date.now();
+  await assert.rejects(node(script, undefined, {timeoutMs: 400}), {code: 'TIMEOUT'});
+  assert.ok(Date.now() - began < 6000, 'cleanup must terminate inherited pipe holders');
+});
+
 test('local runner retains preabort and deadline error contracts', async () => {
   const controller = new AbortController();
   controller.abort();

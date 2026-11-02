@@ -1,5 +1,4 @@
 name: Publish GitHub and npm
-
 on:
   workflow_dispatch:
     inputs:
@@ -7,13 +6,16 @@ on:
         description: Existing release tag (vX.Y.Z); must match package.version
         required: true
         type: string
-
+      channel:
+        description: Explicit publication channel (github-only never contacts npm)
+        required: true
+        type: choice
+        default: both
+        options: [both, github-only]
 permissions: {}
-
 concurrency:
   group: draft-release-${{ inputs.tag }}
   cancel-in-progress: false
-
 jobs:
   draft:
     runs-on: ubuntu-latest
@@ -23,86 +25,78 @@ jobs:
       actions: read
     env:
       RELEASE_TAG: ${{ inputs.tag }}
+      RELEASE_CHANNEL: ${{ inputs.channel }}
     defaults:
       run:
         shell: bash
     steps:
-      - name: Validate requested tag
+      - name: Validate requested tag and channel
         run: |
           set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
-            echo 'Tag must have the form vX.Y.Z (no prerelease or leading zeroes).' >&2
-            exit 1
-          }
-
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "$RELEASE_CHANNEL" = both || "$RELEASE_CHANNEL" = github-only ]]
       - uses: actions/checkout@v4
         with:
           ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          registry-url: https://registry.npmjs.org/
-
       - name: Verify tag matches package version
-        run: |
-          set -euo pipefail
-          node --input-type=module -e 'import { readFileSync } from "node:fs"; import assert from "node:assert/strict"; const pkg = JSON.parse(readFileSync("package.json", "utf8")); assert.equal(process.env.RELEASE_TAG, "v" + pkg.version, "Tag and package.version differ");'
-
-      - name: Require successful tag CI
+        run: node scripts/verify-tag.mjs
+      - name: Select latest successful exact tag SHA and run attempts
+        id: runs
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           export RELEASE_SHA="$(git rev-parse HEAD)"
-          gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$RELEASE_SHA&event=push&per_page=100" > "$RUNNER_TEMP/tag-ci.json"
-          node --input-type=module <<'NODE'
-          import {readFileSync} from 'node:fs';
-          import assert from 'node:assert/strict';
-          const runs=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/tag-ci.json','utf8')).workflow_runs;
-          const matching=runs.filter(r=>r.head_sha===process.env.RELEASE_SHA && r.head_branch===process.env.RELEASE_TAG).sort((a,b)=>b.id-a.id);
-          assert.ok(matching.length, 'Push the version tag and run CI before preparing a release');
-          assert.equal(matching[0].conclusion,'success','Latest CI for this exact tag must succeed');
-          NODE
-
-      - name: Install Subversion test tools
-        run: sudo apt-get update && sudo apt-get install -y subversion
-
-      - run: npm ci
-      - run: npm run check
-      - name: Verify package contents and installation
+          mkdir -p evidence
+          for workflow in ci layout host-compat; do
+            case "$workflow" in ci) kind=ci;; layout) kind=chrome;; host-compat) kind=compat;; esac
+            gh api "repos/$GH_REPO/actions/workflows/$workflow.yml/runs?head_sha=$RELEASE_SHA&per_page=100" > "evidence/$kind.json"
+          done
+          node scripts/release-preflight.mjs select evidence
+      - name: Download four matrix candidates Chrome and exact host evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CI_RUN: ${{ steps.runs.outputs.ci_run }}
+          CI_ATTEMPT: ${{ steps.runs.outputs.ci_attempt }}
+          CHROME_RUN: ${{ steps.runs.outputs.chrome_run }}
+          CHROME_ATTEMPT: ${{ steps.runs.outputs.chrome_attempt }}
+          COMPAT_RUN: ${{ steps.runs.outputs.compat_run }}
+          COMPAT_ATTEMPT: ${{ steps.runs.outputs.compat_attempt }}
         run: |
           set -euo pipefail
-          node scripts/verify-package.mjs
-          npm run test:install
-
-      - name: Pack checked artifact and calculate SHA-256
-        id: pack
+          for matrix in ubuntu-latest-node-22 ubuntu-latest-node-24 windows-latest-node-22 windows-latest-node-24; do
+            gh run download "$CI_RUN" --name "dsh-vcs-$matrix-attempt-$CI_ATTEMPT" --dir "evidence/candidates/$matrix"
+          done
+          gh run download "$CHROME_RUN" --name "isolated-layout-evidence-attempt-$CHROME_ATTEMPT" --dir evidence/chrome
+          for host in 0.1.7-rc.2 0.2.0-rc.2 0.2.1-rc.2 0.2.1-rc.5; do
+            gh run download "$COMPAT_RUN" --name "host-compat-$host-attempt-$COMPAT_ATTEMPT" --dir "evidence/compat/$host"
+          done
+      - name: Verify evidence and select already-tested candidate bytes
+        id: evidence
         run: |
           set -euo pipefail
-          # check already ran; do not execute a second set of lifecycle scripts.
-          npm pack --ignore-scripts --json > "$RUNNER_TEMP/dsh-vcs-pack.json"
-          node --input-type=module <<'NODE'
-          import { readFileSync, appendFileSync } from 'node:fs';
-          import assert from 'node:assert/strict';
-          const {parsePackReport} = await import('./scripts/pack-report.mjs');
-          const reports = parsePackReport(readFileSync(process.env.RUNNER_TEMP + '/dsh-vcs-pack.json', 'utf8'));
-          assert.equal(reports.length, 1);
-          const filename = reports[0].filename;
-          assert.match(filename, /^[a-zA-Z0-9][a-zA-Z0-9._-]*\.tgz$/);
-          appendFileSync(process.env.GITHUB_OUTPUT, 'filename=' + filename + '\n');
-          NODE
-          artifact="$(node --input-type=module -e 'import {readFileSync} from "node:fs"; import {parsePackReport} from "./scripts/pack-report.mjs"; console.log(parsePackReport(readFileSync(process.env.RUNNER_TEMP + "/dsh-vcs-pack.json", "utf8"))[0].filename)')"
-          sha256sum -- "$artifact" > SHA256SUMS.txt
-          sha256sum --check -- SHA256SUMS.txt
+          export RELEASE_SHA="$(git rev-parse HEAD)"
+          node scripts/release-preflight.mjs verify evidence
+          (cd verified && sha256sum --check SHA256SUMS.txt)
+      # No npm install, npm pack, registry lookup or npm credentials on github-only.
+      - name: Configure npm credentials for explicit both channel only
+        if: inputs.channel == 'both'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
 
       - name: Publish exact tarball to npm
+        if: inputs.channel == 'both'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTOMATION_TOKEN }}
-          ARTIFACT: ${{ steps.pack.outputs.filename }}
+          ARTIFACT: ${{ steps.evidence.outputs.filename }}
         run: |
           set -euo pipefail
           test -n "$NODE_AUTH_TOKEN" || { echo 'Missing NPM_AUTOMATION_TOKEN secret' >&2; exit 1; }
@@ -129,9 +123,10 @@ jobs:
           NODE
 
       - name: Verify public npm artifact before GitHub release
+        if: inputs.channel == 'both'
         timeout-minutes: 6
         env:
-          ARTIFACT: ${{ steps.pack.outputs.filename }}
+          ARTIFACT: ${{ steps.evidence.outputs.filename }}
         run: |
           node --input-type=module <<'NODE'
           import {readFileSync} from 'node:fs';
@@ -163,15 +158,15 @@ jobs:
           assert.ok(verified,'npm accepted upload but public artifact is not verified; do not create GitHub release or blindly republish');
           NODE
 
-      - name: Publish GitHub release after npm succeeds
+      - name: Publish GitHub release after channel gates succeed
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          ARTIFACT: ${{ steps.pack.outputs.filename }}
+          ARTIFACT: ${{ steps.evidence.outputs.filename }}
         run: |
           set -euo pipefail
           # Existing releases are never overwritten. npm retries require identical integrity.
           notes="docs/releases/${RELEASE_TAG#v}.md"
           test -s "$notes" || { echo "Missing version-specific release notes" >&2; exit 1; }
-          gh release create "$RELEASE_TAG" "$ARTIFACT" SHA256SUMS.txt \
+          gh release create "$RELEASE_TAG" "$ARTIFACT" verified/SHA256SUMS.txt verified/release-evidence.json \
             --verify-tag --title "DSH VCS $RELEASE_TAG" --notes-file "$notes"

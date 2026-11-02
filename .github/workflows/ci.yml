@@ -47,11 +47,33 @@ jobs:
       - run: svnadmin --version --quiet
       # Ensure esbuild and test-only dependencies remain available even if repository or runner defaults set NODE_ENV=production.
       - run: npm ci --include=dev
-      - run: npm run check
+      - run: npm run build
+      - run: node scripts/run-release-tests.mjs
       - run: npm run verify:package
-      - run: npm run test:install
-      - run: npm pack
+      - run: npm pack --ignore-scripts
+      - name: Bind exact candidate and test its installation
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+          MATRIX: ${{ matrix.os }}-node-${{ matrix.node }}
+        run: |
+          set -euo pipefail
+          artifact="$(node -p "'feng0531-dsh-vcs-'+require('./package.json').version+'.tgz'")"
+          npm run test:install -- "$artifact"
+          node scripts/release-preflight.mjs candidate "$artifact" "$MATRIX"
       - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: dsh-vcs-${{ matrix.os }}-node-${{ matrix.node }}
-          path: "*.tgz"
+          name: dsh-vcs-${{ matrix.os }}-node-${{ matrix.node }}-attempt-${{ github.run_attempt }}
+          path: candidate/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report-${{ matrix.os }}-node-${{ matrix.node }}-attempt-${{ github.run_attempt }}
+          path: |
+            test-results/release.tap
+            test-results/test-summary.json
+            test-results/tools.json

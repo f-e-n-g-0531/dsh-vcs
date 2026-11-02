@@ -18,5 +18,13 @@ export async function checkBranchHistory(){
   const count=calls.filter(x=>x.endpoint==='vcs/history').length;button('revisionLoadRefs').click();await wait(()=>refLoads===2&&select.options.length===3);
   if(select.value!==JSON.stringify([reference,b])||calls.filter(x=>x.endpoint==='vcs/history').length!==count)throw Error('Ref refresh moved pinned history');
   select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));await wait(()=>calls.filter(x=>x.endpoint==='vcs/history').length===count+1&&!select.disabled);if(calls.at(-1).p.snapshot!==undefined)throw Error('HEAD navigation reused branch snapshot');
- }}finally{root.unmount();host.remove();}
+ }
+  // Distinct branches/tags at the same data snapshot still reset and reload.
+  const calls=[],names=['refs/heads/same','refs/tags/same'];
+  const rpc=async(endpoint,p)=>{calls.push({endpoint,p});if(endpoint==='vcs/references')return {references:names.map(name=>({name,commit:a}))};if(endpoint==='vcs/history')return {snapshot:p.snapshot||a,commits:[{id:a,subject:'same-OID visible',parents:[],author:'a',date:'2026-01-01'}],nextOffset:null};throw Error('Unexpected same-OID RPC');};
+  flushSync(()=>root.render(<HistoryPanel key='same-OID' sessionId='s' repositoryId='r' rpc={rpc} t={k=>k} onRediscover={()=>{}}/>));
+  const button=k=>[...host.querySelectorAll('button')].find(n=>n.textContent===k);
+  await wait(()=>button('same-OID visible'));button('revisionLoadRefs').click();await wait(()=>host.querySelector('[aria-label=historyBranch]').options.length===3);
+  for(const name of [names[0],names[1],'']){const count=calls.filter(c=>c.endpoint==='vcs/history').length;const select=host.querySelector('[aria-label=historyBranch]');select.value=name?JSON.stringify([name,a]):'';select.dispatchEvent(new Event('change',{bubbles:true}));await wait(()=>calls.filter(c=>c.endpoint==='vcs/history').length===count+1&&!select.disabled&&button('same-OID visible'));if(calls.at(-1).p.snapshot!==(name?a:undefined))throw Error('Same-OID reference lost pinned/reset snapshot');}
+ }finally{root.unmount();host.remove();}
 }

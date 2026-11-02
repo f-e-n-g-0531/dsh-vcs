@@ -5,11 +5,12 @@ import HistoryGraph from './HistoryGraph.jsx';
 import RevisionPanel from './RevisionPanel.jsx';
 import {filterLoadedCommits} from './history-filter.mjs';
 import {mergeHistoryWindow} from './history-window.mjs';
+import {reviewLocation,patchReviewLocation,pushReviewLocation} from './review-location.mjs';
 export default function HistoryPanel(props){
  return <ScopedHistoryPanel key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;
 }
 function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover,showSearch=false}){
- const [selection,setSelection]=useState({id:null,path:null,revision:0}),[query,setQuery]=useState('');
+ const [selection,setSelection]=useState({...reviewLocation(),revision:0}),[query,setQuery]=useState('');
  const [navStack,setNavStack]=useState([]);
  const [references,setReferences]=useState(null),[historyTip,setHistoryTip]=useState(''),[historyRef,setHistoryRef]=useState('');
  const navigateReference=value=>{const ref=(references||[]).find(row=>JSON.stringify([row.name,row.commit])===value);const tip=ref?.commit||'';setHistoryRef(value);setHistoryTip(tip);setSearch(old=>old?{...old,snapshot:tip||null}:null);setOffset(0);setQuery('');setSelected(null);setPage({commits:[],snapshot:null,nextOffset:null});};
@@ -18,18 +19,20 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover,showSearc
  const goBack=()=>{if(!offset)return;setPage(old=>({commits:[],snapshot:old.snapshot,nextOffset:null}));setSelected(null);setQuery('');setOffset(Math.max(0,offset-50));};
  const referenceIndex=useMemo(()=>indexHistoryReferences(references||[]),[references]);
  const selected=selection.id;
- const navigateCommit=(id,path=null)=>{ if(selection.id)setNavStack(stack=>[...stack,selection]); setSelection(old=>({id,path,revision:old.revision+1})); };
- const navigationBack=()=>{ if(!navStack.length)return; const prev=navStack[navStack.length-1]; setNavStack(stack=>stack.slice(0,-1)); setSelection(old=>({id:prev.id,path:prev.path,revision:old.revision+1})); };
- const setSelected=(id,path=null)=>setSelection(old=>({id,path,revision:old.revision+(path||old.path?1:0)}));
+ const navigateCommit=(id,path=null,options={})=>{ if(selection.id)setNavStack(stack=>pushReviewLocation(stack,patchReviewLocation(selection,options.returnLocation||{}))); setSelection(old=>({...reviewLocation({id,path,...options}),revision:old.revision+1})); };
+ const navigationBack=()=>{ if(!navStack.length)return; const prev=navStack[navStack.length-1]; setNavStack(stack=>stack.slice(0,-1)); setSelection(old=>({...reviewLocation(prev),revision:old.revision+1})); };
+ const setSelected=(id,path=null)=>{setNavStack([]);setSelection(old=>({...reviewLocation({id,path}),revision:old.revision+1}));};
+ const updateLocation=patch=>setSelection(old=>({...patchReviewLocation(old,patch),revision:old.revision}));
  const [page,setPage]=useState({commits:[],snapshot:null,nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  // Scope changes remount locally; parent still remounts for refresh. Pagination pins first snapshot.
+ // Reference identity also advances the request generation: two names may share one OID.
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
   rpc('vcs/history',{sessionId,repositoryId,offset,limit:50,...(search?{search:search.values}:{}),...((search?.snapshot||historyTip||page.snapshot)?{snapshot:search?.snapshot||historyTip||page.snapshot}:{})},controller.signal).then(value=>{
-   if(!controller.signal.aborted){const merged=mergeHistoryWindow(page,value,offset);setPage(merged);const evicted=new Set(page.commits.filter(row=>!merged.commits.some(next=>next.id===row.id)).map(row=>row.id));setSelection(old=>evicted.has(old.id)?{id:null,path:null,revision:old.revision+1}:old);}
+   if(!controller.signal.aborted){const merged=mergeHistoryWindow(page,value,offset);setPage(merged);const evicted=new Set(page.commits.filter(row=>!merged.commits.some(next=>next.id===row.id)).map(row=>row.id));setSelection(old=>evicted.has(old.id)?{...reviewLocation(),revision:old.revision+1}:old);}
   }).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
- },[sessionId,repositoryId,offset,retry,search,historyTip]);
+ },[sessionId,repositoryId,offset,retry,search,historyTip,historyRef]);
  const commits=filterLoadedCommits(page.commits,query);
  return <section className="vcs-history vcs-history-browser" aria-label={t('history')} aria-busy={busy}>
  <div className="vcs-history-list"><p>{t('historyListOnly')}</p>{references!==null&&<p>{t('historyRefsScope')}</p>}
@@ -48,6 +51,6 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover,showSearc
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  {!!page.commits.length&&<HistoryGraph commits={page.commits} selected={selected} onSelect={setSelected} t={t}/>}
  <RevisionPanel onReferencesLoaded={setReferences} commits={page.commits} {...{sessionId,repositoryId,rpc,t,onRediscover}}/>
- </div><div className="vcs-history-details">{navStack.length>0&&<p><button onClick={navigationBack} aria-label={t('historyNavigationBack')}>{t('historyNavigationBack')} · {navStack[navStack.length-1].id.slice(0,10)}</button></p>}{selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+ </div><div className="vcs-history-details">{navStack.length>0&&<p><button onClick={navigationBack} aria-label={t('historyNavigationBack')}>{t('historyNavigationBack')} · {navStack[navStack.length-1].id.slice(0,10)}</button></p>}{selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} initialPath={selection.path} initialLocation={selection} onLocationChange={updateLocation} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </div></section>;
 }

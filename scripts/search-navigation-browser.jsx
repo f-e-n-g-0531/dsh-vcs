@@ -1,0 +1,34 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
+import GrepPanel from '../src/GrepPanel.jsx';
+export async function checkSearchNavigation(){
+ const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
+ const wait=async(fn,label)=>{for(let i=0;i<600;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Search navigation timeout: '+label);};
+ const A='a'.repeat(40),B='b'.repeat(40),oid='c'.repeat(40),path=' spaced 中文 %2F.txt';let head=A,pending,oldSignal;
+ const reads=[];
+ const rpc=async(e,p,signal)=>{
+  if(e==='vcs/grep'){if(p.query==='late'){oldSignal=signal;return new Promise(resolve=>pending=resolve);}return {snapshot:head,matches:[{path,line:3,text:'pinned hit'}]};}
+  if(e==='vcs/tree-history')return {path,nextOffset:null,commits:[{id:B,path,subject:'earlier version',author:'a',date:'2026-01-01'}]};
+  if(e==='vcs/tree-file'){reads.push(p);if(![A,B].includes(p.commit)||p.path!==path)throw Error('Search opened mutable version');return {commit:p.commit,path,oid,encoding:'UTF-8',text:'one\ntwo\npinned hit\nfour'};}
+  throw Error('Unexpected search navigation endpoint '+e);
+ };
+ const t=k=>k,button=s=>[...host.querySelectorAll('button')].find(b=>b.textContent===s);
+ const inputValue=async value=>{const input=host.querySelector('[aria-label=grepQuery]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));await wait(()=>!host.querySelector('button[type=submit]').disabled,'submit enabled');};
+ try{
+  flushSync(()=>root.render(<GrepPanel sessionId='search' repositoryId='r' {...{rpc,t}} onRediscover={()=>{throw Error('Unexpected rediscover');}}/>));
+  await inputValue('pinned');host.querySelector('button[type=submit]').click();await wait(()=>button(path+':3'),'search hit');head=B;
+  button(path+':3').click();await wait(()=>reads.length&&host.querySelector('.monaco-editor'),'fixed file preview');
+  await wait(()=>host.querySelector('.selected-text'),'line location');
+  if(!host.textContent.includes(A)||host.querySelector('[aria-label=treePreview] h4')?.textContent!==path)throw Error('Pinned file identity missing');
+  if(reads[0].commit!==A)throw Error('Search did not pin original snapshot');
+  button('pathHistory').click();await wait(()=>button('earlier version'),'search path history');button('earlier version').click();await wait(()=>reads.at(-1)?.commit===B,'path history destination');
+  button('historyBack').click();await wait(()=>reads.at(-1)?.commit===A&&host.querySelector('.selected-text'),'return search origin line');
+  button('historyBack').click();await wait(()=>button(path+':3'),'back to results');
+  if(host.querySelector('[aria-label=grepQuery]').value!=='pinned'||reads.length!==3)throw Error('Search query/result not restored');
+  await inputValue('late');host.querySelector('button[type=submit]').click();await wait(()=>pending,'late request');
+  flushSync(()=>root.render(<GrepPanel sessionId='other' repositoryId='r' {...{rpc,t}} onRediscover={()=>{}}/>));
+  if(!oldSignal.aborted)throw Error('Search scope did not abort');pending({snapshot:A,matches:[{path:'STALE',line:1,text:'old'}]});
+  await new Promise(r=>setTimeout(r,40));if(host.textContent.includes('STALE')||host.querySelector('input').value!=='')throw Error('Late search crossed scope');
+ }finally{root.unmount();host.remove();}
+}

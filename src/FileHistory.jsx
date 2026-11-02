@@ -1,10 +1,11 @@
 import React,{useEffect,useState} from 'react';
+import {mergeFileHistoryWindow,previousHistoryOffset} from './history-pages.mjs';
 function FileHistoryPages({sessionId,repositoryId,commit,parentIndex,id,follow,since,until,rpc,t,onRediscover,onSelectCommit}){
  const [page,setPage]=useState({commits:[],nextOffset:null}),[offset,setOffset]=useState(0),[retry,setRetry]=useState(0),[busy,setBusy]=useState(true),[error,setError]=useState('');
  const date={...(since?{since}:{}),...(until?{until}:{})};
  useEffect(()=>{
   const controller=new AbortController();setBusy(true);setError('');
-  rpc('vcs/file-history',{sessionId,repositoryId,commit,parentIndex,id,offset,limit:50,follow,...date},controller.signal).then(value=>{if(!controller.signal.aborted)setPage(old=>({...value,commits:offset?[...old.commits,...value.commits]:value.commits}));}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
+  rpc('vcs/file-history',{sessionId,repositoryId,commit,parentIndex,id,offset,limit:50,follow,...date},controller.signal).then(value=>{if(!controller.signal.aborted)setPage(old=>mergeFileHistoryWindow(old,value,offset));}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,commit,parentIndex,id,offset,retry,follow,since,until]);
  return <section aria-label={t('fileHistory')} aria-busy={busy}><p>{t('fileHistoryScope')}</p><p style={{overflowWrap:'anywhere'}}>{page.path} · <code>{commit}</code></p>
@@ -13,6 +14,7 @@ function FileHistoryPages({sessionId,repositoryId,commit,parentIndex,id,follow,s
  {error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
  {!busy&&!error&&!page.commits.length&&<p>{t('historyEmpty')}</p>}
  {page.truncated&&<p role="status">{t('historyLimit')}</p>}
+ {!!offset&&<button disabled={busy} onClick={()=>setOffset(previousHistoryOffset(offset))}>{t('historyBack')}</button>}
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  </section>;
 }

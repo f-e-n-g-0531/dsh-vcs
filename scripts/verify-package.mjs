@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 import {PACKAGE_FILES as required} from './package-contract.mjs';
+import {SUPPORTED_HOSTS} from './host-compat-policy.mjs';
 
 function verify() {
   assert.equal(process.argv.length, 2, 'Usage: node scripts/verify-package.mjs (no arguments)');
@@ -24,7 +25,7 @@ function verify() {
     './locale/*.json': './locale/*.json',
   }, 'Manifest exports must match the shipped plugin entrypoints');
   assert.equal(manifest.icon, './icon.svg');
-  assert.equal(manifest.peerDependencies?.['@deepseek-ai/dsh'], '0.1.7-rc.2 || 0.2.0-rc.2 || 0.2.1-rc.2');
+  assert.equal(manifest.peerDependencies?.['@deepseek-ai/dsh'], SUPPORTED_HOSTS.join(' || '));
   assert.equal(manifest.peerDependenciesMeta?.['@deepseek-ai/dsh']?.optional, true);
   assert.equal(manifest.dsh?.bundle?.patch, './cordis.patch.yml');
   assert.equal(manifest.dsh?.client?.platform, 'web');
@@ -64,7 +65,7 @@ function verify() {
     const path = file.path;
     assert.equal(typeof path, 'string', 'Invalid packed path');
     assert.ok(!path.includes('\\') && !path.startsWith('/') && !path.split('/').some(part => !part || part === '.' || part === '..'), 'Unsafe packed path: ' + path);
-    assert.ok((['src/svn-identity.mjs','src/svn-target.mjs','src/svn-path.mjs','src/svn-revision.mjs','src/commit-signature.mjs'].includes(path)&&allowed.has(path))||!/(^|\/)(src|tests?|node_modules|\.git|\.github|secrets?)(\/|$)/i.test(path), 'Development/private directory packed: ' + path);
+    assert.ok((['src/svn-identity.mjs','src/svn-target.mjs','src/svn-path.mjs','src/svn-revision.mjs','src/commit-signature.mjs','src/operation-budget.mjs','src/historical-access.mjs','src/preview-capabilities.mjs'].includes(path)&&allowed.has(path))||!/(^|\/)(src|tests?|node_modules|\.git|\.github|secrets?)(\/|$)/i.test(path), 'Development/private directory packed: ' + path);
     assert.ok(!/(^|\/)(\.env(?:\..*)?|\.npmrc|\.netrc|credentials(?:\..*)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|.*\.(?:pem|key|p12|pfx))$/i.test(path), 'Potential secret packed: ' + path);
     assert.ok(allowed.has(path) || /^locale\/[a-zA-Z0-9_-]+\.json$/.test(path), 'Unexpected packed file: ' + path);
     assert.ok(!paths.has(path), 'Duplicate packed file: ' + path);

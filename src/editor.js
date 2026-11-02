@@ -11,6 +11,9 @@ import 'monaco-editor/esm/vs/basic-languages/xml/xml.contribution.js';
 import 'monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution.js';
 import 'monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js';
 
+// Read-only diagnostics for isolated resource regression; exposes no source text.
+export const getEditorResources = () => ({models: monaco.editor.getModels().length});
+
 const languages = {ts:'typescript',tsx:'typescript',js:'javascript',jsx:'javascript',mjs:'javascript',cpp:'cpp',h:'cpp',hpp:'cpp',c:'cpp',cs:'csharp',py:'python',xml:'xml',html:'xml',yml:'yaml',yaml:'yaml',md:'markdown'};
 function color(token) {
   const value = getComputedStyle(document.body).getPropertyValue(token).trim();

@@ -1,23 +1,20 @@
+import {chromeCommand} from './test-tools.mjs';
 import {realSvnBrowserData} from './svn-browser-data.mjs';
-import {spawn,execFileSync} from 'node:child_process';
+import {execFileSync} from 'node:child_process';
+import {startBrowser, startFixtureServer} from './browser-runner.mjs';
 import * as vcs from '../vcs.mjs';
 import {createHandler} from '../index.mjs';
 import {prepareBaselineJpeg,prepareSimpleWebp} from '../image-preview.mjs';
 import {writeFile,mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-const profile=await mkdtemp(path.join(os.tmpdir(),'vcs-chrome-'));
-const chrome=spawn('google-chrome',['--headless','--no-sandbox','--disable-gpu','--remote-debugging-port=9229','--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
-let ws;const pending=new Map();let seq=0;
+let browser, server;
 const pause=()=>new Promise(r=>setTimeout(r,100));
 try{
- let tabs;for(let i=0;i<100;i++){try{tabs=await (await fetch('http://127.0.0.1:9229/json')).json();break;}catch{await pause();}}
- if(!tabs)throw Error('Chrome debugging unavailable');
- ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);
- await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});
- ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}};
- const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
- await call('Page.navigate',{url:'http://127.0.0.1:8765/test-results/monaco-fixture.html'});
+ server=await startFixtureServer();
+ browser=await startBrowser(chromeCommand(),{timeoutMs:240000});
+ const call=browser.call;
+ await browser.navigate(server.origin+'/test-results/monaco-fixture.html');
  const deadline=Date.now()+120000;let report;
  while(Date.now()<deadline){const r=await call('Runtime.evaluate',{expression:'document.querySelector("#report")?.textContent',returnByValue:true});report=r.result.value;if(report&&report!=='pending')break;await pause();}
  const dom=await call('Runtime.evaluate',{expression:'document.documentElement.outerHTML',returnByValue:true});await writeFile('test-results/monaco-dom.html',dom.result.value);
@@ -44,7 +41,7 @@ try{
  await writeFile('test-results/webp-lossless-report.json',JSON.stringify({pass:true,width:3,height:2,encoding:preparedLossless.encoding,bytes:preparedLossless.bytes}));
  const repository=await mkdtemp(path.join(os.tmpdir(),'vcs-jpeg-repo-'));
  try{
-  const git=(...args)=>execFileSync('git',['-C',repository,...args],{encoding:'utf8'});git('init','-q');git('config','user.name','JPEG');git('config','user.email','jpeg@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.jpg'),Buffer.from(jpeg,'base64'));git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.jpg'),'UNCOMMITTED');
+  const git=(...args)=>execFileSync('git',['-c','core.hooksPath='+path.join(repository,'.git','disabled-hooks'),'-c','commit.gpgsign=false','-c','tag.gpgsign=false','-C',repository,...args],{encoding:'utf8',timeout:15000,windowsHide:true,maxBuffer:16*1024*1024});git('init','-q');git('config','user.name','JPEG');git('config','user.email','jpeg@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.jpg'),Buffer.from(jpeg,'base64'));git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.jpg'),'UNCOMMITTED');
   const rpc=createHandler({sessions:{get:()=>({header:{cwd:repository}})},sessionPersistence:{stat:async()=>undefined}},vcs);const discovery=await rpc('vcs/repositories',{sessionId:'jpeg'});if(!discovery.ok)throw Error('JPEG discovery failed');const repositoryId=discovery.value.repositories[0].id;const details=await rpc('vcs/commit',{sessionId:'jpeg',repositoryId,commit});if(!details.ok)throw Error('JPEG details failed');const id=details.value.changes[0].id;
   const result=await rpc('vcs/commit-image',{sessionId:'jpeg',repositoryId,commit,id});if(!result.ok||result.value.mime!=='image/jpeg'||result.value.width!==3)throw Error('JPEG authorized committed image failed');await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedJpeg("+JSON.stringify(result.value.base64)+"))");
   const pair=await rpc('vcs/revision-image',{sessionId:'jpeg',repositoryId,base:commit,target:commit,id});if(pair.ok)throw Error('Unrelated JPEG pair id accepted');
@@ -58,7 +55,7 @@ try{
  {
  const repository=await mkdtemp(path.join(os.tmpdir(),'vcs-webp-repo-'));
  try{
-  const git=(...args)=>execFileSync('git',['-C',repository,...args],{encoding:'utf8'});git('init','-q');git('config','user.name','WebP');git('config','user.email','webp@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.webp'),simpleWebp);git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.webp'),'UNCOMMITTED');
+  const git=(...args)=>execFileSync('git',['-c','core.hooksPath='+path.join(repository,'.git','disabled-hooks'),'-c','commit.gpgsign=false','-c','tag.gpgsign=false','-C',repository,...args],{encoding:'utf8',timeout:15000,windowsHide:true,maxBuffer:16*1024*1024});git('init','-q');git('config','user.name','WebP');git('config','user.email','webp@example.test');git('config','core.autocrlf','false');await writeFile(path.join(repository,'image.webp'),simpleWebp);git('add','.');git('commit','-qm','image');const commit=git('rev-parse','HEAD').trim();await writeFile(path.join(repository,'image.webp'),'UNCOMMITTED');
   const rpc=createHandler({sessions:{get:()=>({header:{cwd:repository}})},sessionPersistence:{stat:async()=>undefined}},vcs);const discovery=await rpc('vcs/repositories',{sessionId:'webp'});if(!discovery.ok)throw Error('WebP discovery failed');const repositoryId=discovery.value.repositories[0].id;const details=await rpc('vcs/commit',{sessionId:'webp',repositoryId,commit});if(!details.ok)throw Error('WebP details failed');const id=details.value.changes[0].id;
   const result=await rpc('vcs/commit-image',{sessionId:'webp',repositoryId,commit,id});if(!result.ok||result.value.mime!=='image/webp'||result.value.width!==3)throw Error('WebP authorized committed image failed');await evaluate("import('./history-viewer-browser.js').then(m=>m.checkPreparedWebp("+JSON.stringify(result.value.base64)+"))");
   const pair=await rpc('vcs/revision-image',{sessionId:'webp',repositoryId,base:commit,target:commit,id});if(pair.ok)throw Error('Unrelated WebP pair id accepted');
@@ -101,4 +98,4 @@ try{
   await press('Tab','Tab',9,undefined,8);if(!await evaluate("document.activeElement===document.querySelector('#native-blame tbody button')"))throw Error('Native blame reverse Tab failed');
   await writeFile('test-results/blame-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeBlameState')}));
  }finally{await evaluate('disposeNativeBlame();delete globalThis.disposeNativeBlame');}
-}finally{ws?.close();chrome.kill();await new Promise(r=>chrome.exitCode!==null?r():chrome.once('exit',r));await rm(profile,{recursive:true,force:true,maxRetries:5});}
+}finally{try{await browser?.close();}finally{await server?.close();}}

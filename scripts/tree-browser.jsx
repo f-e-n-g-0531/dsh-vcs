@@ -13,7 +13,7 @@ export async function checkTree(){
  const button=text=>[...host.querySelectorAll('button')].find(b=>b.textContent===text);
  const entries=[{path:'nested',mode:'040000',type:'tree',oid},...Array.from({length:101},(_,i)=>({path:'nested/file'+i,mode:'100644',type:'blob',oid})),{path:'link',mode:'120000',type:'blob',oid},{path:'submodule',mode:'160000',type:'commit',oid}];
  let fileCalls=0,fileSignal,lateFile;const source='<img src=x onerror=alert(1)>\n中文';
- const rpc=async(endpoint,p,s)=>{if(endpoint==='vcs/tree-file'){fileCalls++;fileSignal=s;if(p.path==='nested/file1')return new Promise(resolve=>lateFile=resolve);return {commit,path:p.path,oid,encoding:'UTF-8',text:source};}calls++;if(endpoint!=='vcs/tree'||p.commit!==commit||Object.keys(p).length!==3)throw Error('Invalid tree request');if(calls===2){signal=s;return new Promise(resolve=>resolveLate=resolve);}return {commit,entries};};
+ const rpc=async(endpoint,p,s)=>{if(endpoint==='vcs/tree-page')throw Object.assign(Error('Old host'),{code:'vcs/not-found'});if(endpoint==='vcs/tree-file'){fileCalls++;fileSignal=s;if(p.path==='nested/file1')return new Promise(resolve=>lateFile=resolve);return {commit,path:p.path,oid,encoding:'UTF-8',text:source};}calls++;if(endpoint!=='vcs/tree'||p.commit!==commit||Object.keys(p).length!==3)throw Error('Invalid tree request');if(calls===2){signal=s;return new Promise(resolve=>resolveLate=resolve);}return {commit,entries};};
  try{
  root.render(<HistoricalTree {...{commit,rpc}} sessionId="s" repositoryId="r" t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
  await wait(()=>button('historicalTree'));if(calls)throw Error('Tree queried before opt-in');button('historicalTree').click();await wait(()=>button('nested/'));
@@ -33,7 +33,7 @@ export async function checkTree(){
  for(const language of ['zh','en']){
   const t=k=>locales[language][k],parent=' spaced 中文%2F ',child='<img>',directory=parent+'/'+child;let treeRequests=0,previewSignal,resolvePreview;
   const crumbEntries=[parent,directory].map(path=>({path,type:'tree',mode:'040000',oid})).concat(Array.from({length:101},(_,i)=>({path:directory+'/file'+i,type:'blob',mode:'100644',oid})));
-  const crumbRpc=async(endpoint,p,s)=>{if(endpoint==='vcs/tree'){treeRequests++;return {entries:crumbEntries};}previewSignal=s;return new Promise(resolve=>resolvePreview=resolve);};
+  const crumbRpc=async(endpoint,p,s)=>{if(endpoint==='vcs/tree-page')throw Object.assign(Error('Old host'),{code:'vcs/not-found'});if(endpoint==='vcs/tree'){treeRequests++;return {entries:crumbEntries};}previewSignal=s;return new Promise(resolve=>resolvePreview=resolve);};
   flushSync(()=>root.render(<HistoricalTree key={language} sessionId='crumb' repositoryId='r' commit={commit} rpc={crumbRpc} t={t} onRediscover={()=>{throw Error('Unexpected breadcrumb rediscovery');}}/>));
   button(t('historicalTree')).click();await wait(()=>button(parent+'/'));button(parent+'/').click();await wait(()=>button(child+'/'));button(child+'/').click();await wait(()=>button(t('treeNext')));
   const nav=()=>host.querySelector('nav');if(nav().getAttribute('aria-label')!==t('treeBreadcrumbs')||nav().querySelector('[aria-current=location]')?.textContent!==child||nav().querySelector('img'))throw Error('Breadcrumb identity or escaping failed');
@@ -46,6 +46,7 @@ export async function checkTree(){
  }
  const pending=[],requests=[];let fail=true,identity={sessionId:'preview',repositoryId:'r',commit};
  const previewRpc=async(endpoint,p,s)=>{
+  if(endpoint==='vcs/tree-page')throw Object.assign(Error('Old host'),{code:'vcs/not-found'});
   requests.push({endpoint,p,s});if(endpoint==='vcs/tree')return {commit:p.commit,entries:['retry-file','empty-file','binary-file','pending-file'].map(path=>({path,type:'blob',mode:'100644',oid}))};
   if(endpoint!=='vcs/tree-file')throw Error('Unexpected preview endpoint');
   if(p.path==='pending-file')return new Promise(resolve=>pending.push({resolve,signal:s}));

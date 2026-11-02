@@ -4,7 +4,7 @@
 
 ## 准备开发环境
 
-需要Node.js 22+、Git、SVN和svnadmin。在项目根目录执行：
+需要 Node.js 22+、Git、SVN、svnadmin 和 OpenSSL。先运行 `npm run test:preflight` 确认实际工具版本；OpenSSL 可通过 `OPENSSL_BIN` 指定现有可执行文件，不会自动安装工具。在项目根目录执行：
 
 ```sh
 npm ci --include=dev
@@ -17,7 +17,13 @@ npm run test:install
 - `verify:package`：检查安装包文件是否完整，是否包含不该发布的文件。
 - `test:install`：在临时目录安装实际包，检查入口注册；不是实际DSH页面验证。
 
-检查失败和跳过项都要说明。测试使用临时仓库和合成数据，不读取或修改个人项目。
+检查失败和跳过项都要说明。发布验证使用 `npm run test:release` 输出 TAP 与机器摘要，任何失败、取消、跳过或待办均阻断。测试使用临时仓库和合成数据，不读取或修改个人项目。
+
+## 浏览器与性能验证
+
+- `CHROME_BIN` 指向已安装 Chrome／Chromium，再运行 `npm run test:browser`；使用临时浏览器配置和仅监听回环地址的合成页面，不替换当前 DSH 服务。此入口验证 React／Monaco 主夹具；完整 SVN／可信键盘 CI 仍使用[浏览器工作流](<.github/workflows/layout.yml>)。
+- `npm run test:performance -- --large-bytes 65536` 生成 10,002 文件、10 次 warm 的小规模采样；省略该参数默认使用 4MiB 正文。结果写入 `test-results/performance/baseline.json`，记录环境、内容指纹、读取量及 p50／p95。
+- `npm run test:performance -- --baseline <上一份报告> --max-ratio 1.2 --strict` 显式启用相对预算。只比较相同环境与内容规模，不把不同机器或小文件数据当作通用性能承诺。
 
 ## 从哪里修改
 

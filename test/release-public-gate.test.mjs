@@ -19,6 +19,6 @@ test('public release gate retries missing tarball but fails closed on server err
 });
 test('public release gate rejects foreign package origin before downloading',async()=>{
  let calls=0;await assert.rejects(execute(async()=>{calls++;return response(200,{dist:{...metadata.dist,tarball:'https://example.com/package.tgz'}});}));assert.equal(calls,1);
- assert.ok(workflow.indexOf('Verify public npm artifact before GitHub release')<workflow.indexOf('      - name: Publish GitHub release after npm succeeds'));
+ assert.ok(workflow.indexOf('Verify public npm artifact before GitHub release')<workflow.indexOf('      - name: Publish GitHub release after channel gates succeed'));
  assert.ok(!section.includes('NODE_AUTH_TOKEN'));
 });

@@ -12,7 +12,13 @@ test('history Monaco defaults advanced with stable identity and optional fallbac
  const source=await readFile(new URL('../src/HistoryViewer.jsx',import.meta.url),'utf8');
  const lifecycle=await readFile(new URL('../src/useHistoryEditor.mjs',import.meta.url),'utf8');
  assert.ok(source.includes('useHistoryEditor({comparison,identity,enabled,single,line,sideBySide,ignoreWhitespace,wrap})'));
- assert.ok(source.includes('[enabled,setEnabled]=useState(true)'));
+ const {build}=await import('esbuild');const React=await import('react');const {renderToStaticMarkup}=await import('react-dom/server');
+ const bundle=await build({entryPoints:['src/HistoryViewer.jsx'],bundle:true,write:false,platform:'node',format:'esm',external:['react'],loader:{'.css':'text'}});
+ const encoded=bundle.outputFiles[0].text.replaceAll("from \"react\"",'from '+JSON.stringify(new URL('../node_modules/react/index.js',import.meta.url).href));
+ const {default:Viewer}=await import('data:text/javascript;base64,'+Buffer.from(encoded).toString('base64'));
+ const props={comparison:{path:'f',left:{text:'before'},right:{text:'after'}},identity:'fixed',t:k=>k};
+ const advanced=renderToStaticMarkup(React.createElement(Viewer,props));assert.match(advanced,/historyBasic/);assert.doesNotMatch(advanced,/historyAdvanced/);
+ const basic=renderToStaticMarkup(React.createElement(Viewer,{...props,initialOptions:{enabled:false}}));assert.match(basic,/historyAdvanced/);assert.match(basic,/before/);assert.match(basic,/after/);
  assert.ok(lifecycle.includes('if (!enabled) return'));
  assert.ok(lifecycle.includes('task.dispose()'));assert.ok(lifecycle.includes('link.remove()'));
  assert.ok(source.includes('!ready&&<TextComparison'));

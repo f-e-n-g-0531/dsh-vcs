@@ -1,0 +1,88 @@
+name: Controlled host compatibility
+on:
+  workflow_dispatch:
+    inputs:
+      fixture_run:
+        description: Same-repository trusted run ID containing host-fixture-VERSION artifacts
+        type: string
+        required: true
+      fixture_hashes:
+        description: 'JSON map of each exact host version to offline host.tar.gz SHA-256 (dependencies included, no links)'
+        type: string
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ['0.1.7-rc.2', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.5']
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_SHA: ${{ github.sha }}
+      DSH_EXPECTED_HOST_VERSION: ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require exact version tag and controlled fixture inputs
+        env:
+          FIXTURE_RUN: ${{ inputs.fixture_run }}
+          FIXTURE_HASHES: ${{ inputs.fixture_hashes }}
+        run: |
+          test "${{ github.ref_type }}" = tag
+          node scripts/verify-tag.mjs
+          node --input-type=module -e "import assert from 'node:assert/strict'; assert.match(process.env.FIXTURE_RUN,/^[1-9][0-9]*$/); assert.match(JSON.parse(process.env.FIXTURE_HASHES)[process.env.DSH_EXPECTED_HOST_VERSION]||'',/^[a-f0-9]{64}$/);"
+      - name: Download explicitly selected same-repository offline host fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FIXTURE_RUN: ${{ inputs.fixture_run }}
+          FIXTURE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          gh api "repos/$GH_REPO/actions/runs/$FIXTURE_RUN" > fixture-run.json
+          node scripts/release-host-fixture.mjs validate-run fixture-run.json
+          attempt="$(node -p "require('./fixture-run.json').run_attempt")"
+          gh run download "$FIXTURE_RUN" --name "host-fixture-$DSH_EXPECTED_HOST_VERSION-attempt-$attempt" --dir fixture
+      - name: Verify fixture bytes and extract without links
+        env:
+          FIXTURE_HASHES: ${{ inputs.fixture_hashes }}
+        run: |
+          hash="$(node -p "JSON.parse(process.env.FIXTURE_HASHES)[process.env.DSH_EXPECTED_HOST_VERSION]")"
+          node scripts/release-host-fixture.mjs fixture/host.tar.gz "$hash" "$RUNNER_TEMP/host"
+      - name: Install only contract dependencies, never build plugin or boot host
+        run: npm ci --include=dev --ignore-scripts
+      - name: Consume exact CI candidate, never rebuild plugin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-evidence
+          gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$RELEASE_SHA&per_page=100" > ci-evidence/ci.json
+          node scripts/release-preflight.mjs select-ci ci-evidence
+          ci_run="$(node -p "require('./ci-evidence/ci-selection.json').ci.id")"
+          ci_attempt="$(node -p "require('./ci-evidence/ci-selection.json').ci.attempt")"
+          for matrix in ubuntu-latest-node-22 ubuntu-latest-node-24 windows-latest-node-22 windows-latest-node-24; do
+            gh run download "$ci_run" --name "dsh-vcs-$matrix-attempt-$ci_attempt" --dir "ci-evidence/candidates/$matrix"
+          done
+          node scripts/release-preflight.mjs consume ci-evidence
+      - name: Run actual host contracts from the isolated dependency tree
+        env:
+          DSH_COMPAT_REPORT: compat.json
+        run: node scripts/test-host-compat.mjs "$RUNNER_TEMP/host/node_modules/@deepseek-ai/dsh/package.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: host-compat-${{ matrix.host }}-attempt-${{ github.run_attempt }}
+          path: compat.json
+          if-no-files-found: error

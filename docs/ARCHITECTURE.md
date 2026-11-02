@@ -23,8 +23,8 @@
 
 - [客户端入口](<../src/client.jsx>)负责DSH页面注册、工作区选择与交互状态；[RPC适配器](<../src/client-rpc.mjs>)仅转换认证响应，保留错误码和取消信号。[状态调度器](<../src/status-limiter.mjs>)跨请求代次限制两项并发，取消在途请求直到结束才释放槽；[列表键盘处理](<../src/file-list-keyboard.mjs>)只管理焦点和目录开合，不自动选择文件。
 - 工作区／历史／Stash／内容搜索使用单一 `reviewView` 状态互斥切换，工作区比较、编辑器与快捷键共用 `reviewActive` 门禁；进入只读辅助视图统一取消工作区比较并清空旧选择，避免新增视图时漏更新依赖。
-- [内容搜索](<../src/GrepPanel.jsx>)按 Session／repositoryId 重新挂载请求所有者，切换时取消在途查询并清空输入和结果，旧响应不能回填新上下文。
-- 历史面板组合提交详情、目录、文件历史、Blame和比较视图；[历史窗口模型](<../src/history-window.mjs>)独立维护最多200行的加载窗口。
+- [内容搜索](<../src/GrepPanel.jsx>)按 Session／repositoryId 重新挂载请求所有者，切换时取消旧查询。搜索结果绑定固定 snapshot，打开文件不跟随移动的 HEAD，返回保留查询结果。
+- 历史面板组合提交详情、目录、文件历史、Blame 和比较视图；[历史窗口模型](<../src/history-window.mjs>)和[文件历史分页](<../src/history-pages.mjs>)有界显示最多 200 条。[导航位置](<../src/review-location.mjs>)只保存有界的提交／父提交／文件／行和视图选项，不保存正文或授权。
 - [历史审阅视图](<../src/HistoryViewer.jsx>)负责展示；[生命周期Hook](<../src/useHistoryEditor.mjs>)管理编辑器与样式资源；[编辑器任务](<../src/history-editor.mjs>)处理异步加载和释放。
 - [Monaco入口](<../src/editor.js>)负责只读模型、Worker与主题；[加载器](<../src/editor-loader.mjs>)负责HTTP／MIME诊断。基础比较是手动选项或失败回退，不是默认审阅。
 
@@ -33,7 +33,7 @@
 - 发现默认检查Session目录及一级子目录；定向扫描仍限于Session内。发现的包含仓库可能大于Session目录。
 - 授权最多32个Session、约5分钟；每次请求重新解析cwd，拒绝旧扫描覆盖新状态。过期需手动重新发现。
 - 历史绑定不可变OID和选中ID；Git禁止replace refs、lazy fetch、提示及外部diff／textconv。不checkout、不自动获取对象。
-- 本地子进程无shell、有限输出和超时。历史／SVN取消传递到底层；工作区状态／比较取消仍不保证立即终止子进程，不能在重构中冒称已解决。
+- [操作预算](<../src/operation-budget.mjs>)通过异步上下文为本地 RPC 提供统一截止时间；[本地命令](<../local-command.mjs>)共享剩余预算，取消或超时清理进程树，直到 close 与清理结束才释放请求容量。不是即时终止承诺。
 - 文本每侧2MiB；历史UTF8分段最大16MiB、每片64KiB。历史图最多200节点／1000关系／32泳道，不等于完整无限图。
 - 刷新仅手动或可见window聚焦，无周期刷新。资源路由是固定认证白名单，URL不能成为任意磁盘路径。
 

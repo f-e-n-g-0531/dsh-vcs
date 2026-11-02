@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {hostPreparationManifest,validateOfficialHostLock} from '../scripts/prepare-host-fixture.mjs';
+import {SUPPORTED_HOSTS} from '../scripts/host-compat-policy.mjs';
+function lock(version){const m=hostPreparationManifest(version);return {lockfileVersion:3,packages:{'':{dependencies:m.dependencies},...Object.fromEntries(Object.keys(m.dependencies).map(name=>['node_modules/'+name,{version,resolved:'https://registry.npmjs.org/'+name+'/-/package.tgz',integrity:'sha512-YWJjZA=='}]))}};}
+test('host preparation pins all declared official versions and rejects tags and undeclared versions',()=>{for(const version of SUPPORTED_HOSTS){assert.equal(hostPreparationManifest(version).dependencies['@deepseek-ai/dsh'],version);assert.equal(validateOfficialHostLock(lock(version),version),true);}for(const version of ['latest','0.2.1-rc.4','0.2.1-rc.6','0.2.1'])assert.throws(()=>hostPreparationManifest(version));});
+test('host provenance refuses foreign or linked dependency trees and missing integrity',()=>{const version='0.2.1-rc.5';for(const patch of [{resolved:'http://registry.npmjs.org/a.tgz'},{resolved:'https://evil.invalid/a.tgz'},{resolved:'https://registry.npmjs.org.evil.invalid/a.tgz'},{resolved:'https://user:secret@registry.npmjs.org/a.tgz'},{integrity:''},{link:true},{version:'0.2.1-rc.6'}]){const data=lock(version);Object.assign(data.packages['node_modules/@deepseek-ai/dsh'],patch);assert.throws(()=>validateOfficialHostLock(data,version));}});

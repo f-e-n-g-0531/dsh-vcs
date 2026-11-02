@@ -8,9 +8,9 @@ profile是DSH配置与插件环境，不是Session。下面以web为例：请使
 
 ## 安装正式包
 
-	dsh plugin --profile web add @feng0531/dsh-vcs@0.3.73
+	dsh plugin --profile web add "@feng0531/dsh-vcs@<已确认发布到 npm 的版本>"
 
-也可以从[正式发布页](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest)下载 tgz 与 SHA256SUMS.txt，核对 SHA-256 后执行：
+GitHub 与 npm 的版本可能不同；例如 0.4.11 只发布了 GitHub。不要把候选源码版本当作 registry 已发布版本。也可以从[正式发布页](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest)下载 tgz 与 SHA256SUMS.txt，核对 SHA-256 后执行：
 
 	dsh plugin --profile web add "<tgz 的绝对路径>"
 

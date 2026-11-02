@@ -3,10 +3,11 @@ import HistoryViewer from './HistoryViewer.jsx';
 import FileHistory from './FileHistory.jsx';
 import ImageComparison from './ImageComparison.jsx';
 import BlamePanel from './BlamePanel.jsx';
+import {canLoadLarge} from './preview-actions.mjs';
 export default function HistoryComparison(props){
  return <ScopedHistoryComparison key={JSON.stringify([props.sessionId,props.repositoryId,props.commit,props.parentIndex,props.base,props.target,props.id])} {...props}/>;
 }
-function ScopedHistoryComparison({sessionId,repositoryId,commit,parentIndex,base,target,id,rpc,t,onRediscover,onSelectCommit}){
+function ScopedHistoryComparison({sessionId,repositoryId,commit,parentIndex,base,target,id,rpc,t,onRediscover,onSelectCommit,initialViewer,onViewerChange,initialOrigin,initialBlameStartLine}){
  const [comparison,setComparison]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0),[large,setLarge]=useState(false);
  useEffect(()=>{
   const controller=new AbortController();setComparison(null);setError('');
@@ -17,10 +18,10 @@ function ScopedHistoryComparison({sessionId,repositoryId,commit,parentIndex,base
  if(!comparison)return <p role="status">{t('loading')}{large&&<button onClick={()=>setLarge(false)}>{t('largeClose')}</button>}</p>;
  return <section className="vcs-history-comparison"><header className="vcs-comparison-heading"><h4>{comparison.path}</h4><p>{comparison.left.label} ↔ {comparison.right.label}</p>
  {comparison.notice&&<p role="status">{comparison.notice}</p>}
- {large?<p>{t('largeScope')} <button onClick={()=>setLarge(false)}>{t('largeClose')}</button></p>:comparison.notice?.includes('2 MiB')&&<p>{t('largeScope')} <button onClick={()=>setLarge(true)}>{t('largeLoad')}</button></p>}
- </header>{comparison.binary?<p>{t('binary')}</p>:<HistoryViewer comparison={comparison} identity={base?JSON.stringify([sessionId,repositoryId,base,target,id]):JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} t={t}/>}
+ {large?<p>{t('largeScope')} <button onClick={()=>setLarge(false)}>{t('largeClose')}</button></p>:canLoadLarge(comparison)&&<p>{t('largeScope')} <button onClick={()=>setLarge(true)}>{t('largeLoad')}</button></p>}
+ </header>{comparison.binary?<p>{t('binary')}</p>:<HistoryViewer initialOptions={initialViewer} onOptionsChange={onViewerChange} comparison={comparison} identity={base?JSON.stringify([sessionId,repositoryId,base,target,id]):JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} t={t}/>}
  <div className="vcs-comparison-extras">{commit&&!base&&<FileHistory onSelectCommit={onSelectCommit} key={'file-history:'+JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
- {commit&&!base&&<BlamePanel onSelectCommit={onSelectCommit} key={'blame:'+JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
+ {commit&&!base&&<BlamePanel initialOrigin={initialOrigin} initialStartLine={initialBlameStartLine} onSelectLocation={onSelectCommit} onSelectCommit={onSelectCommit} key={'blame:'+JSON.stringify([sessionId,repositoryId,commit,parentIndex,id])} {...{sessionId,repositoryId,commit,parentIndex,id,rpc,t,onRediscover}}/>}
  {(commit||base)&&<ImageComparison key={'image:'+JSON.stringify([sessionId,repositoryId,commit,parentIndex,base,target,id])} {...{sessionId,repositoryId,commit,parentIndex,base,target,id,rpc,t,onRediscover}}/>}
  </div></section>;
 }
