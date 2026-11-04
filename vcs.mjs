@@ -65,12 +65,13 @@ export async function detectRepository(cwd) {
 
 const DISCOVERY_SKIP = new Set(['.git', '.svn', 'node_modules', 'bower_components', 'vendor', '.pnpm', '.yarn', '.npm', '.cache', '__pycache__', '.venv', 'venv', '.tox', '.mypy_cache', '.pytest_cache', '.gradle', '.nuget']);
 
-async function repositoryAt(directory, type, options = () => undefined) {
+async function repositoryAt(directory, type, options = () => undefined, includeBranch = true) {
   if (type === 'svn') {
     const info = parseXML(await svn(directory, ['info', '--xml', '--', '.'], undefined, options())).info.entry[0];
     return { root: await fs.realpath(info['wc-info']['wcroot-abspath']), type };
   }
   const root = await fs.realpath((await git(directory, ['rev-parse', '--show-toplevel'], undefined, options())).toString('utf8').trim());
+  if (!includeBranch) return {root, type};
   let branch;
   try { branch = (await git(root, ['symbolic-ref', '--quiet', '--short', 'HEAD'], undefined, options())).toString('utf8').trim(); }
   catch (e) {
@@ -194,10 +195,10 @@ export async function discoverRepositories(cwd, { signal, maxDepth = 6, maxDirec
   return result;
 }
 
-async function checkedRepo(repo, signal, budget) {
+async function checkedRepo(repo, signal, budget, includeBranch = true) {
   signal?.throwIfAborted();
   if (!repo || !['git', 'svn'].includes(repo.type) || typeof repo.root !== 'string') throw new Error('Invalid repository');
-  const found = await repositoryAt(repo.root, repo.type, budget || (() => ({signal})));
+  const found = await repositoryAt(repo.root, repo.type, budget || (() => ({signal})), includeBranch);
   signal?.throwIfAborted();
   if (!found || found.type !== repo.type || path.resolve(found.root) !== path.resolve(repo.root)) throw new Error('Repository root changed or is invalid');
   return found;
@@ -206,8 +207,8 @@ function assertGit(repo, message) {
   if (repo.type !== 'git') throw new Error(message);
   return repo;
 }
-async function checkedGitRepo(repo, signal, message, budget) {
-  return assertGit(await checkedRepo(repo, signal, budget), message);
+async function checkedGitRepo(repo, signal, message, budget, includeBranch = true) {
+  return assertGit(await checkedRepo(repo, signal, budget, includeBranch), message);
 }
 // Probe --since-as-filter support so older Git cannot run a silently unfiltered query.
 async function assertSinceAsFilterSupport(repo, signal, label) {
@@ -338,7 +339,8 @@ export async function getHistoricalSegment(repo, {commit,path:file,offset,line,s
  return withOperationBudget({signal},async()=>{
  const expectedEpoch = historicalAccess.captureEpoch();
  // Capture before any await: revoked in-flight validation cannot refill object bytes.
- repo = await checkedGitRepo(repo, signal, 'Historical segments support Git only');
+ // Segment identity depends on the canonical root and pinned commit, not current HEAD metadata.
+ repo = await checkedGitRepo(repo, signal, 'Historical segments support Git only', undefined, false);
  return historicalAccess.segment(repo.root, {commit,path:file,offset,line,signal,expectedEpoch});
  });
 }
