@@ -11,7 +11,7 @@ test('revision reference entry remains available without loaded HEAD commits',as
 test('history Monaco defaults advanced with stable identity and optional fallback',async()=>{
  const source=await readFile(new URL('../src/HistoryViewer.jsx',import.meta.url),'utf8');
  const lifecycle=await readFile(new URL('../src/useHistoryEditor.mjs',import.meta.url),'utf8');
- assert.ok(source.includes('useHistoryEditor({comparison,identity,enabled,single,line,sideBySide,ignoreWhitespace,wrap})'));
+ assert.ok(source.includes('useHistoryEditor({comparison,identity,enabled,single,startLine,line:single&&Number.isSafeInteger(line)&&line>=startLine?line-startLine+1:null,sideBySide,ignoreWhitespace,wrap})'));
  const {build}=await import('esbuild');const React=await import('react');const {renderToStaticMarkup}=await import('react-dom/server');
  const bundle=await build({entryPoints:['src/HistoryViewer.jsx'],bundle:true,write:false,platform:'node',format:'esm',external:['react'],loader:{'.css':'text'}});
  const encoded=bundle.outputFiles[0].text.replaceAll("from \"react\"",'from '+JSON.stringify(new URL('../node_modules/react/index.js',import.meta.url).href));
@@ -29,7 +29,7 @@ test('history editor controls are ready-only and instance scoped',async()=>{
  const source=await readFile(new URL('../src/HistoryViewer.jsx',import.meta.url),'utf8');
  assert.ok(source.includes('ready&&!single&&<div'));
  const lifecycle=await readFile(new URL('../src/useHistoryEditor.mjs',import.meta.url),'utf8');
- assert.ok(lifecycle.includes('if (ready) viewer.current?.options({sideBySide, ignoreWhitespace, wrap})'));
+ assert.ok(lifecycle.includes('if (ready) viewer.current?.options({sideBySide, ignoreWhitespace, wrap, startLine})'));
  for(const direction of ['previous','next'])assert.ok(source.includes("viewer.current?.navigate('"+direction+"')"));
  assert.ok(lifecycle.includes('viewer.current = null;'));
  assert.ok(lifecycle.includes('try { task.dispose(); } finally { link.remove(); }'));

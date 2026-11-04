@@ -117,7 +117,7 @@ export function createDiff(node, { onStats, onComputation, single = false, maxCo
       key=nextKey;
       if(states.has(key)) editor.restoreViewState(states.get(key));
     },
-    options({sideBySide,ignoreWhitespace,wrap}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off'});if(!single){reportComputation();armComputationDeadline();}},
+    options({sideBySide,ignoreWhitespace,wrap,startLine=1}) {editor.updateOptions({renderSideBySide:sideBySide,ignoreTrimWhitespace:ignoreWhitespace,wordWrap:wrap?'on':'off',...(single?{lineNumbers:line=>String(line+(Number.isSafeInteger(startLine)&&startLine>0?startLine:1)-1)}:{})});if(!single){reportComputation();armComputationDeadline();}},
     revealLine(line) {if(!single||!Number.isInteger(line)||line<1||line>models[0]?.getLineCount())return false;editor.setSelection({startLineNumber:line,startColumn:1,endLineNumber:line,endColumn:models[0].getLineMaxColumn(line)});editor.revealLineInCenter(line);return true;},
     navigate(direction) {if(!single)editor.goToDiff(direction);},
     snapshot() {

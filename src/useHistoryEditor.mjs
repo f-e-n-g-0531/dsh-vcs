@@ -4,7 +4,7 @@ import {loadEditor} from './editor-loader.mjs';
 import {version} from '../package.json';
 
 /** Own one editor instance and stylesheet for the current immutable selection. */
-export function useHistoryEditor({comparison, identity, enabled, single, line, sideBySide, ignoreWhitespace, wrap}) {
+export function useHistoryEditor({comparison, identity, enabled, single, line, startLine = 1, sideBySide, ignoreWhitespace, wrap}) {
   const node = useRef(null);
   const viewer = useRef(null);
   const [ready, setReady] = useState(false);
@@ -38,8 +38,8 @@ export function useHistoryEditor({comparison, identity, enabled, single, line, s
     if (ready && single && line) viewer.current?.revealLine(line);
   }, [ready, single, line]);
   useEffect(() => {
-    if (ready) viewer.current?.options({sideBySide, ignoreWhitespace, wrap});
-  }, [ready, sideBySide, ignoreWhitespace, wrap]);
+    if (ready) viewer.current?.options({sideBySide, ignoreWhitespace, wrap, startLine});
+  }, [ready, sideBySide, ignoreWhitespace, wrap, startLine]);
 
   return {node, viewer, ready, error, computation};
 }

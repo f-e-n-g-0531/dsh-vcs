@@ -15,6 +15,8 @@ import {inside, confined} from './repository-path.mjs';
 import {readWorkspaceLargeText} from './workspace-large-text.mjs';
 import {createHistoricalAccess,validateHistoricalPath} from './src/historical-access.mjs';
 import {withComparisonPreview} from './src/preview-capabilities.mjs';
+import {searchContentPage} from './src/content-search.mjs';
+import {withOperationBudget} from './src/operation-budget.mjs';
 
 const historicalAccess = createHistoricalAccess({run:git});
 /** Host invalidates object bytes on grant replacement, expiry and plugin disposal. */
@@ -272,35 +274,18 @@ export async function listStashes(repo,{signal}={}){
  return {stashes};
 }
 
-export async function searchRepositoryContent(repo,{commit,query,signal}={}) {
+export async function searchRepositoryContent(repo,{commit,query,cursor,limit=100,signal}={}) {
+ return withOperationBudget({signal},async()=>{
  signal?.throwIfAborted();
  if(typeof query!=='string'||!query||query.length>1024||/[\0\r\n]/.test(query))throw new Error('Invalid content search query');
+ if(cursor!==undefined&&!commit)throw Error('Content search continuation requires a fixed commit');
  repo=await checkedGitRepo(repo,signal,'Content search supports Git only');
  let snapshot=commit;
- if(!snapshot){
-  try{snapshot=(await git(repo.root,['rev-parse','--verify','HEAD^{commit}'],MAX_TEXT,{signal})).toString('utf8').trim();}
-  catch{throw new Error('Content search requires a resolved HEAD commit');}
- }
+ if(!snapshot) snapshot=await resolveHeadCommit(args=>git(repo.root,args,MAX_TEXT,{signal}));
  if(!isObjectId(snapshot))throw new Error('Invalid content search commit');
  if((await git(repo.root,['cat-file','-t',snapshot],MAX_TEXT,{signal})).toString('utf8').trim()!=='commit')throw Error('Content search requires a commit object');
- let text;
- try{text=(await git(repo.root,['-c','grep.column=false','grep','--no-color','-F','-n','-I','-z','--max-count=100','-e',query,snapshot,'--'],MAX_TEXT,{signal})).toString('utf8');}
- catch(error){if(error.code==='VCS_COMMAND'&&error.exitCode===1)return {snapshot,matches:[]};throw error;}
- signal?.throwIfAborted();
- const matches=[];
- // -z frames path and line with NUL; legal paths can contain LF.
- for(let position=0;position<text.length;){
-  const pathEnd=text.indexOf(String.fromCharCode(0),position),lineEnd=text.indexOf(String.fromCharCode(0),pathEnd+1),recordEnd=text.indexOf(String.fromCharCode(10),lineEnd+1);
-  if(pathEnd<position||lineEnd<0||recordEnd<0)throw new Error('Invalid content search result');
-  const treePath=text.slice(position,pathEnd),lineNo=text.slice(pathEnd+1,lineEnd),lineText=text.slice(lineEnd+1,recordEnd);position=recordEnd+1;
-  const cut=treePath.indexOf(':');
-  if(cut<0)throw new Error('Invalid content search result');
-  const path=treePath.slice(cut+1);
-  if(!path||!/^\d+$/.test(lineNo))throw new Error('Invalid content search result');
-  matches.push({path,line:Number(lineNo),text:lineText});
-  if(matches.length>500)throw new Error('Content search exceeds match limit');
- }
- return {snapshot,matches};
+ return searchContentPage(git,repo.root,{snapshot,query,cursor,limit,signal});
+ });
 }
 
 export async function getCommitDetails(repo,options={}) {
@@ -349,11 +334,13 @@ function parseCommitChanges(text,scope){
   }
   return changes;
 }
-export async function getHistoricalSegment(repo, {commit,path:file,offset = 0,signal} = {}) {
+export async function getHistoricalSegment(repo, {commit,path:file,offset,line,signal} = {}) {
+ return withOperationBudget({signal},async()=>{
  const expectedEpoch = historicalAccess.captureEpoch();
  // Capture before any await: revoked in-flight validation cannot refill object bytes.
  repo = await checkedGitRepo(repo, signal, 'Historical segments support Git only');
- return historicalAccess.segment(repo.root, {commit,path:file,offset,signal,expectedEpoch});
+ return historicalAccess.segment(repo.root, {commit,path:file,offset,line,signal,expectedEpoch});
+ });
 }
 
 export async function getHistoricalFile(repo,{commit,path:file,signal}={}) {

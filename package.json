@@ -1,6 +1,6 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
@@ -31,6 +31,7 @@
     "src/commit-signature.mjs",
     "src/operation-budget.mjs",
     "src/historical-access.mjs",
+    "src/content-search.mjs",
     "src/preview-capabilities.mjs",
     "dist",
     "locale",

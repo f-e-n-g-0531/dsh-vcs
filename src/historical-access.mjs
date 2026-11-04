@@ -1,10 +1,33 @@
 import {isObjectId} from '../git-history.mjs';
+import {currentOperationBudget} from './operation-budget.mjs';
 
 export const HISTORICAL_CACHE_LIMITS = Object.freeze({maxBytes: 32 * 1024 * 1024, maxEntries: 8, ttlMs: 60000});
 const MAX_BLOB_BYTES = 16 * 1024 * 1024;
 const MAX_LIST_BYTES = 16 * 1024 * 1024;
 const MAX_DIRECTORY_ENTRIES = 100000;
 const CHUNK_BYTES = 64 * 1024;
+const isLineBreak = (buffer,pos) => buffer[pos] === 10 || (buffer[pos] === 13 && buffer[pos + 1] !== 10);
+// At most 257 checkpoints for a 16 MiB blob, independent of its line count.
+function buildLineIndex(buffer,signal) {
+  const index=[];let line=1,lineStart=0;
+  for(let offset=0;offset<=buffer.length;offset++) {
+    if(offset%CHUNK_BYTES===0){signal?.throwIfAborted();currentOperationBudget()?.throwIfExpired();index.push({offset,line,lineStart});}
+    if(isLineBreak(buffer,offset)){line++;lineStart=offset+1;}
+  }
+  return {index,totalLines:line};
+}
+function locateOffset(buffer,index,offset) {
+  const point=index[Math.floor(offset/CHUNK_BYTES)];let line=point.line,lineStart=point.lineStart;
+  for(let pos=point.offset;pos<offset;pos++)if(isLineBreak(buffer,pos)){line++;lineStart=pos+1;}
+  return {line,lineStart};
+}
+function locateLine(buffer,index,line) {
+  let point=index[0];for(const candidate of index){if(candidate.line>line)break;point=candidate;}
+  if(point.line===line)return point.lineStart;
+  let current=point.line;
+  for(let pos=point.offset;pos<buffer.length;pos++)if(isLineBreak(buffer,pos)&&++current===line)return pos+1;
+  return buffer.length;
+}
 
 export function validateHistoricalPath(file, allowRoot = false) {
   if (typeof file !== 'string' || file.length > 32768 || (!file && !allowRoot) || file.includes('\0') || file.startsWith('/') || file.split('/').some(part => (!part || part === '.' || part === '..') && !(allowRoot && file === ''))) {
@@ -87,14 +110,17 @@ export function createHistoricalAccess({run, now = Date.now, maxBytes = HISTORIC
     filtered.sort((a,b) => Number(b.type === 'tree') - Number(a.type === 'tree') || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     return {commit,path:directory,query,entries:filtered.slice(offset,offset + limit),nextOffset:offset + limit < filtered.length ? offset + limit : null};
   };
-  const segment = async (root, {commit,path:file,offset = 0,signal,expectedEpoch = epoch} = {}) => {
+  const segment = async (root, {commit,path:file,offset:requestedOffset,line:targetLine,signal,expectedEpoch = epoch} = {}) => {
     const generation = expectedEpoch; // Includes caller repository validation and all member lookups.
+    if(targetLine !== undefined && (!Number.isSafeInteger(targetLine) || targetLine < 1 || targetLine > MAX_BLOB_BYTES + 1 || requestedOffset !== undefined)) throw Error('Invalid segment target line');
+    let offset = requestedOffset ?? 0;
     if (!Number.isInteger(offset) || offset < 0 || offset > MAX_BLOB_BYTES) throw Error('Invalid segment offset');
     const entry = await lookup(root, {commit,path:file,signal,missingMessage:'Segment requires a selected committed regular file'});
     if (entry.type !== 'blob' || !['100644','100755'].includes(entry.mode)) throw Error('Segment requires a selected committed regular file');
     purge();
     const key = JSON.stringify([root,commit,entry.oid]);
-    let buffer = generation === epoch ? cache.get(key)?.buffer : undefined;
+    let cached = generation === epoch ? cache.get(key) : undefined;
+    let buffer = cached?.buffer, lineIndex = cached?.lineIndex;
     if (buffer) cacheHits++;
     if (!buffer) {
       const rawSize = (await run(root, ['cat-file','-s',entry.oid], 2097152, {signal})).toString('utf8').trim();
@@ -116,24 +142,32 @@ export function createHistoricalAccess({run, now = Date.now, maxBytes = HISTORIC
         if (buffer.includes(0) || buffer.some(byte => byte < 32 && ![9,10,12,13].includes(byte))) throw Error('Segments support UTF-8 text only');
         new TextDecoder('utf-8',{fatal:true}).decode(buffer);
         decodeCount++;
+        lineIndex = buildLineIndex(buffer,signal);
         if (generation === epoch) {
           remove(key);
           const timer = setTimeout(() => remove(key), ttlMs);
           timer.unref?.();
-          cache.set(key, {root,buffer,expiresAt:now() + ttlMs,timer});
+          cache.set(key, {root,buffer,lineIndex,expiresAt:now() + ttlMs,timer});
           bytes += buffer.length;
         }
       } finally {reservedBytes -= size; reservedEntries--;}
     }
     signal?.throwIfAborted();
     const size = buffer.length;
+    const targetFound = targetLine === undefined || targetLine <= lineIndex.totalLines;
+    if(targetLine !== undefined) offset = targetFound ? locateLine(buffer,lineIndex.index,targetLine) : size;
     if (offset > size) throw Error('Segment offset exceeds file size');
+    const start = locateOffset(buffer,lineIndex.index,offset);
     if (offset < size && (buffer[offset] & 192) === 128) throw Error('Segment offset splits UTF-8 character');
     let end = Math.min(size, offset + CHUNK_BYTES);
     while (end < size && (buffer[end] & 192) === 128) end--;
+    if(end < size && buffer[end - 1] === 13 && buffer[end] === 10) end--;
     const text = new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(buffer.subarray(offset,end));
     signal?.throwIfAborted();
-    return {commit,path:file,oid:entry.oid,encoding:'UTF-8',offset,endOffset:end,totalBytes:size,nextOffset:end < size ? end : null,text};
+    const endLine = locateOffset(buffer,lineIndex.index,end).line;
+    const endsMidLine = end < size && end > offset && !isLineBreak(buffer,end - 1);
+    const lineTruncated = endsMidLine;
+    return {commit,path:file,oid:entry.oid,encoding:'UTF-8',offset,endOffset:end,totalBytes:size,nextOffset:end < size ? end : null,text,startLine:start.line,endLine,startsMidLine:offset > start.lineStart,targetFound,lineTruncated,endsMidLine,...(!targetFound?{notice:'Requested line exceeds file line count.'}:{})};
   };
   return {lookup,treePage,segment,clear,captureEpoch:() => epoch,stats:() => {purge();return {bytes,entries:cache.size,reservedBytes,reservedEntries,blobReads,blobReadBytes,decodeCount,cacheHits};}};
 }

@@ -1,4 +1,5 @@
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {singleFileWindow, SINGLE_WINDOW_LINES} from './single-file-window.mjs';
 import {alignLines, MAX_DISPLAY_LINES} from './text-comparison.mjs';
 
 const defaults = {
@@ -13,7 +14,35 @@ const numberStyle = {flex: '0 0 6ch', textAlign: 'right', paddingRight: 8, opaci
 const textStyle = {margin: 0, flex: 1, minWidth: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', tabSize: 4, font: 'inherit'};
 
 // Deliberately no HTML insertion or editable controls: source is React text.
-export default function TextComparison({comparison, labels = {}}) {
+export default function TextComparison(props) {
+  return props.single ? <SingleFileText {...props}/> : <AlignedText {...props}/>;
+}
+
+function SingleFileText({comparison, labels = {}, line = null, startLine = 1, emptyLine = false}) {
+  const text = comparison?.right?.text ?? '';
+  const [anchor, setAnchor] = useState(null), target = useRef(null), container = useRef(null);
+  useEffect(() => setAnchor(null), [text, line, startLine, emptyLine]);
+  const result = useMemo(() => singleFileWindow(text, {line, startLine, anchor, emptyLine}), [text, line, startLine, anchor, emptyLine]);
+  useEffect(() => {
+    if (container.current) container.current.scrollTop = target.current ? Math.max(0, target.current.offsetTop - container.current.clientHeight / 2) : 0;
+  }, [result]);
+  return <section ref={container} className="vcs-text-comparison vcs-single-file" aria-label={labels.singleReadonly ?? 'Read-only file'} style={{overflow:'auto',position:'absolute',inset:0}} tabIndex={0}>
+    <p role="status">{labels.window ?? 'Lines shown'}: {result.startLine}–{result.endLine} / {result.baseLine}–{result.baseLine + Math.max(0,result.totalLines - 1)}</p>
+    {line !== null && !result.targetFound && <p role="status">{labels.targetMissing ?? 'Requested line is not in the available text'}</p>}
+    {result.truncated && <nav>
+      <button disabled={result.startLine <= result.baseLine} onClick={() => setAnchor(Math.max(result.baseLine, result.startLine - SINGLE_WINDOW_LINES / 2))}>{labels.previous ?? 'Previous'}</button>
+      <button disabled={result.endLine >= result.baseLine + result.totalLines - 1} onClick={() => setAnchor(result.endLine + SINGLE_WINDOW_LINES / 2 + 1)}>{labels.next ?? 'Next'}</button>
+    </nav>}
+    <div aria-label={comparison?.right?.label}>
+      {result.rows.map(row => <div key={row.number} ref={row.number === line ? target : null} data-line={row.number} data-target={row.number === line || undefined} aria-current={row.number === line ? 'location' : undefined} style={{...lineStyle,background:row.number === line ? 'var(--dsw-alias-code-diff-added, #259b4940)' : undefined,outline:row.number === line ? '1px solid currentColor' : undefined}}>
+        <span style={numberStyle}>{row.number}</span><pre style={textStyle}>{row.text}</pre>
+      </div>)}
+    </div>
+    {!result.rows.length && <p>{labels.empty ?? defaults.empty}</p>}
+  </section>;
+}
+
+function AlignedText({comparison, labels = {}}) {
   const before = comparison?.left?.text ?? '';
   const after = comparison?.right?.text ?? '';
   const result = useMemo(() => alignLines(before, after), [before, after]);

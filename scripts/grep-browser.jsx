@@ -9,7 +9,7 @@ export async function checkGrep(){
  const rpc=async(e,p,signal)=>{
   if(e!=='vcs/grep')throw Error('Unexpected '+e);
   if(p.query==='pending'){oldSignal=signal;return new Promise(resolve=>pending=resolve);}
-  return {matches:[{path:'f.js',line:3,text:'foo bar'}]};
+  return {snapshot:'a'.repeat(40),matches:[{path:'f.js',line:3,text:'foo bar'}],complete:true,nextCursor:null};
  };
  const t=k=>k;
  try{

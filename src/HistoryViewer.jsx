@@ -2,11 +2,11 @@ import React,{useState} from 'react';
 import TextComparison from './TextComparison.jsx';
 import {comparisonLabels} from './comparison-labels.mjs';
 import {useHistoryEditor} from './useHistoryEditor.mjs';
-export default function HistoryViewer({comparison,identity,t,single=false,line=null,initialOptions,onOptionsChange}){
+export default function HistoryViewer({comparison,identity,t,single=false,line=null,startLine=1,emptyLine=false,initialOptions,onOptionsChange}){
  const [sideBySide,setSide]=useState(initialOptions?.sideBySide!==false),[ignoreWhitespace,setWhitespace]=useState(initialOptions?.ignoreWhitespace===true),[wrap,setWrap]=useState(initialOptions?.wrap===true);
  const [enabled,setEnabled]=useState(initialOptions?.enabled!==false);
  const report=patch=>onOptionsChange?.({sideBySide,ignoreWhitespace,wrap,enabled,...patch});
- const {node,viewer,ready,error,computation}=useHistoryEditor({comparison,identity,enabled,single,line,sideBySide,ignoreWhitespace,wrap});
+ const {node,viewer,ready,error,computation}=useHistoryEditor({comparison,identity,enabled,single,startLine,line:single&&Number.isSafeInteger(line)&&line>=startLine?line-startLine+1:null,sideBySide,ignoreWhitespace,wrap});
  return <div className="vcs-history-viewer"><div className="vcs-history-viewer-toolbar">
  <button aria-pressed={enabled} onClick={()=>{setEnabled(!enabled);report({enabled:!enabled});}}>{t(enabled?'historyBasic':'historyAdvanced')}</button>
  {ready&&!single&&<div key="controls" style={{display:'flex',flexWrap:'wrap',gap:8}}>
@@ -22,6 +22,6 @@ export default function HistoryViewer({comparison,identity,t,single=false,line=n
  {error&&<p role="status">{t('fallback')} {error}</p>}
  <div key="editor-host" className="vcs-history-editor-host" style={{position:'relative',height:'var(--vcs-history-editor-height, 360px)'}}>
  <div ref={node} style={{position:'absolute',inset:0,visibility:ready?'visible':'hidden'}} aria-hidden={!ready}/>
- {!ready&&<TextComparison comparison={comparison} labels={comparisonLabels(t)}/>}
+ {!ready&&<TextComparison comparison={comparison} single={single} line={line} startLine={startLine} emptyLine={emptyLine} labels={{...comparisonLabels(t),singleReadonly:t('readingReadonly'),window:t('readingWindow'),targetMissing:t('readingTargetMissing'),previous:t('previous'),next:t('next')}}/>}
  </div></div>;
 }

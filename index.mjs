@@ -40,7 +40,7 @@ const REQUEST_FIELDS = {
   'vcs/branch-switch-prepare': ['sessionId', 'repositoryId', 'branch'],
   'vcs/branch-switch-confirm': ['sessionId', 'repositoryId', 'token'],
   'vcs/stash-list': ['sessionId', 'repositoryId'],
-  'vcs/grep': ['sessionId', 'repositoryId', 'commit', 'query'],
+  'vcs/grep': ['sessionId', 'repositoryId', 'commit', 'query', 'cursor', 'limit'],
   'vcs/status': ['sessionId', 'repositoryId', 'mode'],
   'vcs/compare': ['sessionId', 'repositoryId', 'mode', 'id', 'large'],
   'vcs/conflict-stages': ['sessionId', 'repositoryId', 'mode', 'id'],
@@ -55,7 +55,7 @@ const REQUEST_FIELDS = {
   'vcs/tree': ['sessionId', 'repositoryId', 'commit'],
   'vcs/tree-page': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'limit', 'query'],
   'vcs/tree-file': ['sessionId', 'repositoryId', 'commit', 'path'],
-  'vcs/tree-segment': ['sessionId', 'repositoryId', 'commit', 'path', 'offset'],
+  'vcs/tree-segment': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'line'],
   'vcs/tree-history': ['sessionId', 'repositoryId', 'commit', 'path', 'offset', 'limit', 'follow', 'since', 'until'],
   'vcs/commit-image': ['sessionId', 'repositoryId', 'commit', 'parentIndex', 'id', 'side'],
   'vcs/workspace-image': ['sessionId', 'repositoryId', 'mode', 'id', 'side'],
@@ -135,6 +135,8 @@ function validateContentSearch(endpoint, payload) {
   if (endpoint !== 'vcs/grep') return;
   if (typeof payload.query !== 'string' || !payload.query || payload.query.length > 1024 || /[\0\r\n]/.test(payload.query)) throw invalid('Invalid content search query.');
   if (payload.commit !== undefined && (typeof payload.commit !== 'string' || !isObjectId(payload.commit))) throw invalid('Invalid content search commit.');
+  if (payload.cursor !== undefined && (typeof payload.cursor !== 'string' || !payload.cursor || payload.cursor.length > 4096 || !payload.commit)) throw invalid('Invalid content search cursor.');
+  if (payload.limit !== undefined && (!Number.isInteger(payload.limit) || payload.limit < 1 || payload.limit > 100)) throw invalid('Invalid content search page size.');
 }
 
 function validateRenameFollow(endpoint, payload) {
@@ -178,6 +180,7 @@ function validateRepositoryPayload(endpoint, payload) {
   validateCommitSelection(endpoint, payload);
   validateLargeComparison(endpoint, payload);
   if (endpoint === 'vcs/tree-segment' && payload.offset !== undefined && (!Number.isInteger(payload.offset) || payload.offset < 0 || payload.offset > 16777216)) throw invalid('Invalid segment offset.');
+  if (endpoint === 'vcs/tree-segment' && payload.line !== undefined && (!Number.isSafeInteger(payload.line) || payload.line < 1 || payload.line > 16777217 || payload.offset !== undefined)) throw invalid('Invalid segment target line.');
   validateBlameWindow(endpoint, payload);
   validateContentSearch(endpoint, payload);
   validateRenameFollow(endpoint, payload);
@@ -215,7 +218,7 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
         ...optionalField('since', payload.since), ...optionalField('until', payload.until), signal,
       });
     case 'vcs/tree-segment':
-      return api.getHistoricalSegment({...repository}, {commit: payload.commit, path: payload.path, offset: payload.offset ?? 0, signal});
+      return api.getHistoricalSegment({...repository}, {commit: payload.commit, path: payload.path, ...optionalField('offset', payload.offset), ...optionalField('line', payload.line), signal});
     case 'vcs/workspace-image':
       return api.getWorkspaceImage({...repository}, {mode, id: payload.id, side: payload.side ?? 'right', signal});
     case 'vcs/revision-image':
@@ -225,7 +228,7 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
     case 'vcs/stash-list':
       return api.listStashes({...repository}, {signal});
     case 'vcs/grep':
-      return api.searchRepositoryContent({...repository}, {commit: payload.commit, query: payload.query, signal});
+      return api.searchRepositoryContent({...repository}, {commit: payload.commit, query: payload.query, ...optionalField('cursor', payload.cursor), ...optionalField('limit', payload.limit), signal});
     case 'vcs/commit-image':
       return api.getCommitImage({...repository}, {commit: payload.commit, parentIndex: payload.parentIndex ?? 0, id: payload.id, side: payload.side ?? 'right', signal});
     case 'vcs/tree-file':
