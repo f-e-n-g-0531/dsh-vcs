@@ -10,6 +10,16 @@ export function useHistoryEditor({comparison, identity, enabled, single, line, s
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [computation, setComputation] = useState('pending');
+  const [generation, setGeneration] = useState(0);
+  const attempt = useRef(null);
+  const failedAttempt = attempt.current;
+  const retry = () => {
+    // A retained click must not restart a cancelled, replaced, or already retried task.
+    if (!enabled || !error || !failedAttempt?.failed || attempt.current !== failedAttempt) return;
+    failedAttempt.failed = false;
+    setError('');
+    setGeneration(value => value + 1);
+  };
 
   useEffect(() => {
     setReady(false);
@@ -21,18 +31,22 @@ export function useHistoryEditor({comparison, identity, enabled, single, line, s
     link.rel = 'stylesheet';
     link.href = asset('editor.css');
     document.head.appendChild(link);
+    const current = {failed: false};
+    attempt.current = current;
     const task = startHistoryEditor({
       node: node.current, comparison, key: identity, single,
-      load: signal => loadEditor(asset('editor.js') + '?v=' + encodeURIComponent(version) + '&retry=0', {signal}),
+      load: signal => loadEditor(asset('editor.js') + '?v=' + encodeURIComponent(version) + '&retry=' + generation, {signal}),
       onReady: instance => { viewer.current = instance; setReady(true); },
-      onError: failure => setError(failure.message),
+      onError: failure => { current.failed = true; setError(failure.message); },
       onComputation: setComputation,
     });
     return () => {
+      attempt.current = null;
+      current.failed = false;
       viewer.current = null;
       try { task.dispose(); } finally { link.remove(); }
     };
-  }, [enabled, comparison, identity, single]);
+  }, [enabled, comparison, identity, single, generation]);
 
   useEffect(() => {
     if (ready && single && line) viewer.current?.revealLine(line);
@@ -41,5 +55,5 @@ export function useHistoryEditor({comparison, identity, enabled, single, line, s
     if (ready) viewer.current?.options({sideBySide, ignoreWhitespace, wrap, startLine});
   }, [ready, sideBySide, ignoreWhitespace, wrap, startLine]);
 
-  return {node, viewer, ready, error, computation};
+  return {node, viewer, ready, error, computation, retry};
 }
