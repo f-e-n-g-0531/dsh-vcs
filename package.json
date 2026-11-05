@@ -1,6 +1,6 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
@@ -57,7 +57,7 @@
     "test:performance": "node scripts/performance-baseline.mjs"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": "0.1.7-rc.2 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.5"
+    "@deepseek-ai/dsh": "0.1.7-rc.2 || 0.2.0-rc.2 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh": { "optional": true }

@@ -74,7 +74,7 @@ jobs:
             gh run download "$CI_RUN" --name "dsh-vcs-$matrix-attempt-$CI_ATTEMPT" --dir "evidence/candidates/$matrix"
           done
           gh run download "$CHROME_RUN" --name "isolated-layout-evidence-attempt-$CHROME_ATTEMPT" --dir evidence/chrome
-          for host in 0.1.7-rc.2 0.2.0-rc.2 0.2.1-rc.2 0.2.1-rc.5; do
+          for host in 0.1.7-rc.2 0.2.0-rc.2 0.2.1-rc.2 0.2.1-rc.5 0.2.2-rc.1; do
             gh run download "$COMPAT_RUN" --name "host-compat-$host-attempt-$COMPAT_ATTEMPT" --dir "evidence/compat/$host"
           done
       - name: Verify evidence and select already-tested candidate bytes

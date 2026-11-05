@@ -35,7 +35,7 @@ npm run test:host-compat -- "<installed @deepseek-ai/dsh/package.json>"
 1. 提交并推送版本修改，创建新标签 `vX.Y.Z`；不移动已有标签。
 2. 等待标签 CI 的 Windows／Ubuntu × Node 22／24 全部成功。
 3. 手动在同一标签运行 **Browser layout checks**，等待成功。
-4. 在同一标签运行 **Controlled host compatibility**，提供受控离线宿主工件 run ID 和四个精确版本的 SHA-256。每个版本必须有自己的真实合同结果。
+4. 在同一标签运行 **Controlled host compatibility**，提供受控离线宿主工件 run ID 和五个精确版本的 SHA-256。每个版本必须有自己的真实合同结果。
 5. 发布预检自动下载四份候选包与浏览器／宿主证据，绑定完整 tag ref、提交 SHA、run ID 和 attempt；核对内嵌版本、零跳过测试摘要及四包字节一致。缺失或失败均阻断。
 
 分支检查不能代替同标签检查。失败后先定位；需要修改源码或测试时使用新的版本和标签。
@@ -44,15 +44,15 @@ npm run test:host-compat -- "<installed @deepseek-ai/dsh/package.json>"
 
 浏览器与宿主合同任务不重新构建插件：先以 `npm ci --include=dev --ignore-scripts` 安装测试依赖，再由[发布预检脚本](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/scripts/release-preflight.mjs>)的 `select-ci` 选定同标签、同提交的成功 CI run／attempt，下载全部四矩阵候选；`consume` 校验版本、测试零失败／取消／跳过／待办及四包字节一致后，将候选包里的发行文件作为本次测试输入。
 
-消费过程生成 `consumed-candidate.json` 收据，记录候选归档 SHA-256、CI run／attempt 和归档位置。生成 Chrome 或宿主成功报告前，再核对原归档及每个已消费发行文件的实际字节；变化即失败，不能用重新构建的文件替代。报告中的 `candidateSha256`、`ciRun`、`ciAttempt` 必须与最终发布预检选中的四份 CI 候选一致，同时仍核对各自的完整 tag ref、提交 SHA 和证据任务 run／attempt。仅“同一提交测试通过”而没有这条字节关联，不足以放行；CI 重跑后也必须重新取得对应候选的浏览器与四版本宿主证据。
+消费过程生成 `consumed-candidate.json` 收据，记录候选归档 SHA-256、CI run／attempt 和归档位置。生成 Chrome 或宿主成功报告前，再核对原归档及每个已消费发行文件的实际字节；变化即失败，不能用重新构建的文件替代。报告中的 `candidateSha256`、`ciRun`、`ciAttempt` 必须与最终发布预检选中的四份 CI 候选一致，同时仍核对各自的完整 tag ref、提交 SHA 和证据任务 run／attempt。仅“同一提交测试通过”而没有这条字节关联，不足以放行；CI 重跑后也必须重新取得对应候选的浏览器与五版本宿主证据。
 
 ## 受控宿主准备与离线合同
 
-[宿主工件工作流](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/.github/workflows/host-fixtures.yml>)仅允许默认分支手动执行，在 GitHub 托管的 Ubuntu runner 上为四个精确版本分别准备真实宿主：`0.1.7-rc.2`、`0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5`。这是明确授权的**在线准备阶段**，不是离线安装，也不使用日常 DSH 的配置或依赖目录。
+[宿主工件工作流](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/.github/workflows/host-fixtures.yml>)仅允许默认分支手动执行，在 GitHub 托管的 Ubuntu runner 上为五个精确版本分别准备真实宿主：`0.1.7-rc.2`、`0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5`、`0.2.2-rc.1`。这是明确授权的**在线准备阶段**，不是离线安装，也不使用日常 DSH 的配置或依赖目录。
 
 工作流通过[准备脚本](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/scripts/prepare-host-fixture.mjs>)固定同版本的官方 DSH 与 ui-slots 包，仅从 `https://registry.npmjs.org` 解析依赖。先生成锁文件并校验精确版本、下载地址及 SHA-512 integrity，再按锁文件安装；两次 npm 操作均禁用安装脚本。工件同时保存锁文件及准备记录，包括锁文件 SHA-256、准备源码 SHA、run ID 和 attempt。不启动宿主，不安装插件，不接触运行中的 profile。
 
-准备完成后，在待发布标签运行[宿主兼容工作流](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/.github/workflows/host-compat.yml>)，提供成功准备任务的 `fixture_run` 和四个版本各自 `host.tar.gz` 的 SHA-256 映射 `fixture_hashes`。工作流只接受本仓库默认分支的受控准备工作流结果，拒绝其他工作流、fork／PR 以及不匹配的摘要；验证归档路径后提取真实依赖树。**宿主合同使用已准备的离线依赖树**，不再在线安装宿主、不启动 profile，也不能用 mock 或一个版本的结果冒充四版本通过。工作流下载证据及安装插件项目的测试依赖仍需要网络，不表示整项 CI 在断网环境运行。
+准备完成后，在待发布标签运行[宿主兼容工作流](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/.github/workflows/host-compat.yml>)，提供成功准备任务的 `fixture_run` 和五个版本各自 `host.tar.gz` 的 SHA-256 映射 `fixture_hashes`。工作流只接受本仓库默认分支的受控准备工作流结果，拒绝其他工作流、fork／PR 以及不匹配的摘要；验证归档路径后提取真实依赖树。**宿主合同使用已准备的离线依赖树**，不再在线安装宿主、不启动 profile，也不能用 mock 或一个版本的结果冒充五版本通过。工作流下载证据及安装插件项目的测试依赖仍需要网络，不表示整项 CI 在断网环境运行。
 
 若维护者已有完整可信依赖树，也可本地生成相同宿主归档：
 
@@ -60,7 +60,7 @@ npm run test:host-compat -- "<installed @deepseek-ai/dsh/package.json>"
 node scripts/release-host-fixture.mjs pack <含node_modules和package-lock.json的根目录> <精确版本> <新的输出目录>
 ```
 
-归档来源必须包含完整依赖与锁文件；根目录内合法依赖链接可物化为普通文件，指向根目录外的链接或外部依赖 store 会被拒绝，须先将依赖完整准备在根目录内。归档本身不得保留链接或越界项。本地生成归档不绕过发布工作流的受控来源检查；四版本工件或真实合同不完整时发布仍会阻断。
+归档来源必须包含完整依赖与锁文件；根目录内合法依赖链接可物化为普通文件，指向根目录外的链接或外部依赖 store 会被拒绝，须先将依赖完整准备在根目录内。归档本身不得保留链接或越界项。本地生成归档不绕过发布工作流的受控来源检查；五版本工件或真实合同不完整时发布仍会阻断。
 
 ## 3. 按渠道发布
 

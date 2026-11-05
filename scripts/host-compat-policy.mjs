@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-export const SUPPORTED_HOSTS = Object.freeze(['0.1.7-rc.2', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.5']);
+export const SUPPORTED_HOSTS = Object.freeze(['0.1.7-rc.2', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.5', '0.2.2-rc.1']);
 export function validateFixtureRun(run, repository, defaultBranch='main') {
   assert.equal(run?.event,'workflow_dispatch','Host fixture must come from controlled manual workflow');
   assert.equal(run.repository?.full_name,repository,'Foreign fixture repository');
