@@ -18,9 +18,9 @@ export async function checkBranchDeletePreview(){
   render();if(calls.length)throw Error('Automatic assessment');fill('topic/old');button('branchDeletePreviewAssess').click();await wait(result,'result');
   if(Object.keys(calls[0].p).sort().join()!=='name,repositoryId,sessionId')throw Error('Unexpected payload');
   for(const text of ['topic/old','refs/heads/main','a'.repeat(40),'b'.repeat(40),'branchDeletePreviewWarning'])if(!host.textContent.includes(text))throw Error('Missing assessment fact');
-  if(host.querySelector('input[type=checkbox]')||host.querySelectorAll('button').length!==2||!host.querySelector('details'))throw Error('Unexpected permission UI');
+  if(host.querySelector('input[type=checkbox]')||host.querySelectorAll('button').length!==2||!host.querySelector('details.vcs-proof'))throw Error('Unexpected permission UI');
   if(host.querySelectorAll('li').length)throw Error('Closed proof mounted OIDs');
-  const toggle=async open=>{const details=host.querySelector('details');if(details.open!==open)details.querySelector('summary').click();await wait(()=>details.open===open&&host.querySelectorAll('li').length===(open?(large?100:2):0),'native details toggle');};
+  const toggle=async open=>{const details=host.querySelector('details.vcs-proof');if(details.open!==open)details.querySelector('summary').click();await wait(()=>details.open===open&&host.querySelectorAll('li').length===(open?(large?100:2):0),'native details toggle');};
   await toggle(true);if(host.querySelectorAll('li').length!==2)throw Error('Small proof missing');await toggle(false);
   large=true;flushSync(()=>button('branchDeletePreviewAssess').click());await wait(result,'10000 result');
   const readCount=calls.length;if(host.querySelectorAll('li').length)throw Error('New proof did not reset closed');
