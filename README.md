@@ -4,7 +4,7 @@
 
 你可以查看差异、浏览历史、追溯文件。已有确认式本地 Git 分支切换会改变 HEAD、暂存区和工作文件。当前冻结源码在 0.7.3 基础上累积了受限整文件／变更块／逐行暂存与取消暂存、commit／amend、从当前 HEAD 创建分支及两类标签、图片叠加／滑动比较和只读分支删除评估，计划以 **0.8.0** 收口，不再扩展功能。写操作必须先预览再明确确认，正文比较仍只读；不提供 fetch／pull／push、stash、merge 或冲突解决。
 
-**0.8.0 发布验证：PENDING，尚未正式发布。** 最近一次记录的默认全量为 **3338/3348 通过、10 失败**，不能以专项测试代替默认全绿，也不表示日常 DSH GUI 已更新。见[本版说明](<docs/releases/0.8.0.md>)及[当前能力](<docs/CURRENT-CAPABILITIES.md>)。
+**0.8.0 发布验证：PENDING，尚未正式发布。** 最近一次记录的默认全量为 **3338/3348 通过、10 失败**，不能以专项测试代替默认全绿，也不表示日常 DSH GUI 已更新。见[本版说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.0.md>)及[当前能力](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/CURRENT-CAPABILITIES.md>)。
 
 - npm 包：`@feng0531/dsh-vcs`
 - [下载正式版本](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) · [查看更新](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md)
