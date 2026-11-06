@@ -28,7 +28,7 @@ export function getProofPage(proof,page){
 }
 function ProofViewer({proof,t}){
  const [open,setOpen]=useState(false),[page,setPage]=useState(0),view=getProofPage(proof,page);
- return <details onToggle={e=>setOpen(e.currentTarget.open)}><summary>{t('branchDeletePreviewPath')}</summary>{open&&<>
+ return <details className="vcs-proof" onToggle={e=>setOpen(e.currentTarget.open)}><summary>{t('branchDeletePreviewPath')}</summary>{open&&<>
  <p>{t('branchDeletePreviewPage')}: {view.page+1} / {view.pageCount} · {t('branchDeletePreviewTotal')}: {view.total}</p>
  <button aria-label={t('branchDeletePreviewPrevious')} disabled={page===0} onClick={()=>setPage(p=>Math.max(0,p-1))}>{t('branchDeletePreviewPrevious')}</button>
  <button aria-label={t('branchDeletePreviewNext')} disabled={page===view.pageCount-1} onClick={()=>setPage(p=>Math.min(view.pageCount-1,p+1))}>{t('branchDeletePreviewNext')}</button>
@@ -55,10 +55,10 @@ function ScopedPreview({sessionId,repositoryId,rpc,t,blocked=false,pending=false
   finally{if(task.current===controller&&alive.current){task.current=null;locked.current=false;setBusy(false);}}
  };
  const snapshot=preview?.snapshot;
- return <section aria-label={t('branchDeletePreviewTitle')} aria-busy={busy} style={{padding:'0 12px',maxHeight:'50%',overflow:'auto',flexShrink:0}}>
- <h3>{t('branchDeletePreviewTitle')}</h3><p>{t('branchDeletePreviewScope')}</p><p>{t('branchDeletePreviewBounds')}</p><p>{t('branchDeletePreviewConstraints')}</p>
+ return <section className="vcs-op" aria-label={t('branchDeletePreviewTitle')} aria-busy={busy}>
+ <h3>{t('branchDeletePreviewTitle')}</h3><details className="vcs-help"><summary>{t('operationDetails')}</summary><p>{t('branchDeletePreviewScope')}</p><p>{t('branchDeletePreviewBounds')}</p></details><p>{t('branchDeletePreviewConstraints')}</p>
  <label>{t('branchDeletePreviewName')}<input aria-label={t('branchDeletePreviewName')} maxLength={1000} value={name} disabled={blocked||pending} onChange={e=>{if(!alive.current||!access.current)return;clear();draft.current=e.target.value.slice(0,1000);setName(draft.current);}}/></label>
- <button disabled={busy||blocked||pending} onClick={assess}>{t('branchDeletePreviewAssess')}</button>
+ <div className="vcs-op-actions"><button disabled={busy||blocked||pending} onClick={assess}>{t('branchDeletePreviewAssess')}</button></div>
  {busy&&<p role="status">{t('loading')}</p>}{error&&<p role="alert">{error}</p>}{(blocked||pending)&&<p role="status">{t('branchDeletePreviewBlocked')}</p>}
  {preview&&<section role="group" aria-label={t('branchDeletePreviewResult')}><p>{t('branchDeletePreviewWarning')}</p><p>{t('branchDeletePreviewName')}: <code>{snapshot.name}</code></p><p>{t('branchDeletePreviewRef')}: <code>{snapshot.ref}</code></p><p>{t('branchDeletePreviewCurrent')}: <code>{snapshot.current.ref}</code> <code>{snapshot.current.oid}</code></p><p>{t('branchDeletePreviewTarget')}: <code>{snapshot.target.ref}</code> <code>{snapshot.target.oid}</code></p><p>{t('commitFormat')}: <code>{snapshot.objectFormat}</code></p><p>{t('branchDeletePreviewCount')}: {snapshot.proof.length}</p><ProofViewer key={preview.version} proof={snapshot.proof} t={t}/></section>}
  <button onClick={()=>{if(alive.current&&generation===draftGeneration.current)clear();}}>{t('branchDeletePreviewCancel')}</button>

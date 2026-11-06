@@ -42,10 +42,10 @@ function ScopedBranchCreate({sessionId,repositoryId,rpc,t,onCreated,onRediscover
   finally{if(!controller.signal.aborted&&alive.current){locked.current=false;setBusy('');}}
  };
  const cancel=()=>{if(!alive.current||generation!==draftGeneration.current)return;draftGeneration.current++;rerenderDraft(n=>n+1);if(confirming.current){confirming.current=false;markUnknown();}task.current?.abort();locked.current=false;clear();setBusy('');setError('');};
- return <section aria-label={t('branchCreateTitle')} aria-busy={!!busy} style={{padding:'0 12px',maxHeight:'50%',overflow:'auto',flexShrink:0}}>
- <h3>{t('branchCreateTitle')}</h3><p>{t('branchCreateScope')}</p><p>{t('branchCreateBounds')}</p>
+ return <section className="vcs-op" aria-label={t('branchCreateTitle')} aria-busy={!!busy}>
+ <h3>{t('branchCreateTitle')}</h3><details className="vcs-help"><summary>{t('operationDetails')}</summary><p>{t('branchCreateScope')}</p><p>{t('branchCreateBounds')}</p></details>
  <label>{t('branchCreateName')}<input aria-label={t('branchCreateName')} disabled={busy==='confirm'||unknown||blocked||pending} value={name} onChange={e=>{if(confirming.current||!alive.current)return;invalidate();setName(e.target.value);}}/></label>
- <button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('branchCreatePrepare')}</button>
+ <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('branchCreatePrepare')}</button></div>
  {busy&&<p role="status">{t(busy==='confirm'?'branchCreatePending':'loading')}</p>}{error&&<p role="alert">{error}</p>}
  {(unknown||blocked)&&<><p role="alert">{t('branchCreateUnknown')}</p><button disabled={!!busy||pending} onClick={()=>{if(!locked.current)onRediscover?.();}}>{t('branchCreateRecover')}</button></>}
  {preview&&<section role="group" aria-label={t('branchCreateConfirmation')}><p>{t('branchCreateWarning')}</p><p>{t('branchCreateName')}: <code>{preview.name}</code></p><p>{t('branchCreateRef')}: <code>{preview.ref}</code></p><p>{t('branchCreateTarget')}: <code>{preview.target.oid}</code></p><p>HEAD: <code>{preview.head}</code></p><p>{t('branchCreateCurrentRef')}: <code>{preview.currentRef}</code></p><p>{t('commitFormat')}: <code>{preview.objectFormat}</code></p><p>{t('commitExpires')}: <time dateTime={new Date(preview.expiresAt).toISOString()}>{new Date(preview.expiresAt).toISOString()}</time></p>

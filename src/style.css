@@ -175,3 +175,26 @@
 .vcs-root .vcs-svn-remote>p,.vcs-root .vcs-svn-remote>button{flex-shrink:0;margin:4px 16px;align-self:flex-start}
 .vcs-root .vcs-history-browser>.vcs-history-details>p{grid-column:2;grid-row:1;overflow:auto;padding:12px}
 @container(max-width:650px){.vcs-root .vcs-history-browser{grid-template-columns:minmax(130px,42%) minmax(0,1fr);grid-template-rows:minmax(120px,38%) minmax(0,1fr)}.vcs-root .vcs-history-browser .vcs-commit-sidebar,.vcs-root .vcs-history-browser .vcs-commit-review{padding:8px}}
+/* Bound the combined operation stack rather than each individual form. */
+.vcs-root>.vcs-operations{flex:0 1 auto;min-height:0;max-height:min(38%,360px);overflow:auto;border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1)}
+.vcs-root>.vcs-operations[hidden]{display:none}
+/* Preserve review space even when short/narrow headers and both drawers expand. */
+.vcs-root>.vcs-top{flex:0 1 auto;min-height:0;max-height:35%;overflow:auto}
+.vcs-root>.vcs-review-views{flex:0 0 auto;max-height:15%;overflow:auto}
+.vcs-root>.vcs-body{flex:1 0 80px;min-height:80px}
+.vcs-root .vcs-op{margin:0;padding:0 12px 8px;border-top:1px solid var(--dsw-alias-border-l2);min-width:0}
+.vcs-root>.vcs-branch-switcher{flex:0 1 auto;min-height:0;max-height:min(25%,240px);overflow:auto}
+.vcs-root .vcs-op h3{font-size:14px;margin:0 0 6px}
+.vcs-root .vcs-op p,.vcs-root .vcs-op label,.vcs-root .vcs-op fieldset{margin:6px 0}
+.vcs-root .vcs-op p,.vcs-root .vcs-op code,.vcs-root .vcs-op pre{overflow-wrap:anywhere}
+.vcs-root .vcs-op label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.vcs-root .vcs-op label:has(input[type=checkbox]){flex-direction:row;align-items:flex-start}
+.vcs-root .vcs-op input,.vcs-root .vcs-op textarea,.vcs-root .vcs-op select{width:100%;min-width:0;max-width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);padding:6px 9px}
+.vcs-root .vcs-op input[type=checkbox]{width:auto}
+.vcs-root .vcs-op textarea{min-height:72px;resize:vertical}
+.vcs-root .vcs-op fieldset{min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:8px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px 10px}
+.vcs-root .vcs-op fieldset legend{padding:0 4px}
+.vcs-root .vcs-op-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.vcs-root .vcs-op-actions>button{flex:0 1 auto}
+.vcs-root .vcs-op details{margin:6px 0}
+.vcs-root .vcs-op pre{max-height:160px;overflow:auto;white-space:pre-wrap;padding:8px;border-radius:8px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2)}

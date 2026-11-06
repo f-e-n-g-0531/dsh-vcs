@@ -78,8 +78,8 @@ function ScopedCommitPanel({sessionId,repositoryId,mode,rpc,t,onCommitted,onRedi
  };
  const cancel=()=>{if(!alive.current||generation!==draftGeneration.current)return;draftGeneration.current++;rerenderDraft(n=>n+1);stopLatest();latestSnapshot.current=null;setLatest(null);setLatestError('');if(confirming.current){confirming.current=false;markUnknown();}task.current?.abort();locked.current=false;clear();setBusy('');setError('');};
  const identityForm=(value,setValue,label)=><fieldset disabled={busy==='confirm'||unknown||blocked||pending}><legend>{t(label)}</legend>{identityKeys.map(key=><label key={key}>{t('commit'+key)}<input aria-label={t(label)+' '+t('commit'+key)} value={value[key]} onChange={e=>{if(confirming.current||!alive.current)return;invalidate();setValue({...value,[key]:e.target.value});}}/></label>)}</fieldset>;
- return <section aria-label={t('commitTitle')} aria-busy={!!busy} style={{padding:'0 12px',maxHeight:'50%',overflow:'auto',flexShrink:0}}>
- <h3>{t('commitTitle')}</h3><p>{t('commitScope')}</p><p>{t('commitDefaults')}</p>
+ return <section className="vcs-op" aria-label={t('commitTitle')} aria-busy={!!busy}>
+ <h3>{t('commitTitle')}</h3><details className="vcs-help"><summary>{t('operationDetails')}</summary><p>{t('commitScope')}</p><p>{t('commitDefaults')}</p></details>
  <section aria-label={t('commitLatestTitle')}><h4>{t('commitLatestTitle')}</h4><p>{t('commitLatestScope')}</p>
  <button disabled={latestBusy||busy==='confirm'||unknown||blocked||pending||mode!=='staged'} onClick={loadLatest}>{t('commitLatestLoad')}</button>
  {latestBusy&&<><p role="status">{t('loading')}</p><button onClick={()=>{if(alive.current)stopLatest();}}>{t('commitLatestCancel')}</button></>}{latestError&&<p role="alert">{latestError}</p>}
@@ -90,8 +90,7 @@ function ScopedCommitPanel({sessionId,repositoryId,mode,rpc,t,onCommitted,onRedi
  </section>
  {identityForm(author,setAuthor,'commitAuthor')}{identityForm(committer,setCommitter,'commitCommitter')}
  <label>{t('commitMessage')}<textarea aria-label={t('commitMessage')} disabled={busy==='confirm'||unknown||blocked||pending} value={message} onChange={e=>{if(confirming.current||!alive.current)return;invalidate();setMessage(e.target.value);}}/></label>
- <button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('commitPrepare')}</button>
- <button disabled={!!busy||pending} onClick={()=>{if(!alive.current||locked.current)return;invalidate();setAuthor(initialIdentity());setCommitter(initialIdentity());setMessage('');}}>{t('commitClearDraft')}</button>
+ <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('commitPrepare')}</button><button disabled={!!busy||pending} onClick={()=>{if(!alive.current||locked.current)return;invalidate();setAuthor(initialIdentity());setCommitter(initialIdentity());setMessage('');}}>{t('commitClearDraft')}</button></div>
  {busy&&<p role="status">{t(busy==='confirm'?'commitPending':'loading')}</p>}{error&&<p role="alert">{error}</p>}
  {(unknown||blocked)&&<><p role="alert">{t('commitUnknown')}</p><button disabled={!!busy||pending} onClick={()=>{if(!locked.current)onRediscover?.();}}>{t('commitRecover')}</button></>}
  {preview&&<section role="group" aria-label={t('commitConfirmation')}><p>{t('commitWarning')}</p><p>HEAD: <code>{preview.head}</code></p><p>{t('commitRef')}: <code>{preview.ref}</code></p><p>{t('commitFormat')}: <code>{preview.objectFormat}</code></p><p>Index SHA-256: <code>{preview.indexDigest}</code></p><p>Tree: <code>{preview.tree}</code></p><p>Commit: <code>{preview.commit.oid}</code></p>

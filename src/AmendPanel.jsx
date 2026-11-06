@@ -56,12 +56,11 @@ function ScopedAmendPanel({sessionId,repositoryId,mode,rpc,t,onAmended,onRedisco
  };
  const cancel=()=>{if(!alive.current||generation!==draftGeneration.current)return;draftGeneration.current++;rerenderDraft(n=>n+1);if(confirming.current){confirming.current=false;markUnknown();}task.current?.abort();locked.current=false;clear();setBusy('');setError('');};
  const identityForm=(value,setValue,label)=><fieldset disabled={busy==='confirm'||unknown||blocked||pending}><legend>{t(label)}</legend>{identityKeys.map(key=><label key={key}>{t('commit'+key)}<input aria-label={t(label)+' '+t('commit'+key)} value={value[key]} onChange={e=>{if(confirming.current)return;invalidate();setValue({...value,[key]:e.target.value});}}/></label>)}</fieldset>;
- return <section aria-label={t('amendTitle')} aria-busy={!!busy} style={{padding:'0 12px',maxHeight:'50%',overflow:'auto',flexShrink:0}}>
- <h3>{t('amendTitle')}</h3><p>{t('amendScope')}</p><p>{t('amendDefaults')}</p>
+ return <section className="vcs-op" aria-label={t('amendTitle')} aria-busy={!!busy}>
+ <h3>{t('amendTitle')}</h3><details className="vcs-help"><summary>{t('operationDetails')}</summary><p>{t('amendScope')}</p><p>{t('amendDefaults')}</p></details>
  {identityForm(committer,setCommitter,'commitCommitter')}
  <label>{t('commitMessage')}<textarea aria-label={t('commitMessage')} disabled={busy==='confirm'||unknown||blocked||pending} value={message} onChange={e=>{if(confirming.current)return;invalidate();setMessage(e.target.value);}}/></label>
- <button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('amendPrepare')}</button>
- <button disabled={!!busy||pending} onClick={()=>{if(!alive.current||locked.current)return;invalidate();setCommitter(initialIdentity());setMessage('');}}>{t('amendClearDraft')}</button>
+ <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('amendPrepare')}</button><button disabled={!!busy||pending} onClick={()=>{if(!alive.current||locked.current)return;invalidate();setCommitter(initialIdentity());setMessage('');}}>{t('amendClearDraft')}</button></div>
  {busy&&<p role="status">{t(busy==='confirm'?'amendPending':'loading')}</p>}{error&&<p role="alert">{error}</p>}
  {(unknown||blocked)&&<><p role="alert">{t('amendUnknown')}</p><button disabled={!!busy||pending} onClick={()=>{if(!locked.current)onRediscover?.();}}>{t('amendRecover')}</button></>}
  {preview&&<section role="group" aria-label={t('amendConfirmation')}><p>{t('amendWarning')}</p><p>{t('amendOldHead')}: <code>{preview.head}</code></p><p>{t('amendPreviousTree')}: <code>{preview.previousTree}</code></p><p>{t('amendParents')} ({preview.parents.length}): {preview.parents.length===0?t('amendRoot'):null}</p>{preview.parents.map(parent=><p key={parent}>Parent: <code>{parent}</code></p>)}<p>{t('commitRef')}: <code>{preview.ref}</code></p><p>{t('commitFormat')}: <code>{preview.objectFormat}</code></p><p>Index SHA-256: <code>{preview.indexDigest}</code></p><p>{t('amendNewTree')}: <code>{preview.tree}</code></p><p>{t('amendNewCommit')}: <code>{preview.commit.oid}</code></p>

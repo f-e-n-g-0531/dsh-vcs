@@ -42,10 +42,10 @@ function ScopedLightweightTagCreate({sessionId,repositoryId,rpc,t,onCreated,onRe
   finally{if(!controller.signal.aborted&&alive.current){locked.current=false;setBusy('');}}
  };
  const cancel=()=>{if(!alive.current||generation!==draftGeneration.current)return;draftGeneration.current++;rerenderDraft(n=>n+1);if(confirming.current){confirming.current=false;markUnknown();}task.current?.abort();locked.current=false;clear();setBusy('');setError('');};
- return <section aria-label={t('lightweightTagTitle')} aria-busy={!!busy} style={{padding:'0 12px',maxHeight:'50%',overflow:'auto',flexShrink:0}}>
- <h3>{t('lightweightTagTitle')}</h3><p>{t('lightweightTagScope')}</p><p>{t('lightweightTagBounds')}</p>
+ return <section className="vcs-op" aria-label={t('lightweightTagTitle')} aria-busy={!!busy}>
+ <h3>{t('lightweightTagTitle')}</h3><details className="vcs-help"><summary>{t('operationDetails')}</summary><p>{t('lightweightTagScope')}</p><p>{t('lightweightTagBounds')}</p></details>
  <label>{t('lightweightTagName')}<input aria-label={t('lightweightTagName')} disabled={busy==='confirm'||unknown||blocked||pending} value={name} onChange={e=>{if(confirming.current||!alive.current)return;invalidate();setName(e.target.value);}}/></label>
- <button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('lightweightTagPrepare')}</button>
+ <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} onClick={prepare}>{t('lightweightTagPrepare')}</button></div>
  {busy&&<p role="status">{t(busy==='confirm'?'lightweightTagPending':'loading')}</p>}{error&&<p role="alert">{error}</p>}
  {(unknown||blocked)&&<><p role="alert">{t('lightweightTagUnknown')}</p><button disabled={!!busy||pending} onClick={()=>{if(!locked.current)onRediscover?.();}}>{t('lightweightTagRecover')}</button></>}
  {preview&&<section role="group" aria-label={t('lightweightTagConfirmation')}><p>{t('lightweightTagWarning')}</p><p>{t('lightweightTagName')}: <code>{preview.name}</code></p><p>{t('lightweightTagRef')}: <code>{preview.ref}</code></p><p>{t('lightweightTagTarget')}: <code>{preview.head}</code></p><p>{t('lightweightTagTree')}: <code>{preview.targetTree}</code></p><p>HEAD: <code>{preview.head}</code></p><p>{t('lightweightTagCurrentRef')}: <code>{preview.currentRef}</code></p><p>{t('commitFormat')}: <code>{preview.objectFormat}</code></p><p>{t('commitExpires')}: <time dateTime={new Date(preview.expiresAt).toISOString()}>{new Date(preview.expiresAt).toISOString()}</time></p>

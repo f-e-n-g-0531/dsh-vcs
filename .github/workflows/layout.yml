@@ -81,6 +81,8 @@ jobs:
           node scripts/monaco-fixture.mjs
           timeout 240s node scripts/run-monaco-browser.mjs
           node scripts/verify-monaco-result.mjs
+      - name: Check production operation panel geometry
+        run: node scripts/operation-layout-run.mjs
       - name: Record exact tag Chrome success
         env:
           RELEASE_TAG: ${{ github.ref_name }}

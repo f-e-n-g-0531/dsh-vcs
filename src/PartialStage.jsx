@@ -103,8 +103,8 @@ function ScopedPartialStage({sessionId,repositoryId,id,mode,rpc,t,onStaged,onRed
   finally{if(!controller.signal.aborted&&alive.current){locked.current=false;setBusy('');}}
  };
  const close=()=>{if(!alive.current)return;if(confirming.current)markUnknown();task.current?.abort();locked.current=false;clear();setOpen(false);setBusy('');setError('');};
- return <section aria-label={t('partialTitle')} aria-busy={!!busy} style={{padding:'0 12px',flexShrink:0,maxHeight:'45%',overflow:'auto'}}>
-  <button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={replan}>{t('partialPlan')}</button>
+ return <section className="vcs-op" aria-label={t('partialTitle')} aria-busy={!!busy}>
+  <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={replan}>{t('partialPlan')}</button></div>
   {(unknown||blocked)?<><p role="alert">{t('stageUnknown')} {error}</p><button onClick={()=>{if(!locked.current)onStaged();}}>{t('stageRecover')}</button></>:open&&<>
    <p>{t('partialScope')}</p><p>{t('partialReadonly')}</p>{busy&&<p role="status">{t(busy==='confirm'?'stagePending':'loading')}</p>}{error&&<p role="alert">{error}</p>}
    {plan&&<section aria-label={t('partialUnits')}><p>{t('stagePath')}: <code>{plan.path}</code></p><p>HEAD: <code>{plan.head}</code></p><p>{t('stageIndex')}: <code>{plan.index.oid}</code> · {plan.index.mode}</p>

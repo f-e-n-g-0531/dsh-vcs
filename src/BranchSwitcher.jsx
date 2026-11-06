@@ -66,8 +66,8 @@ function ScopedBranchSwitcher({sessionId,repositoryId,rpc,t,onSwitched,onRedisco
  const cancel=()=>{if(generation!==targetGeneration.current||!alive.current)return;nextGeneration();if(confirming.current){confirming.current=false;markUnknown();}task.current?.abort();locked.current=false;clearPreview();setBusy('');setError('');};
  const recover=()=>{if(alive.current&&!locked.current&&!pending)onSwitched?.();};
  const close=()=>{if(generation!==targetGeneration.current||!alive.current||locked.current||uncertain.current)return;nextGeneration();clearPreview();setOpen(false);setData(null);setTarget('');setError('');};
- return <section aria-label={t('branchSwitcher')} aria-busy={!!busy} style={{padding:'0 12px',flexShrink:0,maxHeight:'45%',overflow:'auto'}}>
- <button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={()=>open?close():read()}>{t('branchSwitcher')}</button>
+ return <section className="vcs-op vcs-branch-switcher" aria-label={t('branchSwitcher')} aria-busy={!!busy}>
+ <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={()=>open?close():read()}>{t('branchSwitcher')}</button></div>
  {(open||unknown||blocked)&&<><p>{t('branchScope')}</p>
  {busy==='confirm'&&<button onClick={cancel}>{t('branchCancel')}</button>}
  {busy&&<p role="status">{t(busy==='confirm'?'branchPending':'loading')}</p>}

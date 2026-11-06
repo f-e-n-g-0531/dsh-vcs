@@ -48,8 +48,8 @@ function ScopedIndexStage({sessionId,repositoryId,id,mode,rpc,t,onStaged,onRedis
   if(busy==='confirm'){confirming.current=false;uncertain.current=true;setUnknown(true);onUnknown?.();}
   task.current?.abort();locked.current=false;clearPreview();setBusy('');setOpen(false);setError('');
  };
- return <section aria-label={t('stageTitle')} aria-busy={!!busy} style={{padding:'0 12px',flexShrink:0,maxHeight:'45%',overflow:'auto'}}>
- <button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={prepare}>{t('stagePrepare')}</button>
+ return <section className="vcs-op" aria-label={t('stageTitle')} aria-busy={!!busy}>
+ <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={prepare}>{t('stagePrepare')}</button></div>
  {(unknown||blocked)?<><p role="alert">{t('stageUnknown')} {error}</p><button onClick={()=>{if(!locked.current)onStaged();}}>{t('stageRecover')}</button></>:open&&<>
  <p>{t('stageScope')}</p>{busy&&<p role="status">{t(busy==='confirm'?'stagePending':'loading')}</p>}{error&&<p role="alert">{error}</p>}
  {preview&&<section role="group" aria-label={t('stageConfirmation')}><p>{t('stageWarning')}</p>

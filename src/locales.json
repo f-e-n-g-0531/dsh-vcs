@@ -562,7 +562,8 @@
     "lineScopeUnstage": "Git 普通修改，支持 M 空格 及 MM；I → H，保留未选索引、工作文件和 HEAD。拒绝二进制、无效 UTF-8、增删、重命名、链接、子模块、过滤器及 Git attributes。每侧最多 256 KiB、4000 行、4000 个精确原始块、8000 个操作；精确 LCS 最多 200000 格。全工作树扫描每文件 2 MiB、合计 16 MiB，超限拒绝。",
     "lineWarningUnstage": "核对 I → H、所选操作、完整对象 ID 与模式。候选由捕获的 Index 和固定 HEAD原始字节合成，不一定等于HEAD blob。仅最终确认写索引并复验全新工作树 W；变化必须重新规划。合成 blob 仅追加（append-only），失败或取消可能留下孤立对象，不执行 GC 或回滚。不编辑工作文件或 HEAD。发送确认后取消或离开不保证撤销；结果未知必须显式刷新核对。",
     "lineAcknowledgeUnstage": "我已核对 I → H 逐行操作及合成候选索引，确认仅应用所选操作",
-    "lineConfirmUnstage": "最终确认逐行取消暂存"
+    "lineConfirmUnstage": "最终确认逐行取消暂存",
+    "operationDetails": "范围与限制"
   },
   "en": {
     "lightweightTagTitle": "Create local lightweight tag (not annotated)",
@@ -1127,6 +1128,7 @@
     "lineScopeUnstage": "Git ordinary modified files (M-space or MM); I → H, preserving unselected index, working files and HEAD. Rejects binary, invalid UTF-8, additions/deletions, renames, links, submodules, filters and Git attributes. Each side: 256 KiB, 4000 lines, 4000 exact raw blocks; 8000 operations; exact LCS 200000 cells. Whole working-tree scan: 2 MiB/file, 16 MiB total; over-limit inputs rejected.",
     "lineWarningUnstage": "Verify I → H, selected operations, full object IDs and modes. Synthetic candidate uses captured Index and pinned HEAD raw bytes, not necessarily the HEAD blob. Only final confirmation writes index and revalidates fresh W; changes require replanning. Synthetic blob storage is append-only; failure/cancellation may leave orphan objects, no GC or rollback. Working files and HEAD are not edited. Cancel/leaving after confirmation does not guarantee rollback; unknown outcomes require explicit refresh.",
     "lineAcknowledgeUnstage": "I verified I → H operations and synthetic candidate index; apply only selected operations",
-    "lineConfirmUnstage": "Finally confirm line unstage"
+    "lineConfirmUnstage": "Finally confirm line unstage",
+    "operationDetails": "Scope and limits"
   }
 }

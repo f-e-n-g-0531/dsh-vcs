@@ -48,8 +48,8 @@ function ScopedIndexUnstage({sessionId,repositoryId,id,mode,rpc,t,onUnstaged,onR
   if(busy==='confirm'){confirming.current=false;uncertain.current=true;setUnknown(true);onUnknown?.();}
   task.current?.abort();locked.current=false;clearPreview();setBusy('');setOpen(false);setError('');
  };
- return <section aria-label={t('unstageTitle')} aria-busy={!!busy} style={{padding:'0 12px',flexShrink:0,maxHeight:'45%',overflow:'auto'}}>
- <button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={prepare}>{t('unstagePrepare')}</button>
+ return <section className="vcs-op" aria-label={t('unstageTitle')} aria-busy={!!busy}>
+ <div className="vcs-op-actions"><button disabled={!!busy||unknown||blocked||pending} aria-expanded={open} onClick={prepare}>{t('unstagePrepare')}</button></div>
  {(unknown||blocked)?<><p role="alert">{t('unstageUnknown')} {error}</p><button onClick={()=>{if(!locked.current)onUnstaged();}}>{t('unstageRecover')}</button></>:open&&<>
  <p>{t('unstageScope')}</p>{busy&&<p role="status">{t(busy==='confirm'?'unstagePending':'loading')}</p>}{error&&<p role="alert">{error}</p>}
  {preview&&<section role="group" aria-label={t('unstageConfirmation')}><p>{t('unstageWarning')}</p>
