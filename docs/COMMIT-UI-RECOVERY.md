@@ -1,0 +1,7 @@
+# 提交界面的结果恢复
+
+提交确认发出后，浏览器取消／切换mode／Session或组件卸载不能证明服务器未写入。界面必须在仓库级保留unknown，禁止commit和六类Index确认，直到用户显式刷新或恢复检查。
+
+成功只在响应head／ref／tree／indexDigest与预览一致时成立；网络错误／返回不匹配不自动重发token，不发reset／revert／GC。
+
+父同步pending和unknown引用门禁必须覆盖已捕获旧handler；React按钮disabled状态不是互斥本身。未知结果恢复须核对当前HEAD和Index，不把重新发现仓库误称撤销提交。

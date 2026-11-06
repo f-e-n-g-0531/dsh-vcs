@@ -1,0 +1,7 @@
+# 创建分支确认信任边界
+
+浏览器字段不能指定targetOID或refs路径；Host prepare仅传短名到服务器仓库预览。公开target可用于核对，修改public projection不能改generic coordinator保留的原snapshot。
+
+令牌kind与实例独立，wrongkind尝试不得执行或烧毁另一合法token；repo binding使用当前发现对象身份，不以clone root字符串替代grant。
+
+授权回调由已认证Host提供，writer在执行前获取并finally释放；内部工厂不自动发现Session或创建用户授权。

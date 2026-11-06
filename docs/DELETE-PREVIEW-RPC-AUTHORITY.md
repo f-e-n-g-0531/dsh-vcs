@@ -1,0 +1,7 @@
+# 删除预览公开摘要隔离
+
+只读RPC返回重新构造的plain current／target／proof，不返回服务器prepare原摘要身份、token、baseline或Buffer。即使进程内调用handler拿到结果，也不能直接作为applyBranchDelete的WeakMap snapshot。
+
+删除confirm／preparetoken路由均不注册。协议能力与文件里存在内部apply导出是不同边界；vcs只公开prepareBranchDelete，package闭包为运行所需不代表用户授权。
+
+reader锁覆盖读取与最终授权；当前grant失效不能返回候选。短名携带路径／OID／force等额外字段在Session lookup前拒绝。

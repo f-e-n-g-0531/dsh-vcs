@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {mkdtemp,writeFile,readFile,rm,realpath,mkdir} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import * as adapter from '../index-change.mjs';
+import {createIndexUnstageCoordinator} from '../index-change-host.mjs';
+import cp from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {syncBuiltinESMExports} from 'node:module';
+test('real server snapshot passes fixed unstage coordinator without losing preview tuples',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'unstage-coordinator-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.toUpperCase().startsWith('GIT_')));
+const originalSpawn=cp.spawn;cp.spawn=(command,args,options)=>originalSpawn(command,args,{...options,env:{...options?.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'missing-global')}});syncBuiltinESMExports();t.after(()=>{cp.spawn=originalSpawn;syncBuiltinESMExports();});env.GIT_CONFIG_NOSYSTEM='1';env.GIT_CONFIG_GLOBAL=path.join(root,'missing-global');
+const git=args=>execFileSync('git',['-C',root,'-c','core.autocrlf=false','-c','core.fsmonitor=false',...args],{env,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();git(['init','-q']);git(['config','core.autocrlf','false']);await writeFile(path.join(root,'a'),'before\n');git(['add','a']);git(['-c','user.name=T','-c','user.email=t@example.invalid','-c','commit.gpgsign=false','commit','-qm','base']);const head=git(['rev-parse','HEAD:a']);await writeFile(path.join(root,'a'),'approved\n');git(['add','a']);const staged=git(['rev-parse',':a']),before=await readFile(path.join(root,'a'));const host=createIndexUnstageCoordinator({api:adapter}),address={sessionId:'s',repositoryId:'r',path:'a'},binding={entry:{},repository:{root,type:'git'},cwd:root,assertAuthorized:async()=>{}};const preview=await host.prepare(address,binding);assert.equal(preview.action,'unstage');assert.deepEqual(preview.index,{oid:staged,mode:'100644'});assert.deepEqual(preview.target,{oid:head,mode:'100644'});assert.equal(preview.fingerprint,undefined);
+const id=createHash('sha256').update(JSON.stringify(['staged','a',undefined,'modified','M',' ',undefined,undefined,undefined])).digest('hex');const selectedPreview=await adapter.prepareSelectedIndexUnstage(binding.repository,{id});assert.equal(selectedPreview.path,'a');assert.deepEqual(selectedPreview.index,preview.index);await assert.rejects(adapter.prepareSelectedIndexUnstage(binding.repository,{id:'f'.repeat(64)}),{code:'vcs/index-stale'});
+for(const relative of ['objects/info/Alternates','SHALLOW','objects/pack/fixture.PROMISOR']){const marker=path.join(root,'.git',...relative.split('/'));await mkdir(path.dirname(marker),{recursive:true});await writeFile(marker,'unsupported');await assert.rejects(host.prepare(address,binding),{code:'vcs/index-unsupported'});await rm(marker);}
+const result=await host.confirm({sessionId:'s',repositoryId:'r',token:preview.token},binding);assert.equal(result.index.oid,head);assert.equal(git(['diff','--cached','--name-only']),'');assert.deepEqual(await readFile(path.join(root,'a')),before);await assert.rejects(host.confirm({...address,token:preview.token},binding),{code:'vcs/index-confirmation-invalid'});});

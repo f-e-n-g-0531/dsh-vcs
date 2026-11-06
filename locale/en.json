@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "VCS changes",
-    "description": "Git / SVN read-only review and confirmed local Git branch switching"
+    "description": "Git / SVN review; confirmed restricted Git stage/unstage, commit/amend, branches and tags; read-only deletion assessment"
   }
 }

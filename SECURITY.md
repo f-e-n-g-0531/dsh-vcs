@@ -4,7 +4,7 @@
 
 本插件默认只读预览已发现 Git／SVN 仓库中的内容、路径和属性，并传给已连接的 DSH Web 客户端。**只读预览不代表内容不敏感。** 不要把没有保护的 DSH 服务暴露到公网。
 
-0.6.0 起唯一新增的仓库写操作是明确确认后的已有本地 Git 分支切换：会改变 HEAD、Index 和工作文件，不是历史页的引用导航。不提供 stage、commit、stash、force、fetch、push 或 SVN 写操作，不自动安装或重启宿主。
+0.6.0 起支持明确确认后的已有本地 Git 分支切换，会改变 HEAD、Index 和工作文件，不是历史页的引用导航。0.8.0 仍为计划发布，当前源码另接入受限整文件／完整块／逐行 stage 与 unstage、commit／amend、从当前 HEAD 创建本地分支及 unsigned annotated／lightweight tag；均须独立预览后明确确认。分支删除仅只读评估，不执行删除。不提供远端 fetch／pull／push、stash／merge／rebase／冲突解决、force 或 SVN 写操作，不自动安装、升级或重启日常 DSH／profile。源码接入和历史专项记录不代表当前发布门禁已通过或日常 GUI 已更新。
 
 仓库来自Session工作目录。若Session位于仓库子目录，查看范围可能覆盖整个仓库，而不只该子目录。插件不提供任意磁盘路径读取入口。
 
@@ -26,6 +26,28 @@
 - 执行前重验当前／目标提交、Index、配置和工作区。已暂存、未暂存、冲突、未跟踪及被忽略内容均拒绝；也拒绝过滤器／命令 hooks 配置、仓库 attributes、稀疏／部分克隆、特殊 Index flags、符号链接／硬链接／子模块、Git元数据symlink或alternates、进行中的仓库操作或锁、linked／分离／符号链接 gitdir、`core.worktree`、detached／unborn HEAD，以及与目标分支同名的 tag。目标被其他 worktree 占用时不强制绕过。
 - 命令级禁用 hooks、外部 attributes 和子模块递归，不修改用户 Git 配置，不自动 stash、创建分支或强制覆盖；不访问网络。插件内按仓库互斥写入与读取，不能约束其他进程。
 - 写入开始后的取消、超时、授权变化或其他失败可能返回结果未知；不自动回滚或重试。先刷新并核对真实 HEAD、Index 和工作文件，再决定后续操作。取消预览本身不启动写入。
+
+## 候选单文件取消暂存
+
+仅Git已暂存模式的普通修改文件，预览固定HEAD及原／目标Index tuple后一次确认。客户端只传选中ID和token，不传路径或替代正文；服务器在安全guard后解析路径，不先运行可能触发filters的status。确认绑定完整Index、工作字节、HEAD及授权，真实index.lock下CAS后发布候选，仅改一个tuple并失效stat缓存。
+
+拒绝选中MM、增删改名／冲突、unborn／detached、特殊Index／linked worktree、attributes／filters／hooks及扫描到的链接／硬链接；每文件2MiB、总工作正文16MiB、2万节点，含ignored／untracked。其他普通脏文件可存在但必须保持。外部锁不删除，写后未知不自动回滚／重试，要求刷新核对。该功能源码接入不表示正式发布或当前页面已验收。
+
+## 候选完整变更块与逐行暂存／取消暂存
+
+三阶段固定RPC：ID-only计划、planToken＋精确unit IDs选择预览、token-only最终确认。计划与确认令牌独立且短期单用、绑定授权。客户端不发送偏移／候选正文；服务器保留原始before／after并重算精确块计划，选择在预览时冻结。只允许256KiB／4000行／20万格的精确UTF8计划，无近似。发布沿单文件stage保护链，工作文件不写回。
+
+部分stage私有策略支持同mode的MM，按当前Index→Work保留已暂存内容；整文件stage／unstage仍拒绝MM，候选部分unstage按Index→HEAD精确恢复块，接受受限同mode的M-space／MM，使用方向隔离三阶段token；完整work仅复验不写回，合成候选blob也遵循append-only未知语义。所有写入口共用仓库 pending／unknown 门禁。显示块中的换行标记用于阅读，不改变原始字节。预览和选择不写对象，确认后可能留下孤立blob，禁止自动删除对象或GC回滚。
+
+逐行入口使用独立的正反向计划与 token，删除当前 Index 行和插入目标行独立选择，不自动配对替换或补换行。每个输入及候选最多256KiB／4000行，精确LCS最多20万格、逐行最多8000操作；会合并物理行边界的组合拒绝。块／行仅接受受限同mode既有普通UTF-8文件，不扩大整文件入口边界。
+
+## 候选提交与引用创建
+
+commit 从完整 Index 生成 tree／commit，显式确认 author／committer、时间时区和消息，不自动 stage 或修改工作正文；amend 独立确认历史替换，保留原 author 与有序 parents，允许 same-tree 消息修改。入口受已出生 loose 本地分支、既有 reflog、普通 stage0 Index 和严格配置子集约束，不支持 initial／签名／hooks／packed refs／shared 或 linked worktree／特殊 Index／attributes／filters 等不兼容情况，不宣称任意 Git 配置可用。
+
+新分支与两类 tag 固定当前 HEAD，不接受任意起点、不覆盖、不自动切换或 checkout；annotated tag 使用显式 tagger／消息且不签名，lightweight tag 直接指向 commit、不生成 tag 对象。分支删除只显示固定 tip 与祖先证明，不发放删除授权或提供删除确认。
+
+对象只追加，不通过删除对象或 GC 回滚。确认开始后的取消、超时、授权变化或失败可能已更新 Index／ref，或仅留下不可达对象；不自动重试、回滚或删除 ref。先显式刷新并核对 HEAD、refs、Index 和工作文件。共享 writer 与恢复门禁只协调插件内操作，不能约束外部 Git，不保证跨 Index／ref 的全局原子性。
 
 ## 不能保证什么
 

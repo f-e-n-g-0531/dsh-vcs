@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {encodeGitTag,parseVerifiedGitTag} from '../src/git-tag-object.mjs';
+for(const objectFormat of ['sha1','sha256'])test('actual Git tag hash and cat-file body oracle '+objectFormat,()=>{const root=mkdtempSync(path.join(tmpdir(),'tag-independent-oracle-')),env={...process.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'missing')},run=(args,input)=>execFileSync('git',['-C',root,...args],{env,input,stdio:['pipe','pipe','pipe']});try{run(['init','-q','--object-format='+objectFormat]);const tree=run(['mktree']).toString().trim(),commit=run(['-c','user.name=T','-c','user.email=t@x','commit-tree',tree,'-m','fixture']).toString().trim();const encoded=encodeGitTag({object:commit,tag:'release/安全',tagger:{name:'T',email:'t@x',timestamp:123,timezone:'+0800'},message:'BOM '+String.fromCharCode(65279)+' exact'+String.fromCharCode(13,10)+'EOF'},{objectFormat});assert.equal(run(['hash-object','-t','tag','--stdin'],encoded.body).toString().trim(),encoded.oid);run(['hash-object','-w','-t','tag','--stdin'],encoded.body);assert.deepEqual(run(['cat-file','tag',encoded.oid]),encoded.body);assert.equal(parseVerifiedGitTag(encoded.body,{oid:encoded.oid,objectFormat}).object,commit);assert.equal(run(['for-each-ref']).length,0);}finally{rmSync(root,{recursive:true,force:true});}});

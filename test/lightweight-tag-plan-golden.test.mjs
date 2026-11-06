@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {encodeGitCommit} from '../src/git-commit-object.mjs';
+import {createVerifiedLightweightTagPlan} from '../src/lightweight-tag-plan.mjs';
+for(const objectFormat of ['sha1','sha256'])test('lightweight tag binds raw commit directly without annotated object '+objectFormat,()=>{const id={name:'T',email:'t@x',timestamp:1,timezone:'+0000'},commit=encodeGitCommit({tree:'1'.repeat(objectFormat==='sha1'?40:64),author:id,committer:id,message:'tagger forged'},{objectFormat}),plan=createVerifiedLightweightTagPlan(commit.body,{objectFormat,target:commit.oid,name:'release/安全'});assert.equal(plan.target,commit.oid);assert.equal(plan.targetTree,'1'.repeat(commit.oid.length));assert.equal(plan.ref,'refs/tags/release/安全');assert.equal(plan.action,'lightweight-tag-create');assert.equal(Object.hasOwn(plan,'object'),false);assert.equal(Object.values(plan).some(Buffer.isBuffer),false);assert.throws(()=>createVerifiedLightweightTagPlan(commit.body,{objectFormat,target:'2'.repeat(commit.oid.length),name:'release/安全'}));assert.throws(()=>createVerifiedLightweightTagPlan(commit.body,{objectFormat,target:commit.oid,name:'release/安全',message:'no annotation'}));assert.equal(Object.isFrozen(plan),true);});

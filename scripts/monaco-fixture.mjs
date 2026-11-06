@@ -8,7 +8,7 @@ await build({entryPoints:['scripts/large-compare-browser.jsx'],outfile:'test-res
 await build({entryPoints:['scripts/history-viewer-browser.jsx'],outfile:'test-results/history-viewer-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/graph-native-browser.jsx'],outfile:'test-results/graph-native-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await build({entryPoints:['scripts/blame-native-browser.jsx'],outfile:'test-results/blame-native-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
-for (const name of ['search-navigation','review-context','history-tree-pages','branch-switch','performance','recovery']) await build({entryPoints:['scripts/'+name+'-browser.jsx'],outfile:'test-results/'+name+'-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
+for (const name of ['search-navigation','review-context','history-tree-pages','branch-switch','performance','recovery','reflog','index-unstage','index-stage','partial-stage','partial-unstage','line-selection','commit','amend','image-native','branch-create','branch-delete-preview','tag-create','lightweight-tag']) await build({entryPoints:['scripts/'+name+'-browser.jsx'],outfile:'test-results/'+name+'-browser.js',bundle:true,format:'esm',loader:{'.css':'text'},define:{'process.env.NODE_ENV':'"production"'}});
 await writeFile('test-results/monaco-fixture.html',`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="../dist/editor.css"><div id="a" style="height:300px;width:900px"></div><div id="b" style="height:300px;width:900px"></div><pre id="report">pending</pre><script type="module">
 const report=document.querySelector('#report'),errors=[];let phase='load',sa,sb;
 window.addEventListener('error',e=>errors.push(e.message));
@@ -66,6 +66,7 @@ try{
  phase='svn-history-date';await (await import('./history-viewer-browser.js')).checkSvnHistoryDateFilter();
  phase='commit-signature';await (await import('./history-viewer-browser.js')).checkCommitSignature();
  phase='commit-committer';await (await import('./history-viewer-browser.js')).checkCommitCommitter();
+ phase='reflog';await (await import('./reflog-browser.js')).checkReflog();
  phase='stash-list';await (await import('./history-viewer-browser.js')).checkStashList();
  phase='grep';await (await import('./history-viewer-browser.js')).checkGrep();
  phase='frontend-reload';await (await import('./history-viewer-browser.js')).checkFrontendReload();
@@ -74,9 +75,20 @@ try{
  phase='review-context';await (await import('./review-context-browser.js')).checkReviewContext();
  phase='history-tree-pages';await (await import('./history-tree-pages-browser.js')).checkHistoryTreePages();
  phase='branch-switch';await (await import('./branch-switch-browser.js')).checkBranchSwitch();
+ phase='index-unstage';await (await import('./index-unstage-browser.js')).checkIndexUnstage();
+ phase='index-stage';await (await import('./index-stage-browser.js')).checkIndexStage();
+ phase='partial-stage';await (await import('./partial-stage-browser.js')).checkPartialStage();
+ phase='partial-unstage';await (await import('./partial-unstage-browser.js')).checkPartialUnstage();
+ phase='line-selection';await (await import('./line-selection-browser.js')).checkLineSelection();
+ phase='commit';await (await import('./commit-browser.js')).checkCommit();
+ phase='amend';await (await import('./amend-browser.js')).checkAmend();
+ phase='branch-create';await (await import('./branch-create-browser.js')).checkBranchCreate();
+ phase='branch-delete-preview';await (await import('./branch-delete-preview-browser.js')).checkBranchDeletePreview();
+ phase='tag-create';await (await import('./tag-create-browser.js')).checkTagCreate();
+ phase='lightweight-tag';await (await import('./lightweight-tag-browser.js')).checkLightweightTagCreate();
  phase='recovery';await (await import('./recovery-browser.js')).checkRecovery();
  phase='performance';const performanceReport=await (await import('./performance-browser.js')).checkPerformance({createDiff:one.createDiff,getEditorResources:one.getEditorResources});
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,performance:performanceReport,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation','svn-history-date','commit-signature','commit-committer','stash-list','grep','history-layout','search-navigation','review-context','history-tree-pages','branch-switch','recovery','performance']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,performance:performanceReport,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation','svn-history-date','commit-signature','commit-committer','reflog','stash-list','grep','history-layout','search-navigation','review-context','history-tree-pages','branch-switch','index-unstage','index-stage','partial-stage','partial-unstage','line-selection','commit','amend','branch-create','branch-delete-preview','tag-create','lightweight-tag','recovery','performance']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);

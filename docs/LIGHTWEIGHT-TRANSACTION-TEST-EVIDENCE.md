@@ -1,0 +1,5 @@
+# Lightweight事务专用测试过程
+
+独立real success／replay与finalglobalconfig goldens通过。首轮专用成功路径测试命令计数filter未考虑-c固定配置前缀，实际数1误断言3；四项失败均在成功完成后的instrumentation断言，非生产事务失败。其他stale／unknown用例保留正常结果。
+
+实现worker修正命令查找位置，新增globalconfig与object／auditlog变更补充后复验55/56，仅新增object-bytes fixture因Windows looseobject只读属性EPERM在调用前失败；已chmod后再append修正fixture，最终完整54专用＋独立2项56/56通过，未改变生产验证规则。不提高预算、不降低状态验证，也不提前宣布完整通过。

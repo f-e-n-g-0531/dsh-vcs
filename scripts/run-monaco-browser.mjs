@@ -98,4 +98,15 @@ try{
   await press('Tab','Tab',9,undefined,8);if(!await evaluate("document.activeElement===document.querySelector('#native-blame tbody button')"))throw Error('Native blame reverse Tab failed');
   await writeFile('test-results/blame-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeBlameState')}));
  }finally{await evaluate('disposeNativeBlame();delete globalThis.disposeNativeBlame');}
+ await evaluate("import('./image-native-browser.js').then(async m=>{globalThis.disposeNativeImage=await m.mount();})");
+ try{
+  for(const mode of ['overlay','swipe']){
+   await evaluate('nativeImage.focus('+JSON.stringify(mode)+')');
+   for(const [key,code,vk,expected] of [['Home','Home',36,'0'],['ArrowRight','ArrowRight',39,'1'],['End','End',35,'100'],['ArrowLeft','ArrowLeft',37,'99']]){
+    await press(key,code,vk);
+    const state=await evaluate('nativeImage.state()');if(state.value!==expected||state.calls!==2||!state.trusted.length||!state.trusted.every(Boolean))throw Error('Native image range failed '+mode+' '+key+' '+JSON.stringify(state));
+   }
+  }
+  await writeFile('test-results/image-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeImage.state()'),steps:['overlay-home-arrow-end','swipe-home-arrow-end'],scope:'trusted CDP key events on actual native ranges; no repository writes'}));
+ }finally{await evaluate('disposeNativeImage();delete globalThis.disposeNativeImage');}
 }finally{try{await browser?.close();}finally{await server?.close();}}

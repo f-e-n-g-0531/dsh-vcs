@@ -1,0 +1,5 @@
+# 删除后全局配置新鲜度回归
+
+独立golden在ref删除后授权回调中写隔离global config alias，原始事务未拒绝（Missing expected rejection）。原deleted检查只有local config／metadata，global不在.git内，故本轮不只是性能优化，还补postauth配置新鲜度缺口。
+
+新实现必须prepare pin完整effectiveconfig并在apply每道fresh／deleted屏障重新safeGit no-includes比对。修正后独立success与finalglobalconfig2/2通过，global变更在poststart被拒绝为unknown。最终新鲜度27/27、既有confirm／preview131/131通过，删除RPC／UI仍未开放。

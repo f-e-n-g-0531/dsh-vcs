@@ -12,8 +12,20 @@ import SvnIdentity from './SvnIdentity.jsx';
 import SvnRemote from './SvnRemote.jsx';
 import HistoryPanel from './HistoryPanel.jsx';
 import StashPanel from './StashPanel.jsx';
+import ReflogPanel from './ReflogPanel.jsx';
 import SearchPanel from './SearchPanel.jsx';
 import BranchSwitcher from './BranchSwitcher.jsx';
+import BranchCreate from './BranchCreate.jsx';
+import TagCreate from './TagCreate.jsx';
+import LightweightTagCreate from './LightweightTagCreate.jsx';
+import BranchDeletePreview from './BranchDeletePreview.jsx';
+import CommitPanel from './CommitPanel.jsx';
+import AmendPanel from './AmendPanel.jsx';
+import IndexUnstage from './IndexUnstage.jsx';
+import IndexStage from './IndexStage.jsx';
+import PartialStage from './PartialStage.jsx';
+import PartialUnstage from './PartialUnstage.jsx';
+import {LineStage,LineUnstage} from './LineSelection.jsx';
 import {loadEditor} from './editor-loader.mjs';
 import dictionaries from './locales.json';
 import {reviewShortcut} from './review-keyboard.mjs';
@@ -39,7 +51,7 @@ function useWorkspaceSharedState(){
   return {mode,setMode,statuses,setStatuses,detailError,setDetailError,stats,setStats};
 }
 
-// Review view selection: workspace, history, stash or grep.
+// Review view selection: workspace, history, stash, reflog or grep.
 function useReviewView(initialView,onViewChange){
   const [reviewView,setReviewView]=useState(initialView);
   useEffect(()=>{onViewChange?.(reviewView);},[reviewView]);
@@ -160,16 +172,17 @@ function PanelHeader({t,repositories,repositoryId,gitSelected,scanning,mode,revi
 }
 
 // Repository toolbar: one mutually exclusive review view plus the workspace return action.
-function RepositoryToolbar({t,gitSelected,historyActive,stashActive,grepActive,reviewActive,setReviewView,openReviewView}){
-  return <nav className="vcs-review-views" aria-label={t('reviewView')}><button aria-pressed={!reviewActive} onClick={()=>setReviewView('workspace')}>{t('workspaceView')}</button><button aria-pressed={historyActive} aria-expanded={historyActive} onClick={()=>openReviewView('history')}>{t('history')}</button>{gitSelected&&<><button aria-pressed={stashActive} aria-expanded={stashActive} onClick={()=>openReviewView('stash')}>{t('stash')}</button><button aria-pressed={grepActive} aria-expanded={grepActive} onClick={()=>openReviewView('grep')}>{t('grep')}</button></>}</nav>;
+function RepositoryToolbar({t,gitSelected,historyActive,stashActive,reflogActive,grepActive,reviewActive,setReviewView,openReviewView}){
+  return <nav className="vcs-review-views" aria-label={t('reviewView')}><button aria-pressed={!reviewActive} onClick={()=>setReviewView('workspace')}>{t('workspaceView')}</button><button aria-pressed={historyActive} aria-expanded={historyActive} onClick={()=>openReviewView('history')}>{t('history')}</button>{gitSelected&&<><button aria-pressed={stashActive} aria-expanded={stashActive} onClick={()=>openReviewView('stash')}>{t('stash')}</button><button aria-pressed={reflogActive} aria-expanded={reflogActive} onClick={()=>openReviewView('reflog')}>{t('reflog')}</button><button aria-pressed={grepActive} aria-expanded={grepActive} onClick={()=>openReviewView('grep')}>{t('grep')}</button></>}</nav>;
 }
 
 // Review view bodies; each panel keys its own request scope so it remounts on scope changes.
-function ReviewPanels({sessionId,repositoryId,historyRefresh,scan,rpc,t,rediscover,historyActive,stashActive,grepActive,svnSelected,gitSelected}){
+function ReviewPanels({sessionId,repositoryId,historyRefresh,scan,rpc,t,rediscover,historyActive,stashActive,reflogActive,grepActive,svnSelected,gitSelected}){
   return <>
     {historyActive&&svnSelected&&<SvnRemote key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} {...{sessionId,repositoryId,rpc,t}} onRediscover={rediscover}/>}
     {historyActive&&gitSelected&&<HistoryPanel key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
     {stashActive&&<StashPanel sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
+    {reflogActive&&gitSelected&&<ReflogPanel key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
     {grepActive&&<SearchPanel sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
   </>;
 }
@@ -288,6 +301,23 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const sessionId=session?.id;
     const panelNode=useRef(null),editorNode=useRef(null),viewer=useRef(null),fileListNode=useRef(null),searchNode=useRef(null),revealChange=useRef(null),invalidateRef=useRef(null);
     const [reviewView,setReviewView]=useReviewView(initialView,onViewChange);
+    // Unknown mutation outcomes survive selection/mode and automatic focus refreshes.
+    const [indexUnknown,setIndexUnknown]=useState({}),indexUnknownRef=useRef(new Set());
+    const markIndexUnknown=key=>{indexUnknownRef.current.add(key);setIndexUnknown(old=>({...old,[key]:true}));};
+    const clearIndexUnknown=key=>{indexUnknownRef.current.delete(key);setIndexUnknown(old=>({...old,[key]:false}));};
+    const indexPendingRef=useRef(new Set()),[indexPending,setIndexPending]=useState({});
+    const indexRpc=async(endpoint,payload,signal)=>{
+      const mutation=['vcs/index-stage-confirm','vcs/index-unstage-confirm','vcs/partial-stage-confirm','vcs/partial-unstage-confirm','vcs/line-stage-confirm','vcs/line-unstage-confirm','vcs/commit-confirm','vcs/amend-confirm','vcs/branch-create-confirm','vcs/tag-create-confirm','vcs/lightweight-tag-confirm','vcs/branch-switch-confirm'].includes(endpoint),key=payload.repositoryId;
+      // Switch reads/previews share the live repository barrier as well as confirms.
+      if(!mutation){
+        if(['vcs/branches','vcs/branch-switch-prepare','vcs/branch-delete-preview'].includes(endpoint)&&(indexPendingRef.current.has(key)||indexUnknownRef.current.has(key)||signal?.aborted))throw Object.assign(Error(t('indexMutationPending')),{code:'vcs/busy'});
+        return rpc(endpoint,payload,signal);
+      }
+      if(indexPendingRef.current.has(key)||indexUnknownRef.current.has(key)||signal?.aborted)throw Object.assign(Error(t('indexMutationPending')),{code:'vcs/busy'});
+      indexPendingRef.current.add(key);setIndexPending(old=>({...old,[key]:true}));
+      const aborted=()=>markIndexUnknown(key);signal?.addEventListener('abort',aborted,{once:true});
+      try{return await rpc(endpoint,payload,signal);}catch(e){markIndexUnknown(key);throw e;}finally{signal?.removeEventListener('abort',aborted);indexPendingRef.current.delete(key);setIndexPending(old=>({...old,[key]:false}));}
+    };
     const {mode,setMode,statuses,setStatuses,detailError,setDetailError,stats,setStats}=useWorkspaceSharedState();
     // Loaders are created before the shared reset exists; this late-bound handler keeps the
     // single invalidation path (and its state-reset order) without reordering hooks.
@@ -298,8 +328,9 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const svnSelected=visibleRepositories.some(repo=>repo.type==='svn');
     const historyActive=(gitSelected||svnSelected)&&reviewView==='history';
     const stashActive=gitSelected&&reviewView==='stash';
+    const reflogActive=gitSelected&&reviewView==='reflog';
     const grepActive=gitSelected&&reviewView==='grep';
-    const reviewActive=historyActive||stashActive||grepActive;
+    const reviewActive=historyActive||stashActive||reflogActive||grepActive;
     const {refresh,historyRefresh,refreshStatuses,abortStatus}=useStatusLoading({sessionId,rpc,scheduleStatus,discovery,repositoryId,mode,visibleRepositories,setStatuses,setDetailError,rediscover,invalidate:invalidateLatest});
     const {selected,comparison,loading,tab,setTab,large,selectionKey,selectedRepository,selectedStatus,compareError,reset:resetComparison,clearSelection,selectFile,toggleLarge,retryCompare}=useComparisonLoader({sessionId,rpc,discovery,repositories,statuses,mode,reviewActive,setDetailError,setStats,rediscover});
     const invalidate=()=>{abortStatus();resetComparison();};
@@ -315,10 +346,22 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const busy=scanning||visibleRepositories.some(repo=>!statuses[repo.id]);
     const {selectAdjacent,revealSelected}=usePanelShortcuts({panelNode,searchNode,fileListNode,revealChange,query,setQuery,changes,selected,reviewActive,repositoryId,selectFile,tree,statusFilter,collapsedDirectories,groups,setTree,clearFilters,chosen,setCollapsedDirectories});
     return <section ref={panelNode} className="vcs-root" aria-label={t('title')}><style>{css}</style>
-      <PanelHeader t={t} repositories={repositories} repositoryId={repositoryId} gitSelected={gitSelected} scanning={scanning} mode={mode} reviewActive={reviewActive} busy={busy} sessionId={sessionId} discovery={discovery} sessionCwd={session?.cwd} subdirectory={subdirectory} onSubdirectoryChange={setSubdirectory} onRescan={rescan} onRepositoryChange={value=>{invalidate();setStatuses({});setRepositoryId(value);}} onModeChange={value=>{invalidate();setStatuses({});setMode(value);}} onRefresh={()=>refreshStatuses(false)} onBack={()=>ctx.layout.selectPanel(null)}/>
-      {gitSelected&&<BranchSwitcher key={JSON.stringify([sessionId,repositoryId,scan])} {...{sessionId,repositoryId,rpc,t}} onSwitched={rediscover} onRediscover={rediscover}/>}
+      <PanelHeader t={t} repositories={repositories} repositoryId={repositoryId} gitSelected={gitSelected} scanning={scanning} mode={mode} reviewActive={reviewActive} busy={busy} sessionId={sessionId} discovery={discovery} sessionCwd={session?.cwd} subdirectory={subdirectory} onSubdirectoryChange={setSubdirectory} onRescan={rescan} onRepositoryChange={value=>{invalidate();setStatuses({});setRepositoryId(value);}} onModeChange={value=>{invalidate();setStatuses({});setMode(value);}} onRefresh={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);refreshStatuses(false);}}} onBack={()=>ctx.layout.selectPanel(null)}/>
+      {!reviewActive&&gitSelected&&mode==='staged'&&statuses[repositoryId]?.mode==='staged'&&!statuses[repositoryId]?.error&&statuses[repositoryId]?.changes?.length>0&&<CommitPanel sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onCommitted={()=>{clearIndexUnknown(repositoryId);clearSelection();rediscover();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&statuses[repositoryId]?.mode==='staged'&&!statuses[repositoryId]?.error&&Array.isArray(statuses[repositoryId]?.changes)&&<AmendPanel sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onAmended={()=>{clearIndexUnknown(repositoryId);clearSelection();rediscover();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&chosen.worktreeStatus===' '&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<IndexUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus===' '&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<IndexStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&[' ','M'].includes(chosen.indexStatus)&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<PartialStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&[' ','M'].includes(chosen.worktreeStatus)&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<PartialUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&[' ','M'].includes(chosen.indexStatus)&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<LineStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&[' ','M'].includes(chosen.worktreeStatus)&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<LineUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&!scanning&&typeof sessionId==='string'&&!!sessionId&&typeof repositoryId==='string'&&!!repositoryId&&<BranchCreate sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onCreated={()=>{clearIndexUnknown(repositoryId);clearSelection();rediscover();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/>}
+      {!reviewActive&&gitSelected&&!scanning&&typeof sessionId==='string'&&!!sessionId&&typeof repositoryId==='string'&&!!repositoryId&&<TagCreate sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onCreated={()=>{clearIndexUnknown(repositoryId);clearSelection();rediscover();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/>}
+      {!reviewActive&&gitSelected&&!scanning&&typeof sessionId==='string'&&!!sessionId&&typeof repositoryId==='string'&&!!repositoryId&&<LightweightTagCreate sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onCreated={()=>{clearIndexUnknown(repositoryId);clearSelection();rediscover();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/>}
+      {!reviewActive&&gitSelected&&!scanning&&typeof sessionId==='string'&&!!sessionId&&typeof repositoryId==='string'&&!!repositoryId&&<BranchDeletePreview sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]}/>}
+      {gitSelected&&<BranchSwitcher sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onSwitched={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);clearSelection();rediscover();}}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/>}
       {visibleRepositories.filter(repo=>repo.type==='svn'&&!reviewActive).map(repo=><React.Fragment key={JSON.stringify([sessionId,repo.id,scan,refresh])}><SvnIdentity repositoryId={repo.id} {...{sessionId,rpc,t}} onRediscover={rediscover}/></React.Fragment>)}
-      {(gitSelected||svnSelected)&&<><RepositoryToolbar t={t} gitSelected={gitSelected} historyActive={historyActive} stashActive={stashActive} grepActive={grepActive} reviewActive={reviewActive} setReviewView={setReviewView} openReviewView={openReviewView}/><ReviewPanels sessionId={sessionId} repositoryId={repositoryId} historyRefresh={historyRefresh} scan={scan} rpc={rpc} t={t} rediscover={rediscover} historyActive={historyActive} stashActive={stashActive} grepActive={grepActive} svnSelected={svnSelected} gitSelected={gitSelected}/></>}
+      {(gitSelected||svnSelected)&&<><RepositoryToolbar t={t} gitSelected={gitSelected} historyActive={historyActive} stashActive={stashActive} reflogActive={reflogActive} grepActive={grepActive} reviewActive={reviewActive} setReviewView={setReviewView} openReviewView={openReviewView}/><ReviewPanels sessionId={sessionId} repositoryId={repositoryId} historyRefresh={historyRefresh} scan={scan} rpc={rpc} t={t} rediscover={rediscover} historyActive={historyActive} stashActive={stashActive} reflogActive={reflogActive} grepActive={grepActive} svnSelected={svnSelected} gitSelected={gitSelected}/></>}
       <div className="vcs-body" hidden={reviewActive} aria-label={t('workspaceView')}><FileBrowser t={t} sessionId={sessionId} scanning={scanning} error={error} groups={groups} statuses={statuses} query={query} statusFilter={statusFilter} statusCounts={statusCounts} changes={changes} tree={tree} collapsedDirectories={collapsedDirectories} selected={selected} mode={mode} searchNode={searchNode} fileListNode={fileListNode} chosen={chosen} onQuery={setQuery} onStatusFilter={setStatusFilter} onClearFilters={clearFilters} onToggleTree={()=>setTree(!tree)} onExpandAll={()=>setTreeExpanded(true)} onCollapseAll={()=>setTreeExpanded(false)} onRevealSelected={revealSelected} onSelect={selectFile} onToggleDirectory={(key,closed)=>setCollapsedDirectories(old=>({...old,[key]:!closed}))} onRescan={rescan}/><DetailPane t={t} comparison={comparison} selected={selected} selectedRepository={selectedRepository} selectedStatus={selectedStatus} sessionId={sessionId} mode={mode} discoveryCwd={discovery?.cwd} refresh={refresh} rpc={rpc} rediscover={rediscover} large={large} selectionKey={selectionKey} loading={loading} detailError={detailError} compareError={compareError} error={error} busy={busy} chosen={chosen} repositoryCount={repositories.length} editorNode={editorNode} editorReady={editorReady} editorError={editorError} computation={computation} tab={tab} setTab={setTab} stats={stats} onRetryEditor={()=>setEditorRetry(x=>x+1)} onRetryCompare={retryCompare} onRescan={rescan} onToggleLarge={toggleLarge} sideBySide={sideBySide} setSide={setSide} ignoreWhitespace={ignoreWhitespace} setWhitespace={setWhitespace} wrap={wrap} setWrap={setWrap} viewer={viewer} changes={changes} onSelectAdjacent={selectAdjacent} onCopyError={setDetailError}/></div>
     </section>;
   }

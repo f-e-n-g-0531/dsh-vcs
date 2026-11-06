@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import cp from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
+import {mkdtemp,writeFile,readFile,rm,realpath} from 'node:fs/promises';
+import {existsSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {prepareIndexStage,applyIndexStage} from '../index-change.mjs';
+import {git} from '../local-command.mjs';
+test('final authorization mutation after blob append cannot bypass pre-Index revalidation',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'stage-auth-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),spawn=cp.spawn;cp.spawn=(c,a,o)=>spawn(c,a,{...o,env:{...o.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'absent-global')}});syncBuiltinESMExports();t.after(()=>{cp.spawn=spawn;syncBuiltinESMExports();});const run=(...a)=>git(root,a);await run('init');for(const [k,v]of [['user.name','T'],['user.email','t@example.invalid'],['core.autocrlf','false'],['commit.gpgsign','false']])await run('config',k,v);await writeFile(path.join(root,'a'),'before');await run('add','a');await run('commit','-m','base');await writeFile(path.join(root,'a'),'approved');const repo={root,type:'git'},snapshot=await prepareIndexStage(repo,{path:'a'}),before=await readFile(path.join(root,'.git','index')),object=path.join(root,'.git','objects',snapshot.target.oid.slice(0,2),snapshot.target.oid.slice(2));let afterBlobAuth=0,changed=false;await assert.rejects(applyIndexStage(repo,{snapshot,onStart(){},async assertAuthorized(){if(existsSync(object)&&++afterBlobAuth===3){changed=true;await writeFile(path.join(root,'a'),'late mutation');}}}),{code:'vcs/index-outcome-unknown'});assert.equal(changed,true);assert.deepEqual(await readFile(path.join(root,'.git','index')),before);assert.equal(existsSync(object),true);});

@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,writeFile,readFile,rm,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {withOwnedIndexLock} from '../index-lock.mjs';
+import {withOperationBudget} from '../src/operation-budget.mjs';
+test('ambient budget cancellation after start prevents rename even without direct lock signal',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'index-budget-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),gitDirectory=path.join(root,'.git');await mkdir(gitDirectory);const index=path.join(gitDirectory,'index'),old=Buffer.from('old');await writeFile(index,old);const cancellation=new AbortController();await assert.rejects(withOperationBudget({signal:cancellation.signal},()=>withOwnedIndexLock({gitDirectory,expectedIndexDigest:createHash('sha256').update(old).digest('hex')},async lock=>{await lock.writeCandidate(Buffer.from('new'));await lock.publish({assertAuthorized(){},beforePublish(){},onStart(){cancellation.abort();}});})),{code:'vcs/index-outcome-unknown'});assert.equal(await readFile(index,'utf8'),'old');});
+test('observed postpublish content divergence is unknown without rollback',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'index-post-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),gitDirectory=path.join(root,'.git');await mkdir(gitDirectory);const index=path.join(gitDirectory,'index'),old=Buffer.from('old');await writeFile(index,old);let checks=0;await assert.rejects(withOwnedIndexLock({gitDirectory,expectedIndexDigest:createHash('sha256').update(old).digest('hex')},async lock=>{await lock.writeCandidate(Buffer.from('approved'));await lock.publish({async assertAuthorized(){if(++checks===3)await writeFile(index,'external');},beforePublish(){},onStart(){}});}),{code:'vcs/index-outcome-unknown'});assert.equal(await readFile(index,'utf8'),'external');});

@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {parseVerifiedCommit} from '../src/verified-commit.mjs';
+for(const objectFormat of ['sha1','sha256'])test('verified tree is from hashed headers never header-looking message '+objectFormat,()=>{const width=objectFormat==='sha1'?40:64,tree='1'.repeat(width),parent='2'.repeat(width),body=Buffer.from('tree '+tree+'\nparent '+parent+'\nauthor T <t@example.invalid> 1 +0000\ncommitter T <t@example.invalid> 2 +0000\n\ntree '+'3'.repeat(width)+'\n'),oid=createHash(objectFormat).update(Buffer.from('commit '+body.length+'\0')).update(body).digest('hex'),parsed=parseVerifiedCommit(body,{oid,objectFormat});assert.equal(parsed.tree,tree);assert.deepEqual(parsed.parents,[parent]);body[5]=0x34;assert.throws(()=>parseVerifiedCommit(body,{oid,objectFormat}));});
+test('hash-correct duplicate tree still rejected as ambiguous dependency',()=>{const body=Buffer.from('tree '+'1'.repeat(40)+'\ntree '+'2'.repeat(40)+'\nauthor T <t@example.invalid> 1 +0000\ncommitter T <t@example.invalid> 2 +0000\n\nm'),oid=createHash('sha1').update(Buffer.from('commit '+body.length+'\0')).update(body).digest('hex');assert.throws(()=>parseVerifiedCommit(body,{oid}));});

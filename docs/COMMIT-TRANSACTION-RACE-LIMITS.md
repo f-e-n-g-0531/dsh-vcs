@@ -1,0 +1,9 @@
+# 提交组合事务的竞争边界
+
+内部apply调用者必须持同一仓库writer门禁；当前primitive不自动替Host获取第二层锁，以免与确认协调器死锁。外部Git进程不受该门禁控制。
+
+rawIndex／HEAD／config在前后capture中固定，但没有跨Index和ref的外部原子锁。因此不宣称对外部并发git add或checkout获得全局提交隔离；实际ref更新仍靠oldOID CAS防止普通分支覆盖，检测到变化则unknown。
+
+对象publisher内部存在自有temp阶段，不能任意fresh metadata rebaseline；发布结束后重新capture，仅接受本事务verified created精确目标和fanout新增。任何外来新对象／旧对象修改／Index变化都必须拒绝更新ref并保留新增对象。
+
+初期要求目标loose分支和HEAD／branch reflog预先存在，避免任意日志目录新增豁免。成功后的豁免仅精确目标ref及两个日志，不涵盖任意refs／logs。

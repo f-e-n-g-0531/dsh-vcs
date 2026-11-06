@@ -1,0 +1,7 @@
+# 删除Host工厂与用户授权边界
+
+内部协调器只管理单次token和互斥，不能凭短名或public merged字段提供删除权限。adapter必须是服务器受控prepare/apply，grant provenance来自未来真实Host。
+
+private snapshot仍依赖原执行层的可信并发约束；新增token不会解决rawref类型在最后观察后被替换的窗口。不因测试通过就注册通用删除API。
+
+结果未知需人工核对HEAD、目标ref与日志；不通过自动创建旧ref或删新ref“恢复”。

@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,readFile,rm,realpath} from 'node:fs/promises';
+import path from 'node:path';
+import {tmpdir} from 'node:os';
+import {inflateSync} from 'node:zlib';
+import {encodeGitTag} from '../src/git-tag-object.mjs';
+import {storeCapturedObject} from '../git-object-store.mjs';
+for(const objectFormat of ['sha1','sha256'])test('tag store captures exact bytes before authorization mutation '+objectFormat,async t=>{const temp=await mkdtemp(path.join(tmpdir(),'tag-store-independent-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),gitDirectory=path.join(root,'.git');await mkdir(path.join(gitDirectory,'objects'),{recursive:true});const encoded=encodeGitTag({object:'1'.repeat(objectFormat==='sha1'?40:64),tag:'release/x',tagger:{name:'T',email:'t@x',timestamp:1,timezone:'+0000'},message:'exact EOF'},{objectFormat}),original=Buffer.from(encoded.body);let starts=0;const result=await storeCapturedObject({gitDirectory,objectFormat,type:'tag',bytes:encoded.body,assertAuthorized(){encoded.body.fill(0);},onStart(){starts++;}});assert.equal(result.oid,encoded.oid);assert.equal(starts,1);const compressed=await readFile(path.join(gitDirectory,'objects',result.oid.slice(0,2),result.oid.slice(2)));assert.deepEqual(inflateSync(compressed),Buffer.concat([Buffer.from('tag '+original.length+String.fromCharCode(0)),original]));const again=await storeCapturedObject({gitDirectory,objectFormat,type:'tag',bytes:original,assertAuthorized(){},onStart(){assert.fail('existing valid tag must not start');}});assert.equal(again.created,false);});

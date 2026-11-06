@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import cp from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
+import {mkdtemp,writeFile,readFile,rm,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {prepareIndexUnstage,applyIndexUnstage} from '../index-change.mjs';
+import {git} from '../local-command.mjs';
+test('fixed-object reuse cannot hide a deleted pinned HEAD blob before Index publication',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'cache-invalidation-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),spawn=cp.spawn;cp.spawn=(c,a,o)=>spawn(c,a,{...o,env:{...o.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'absent-global')}});syncBuiltinESMExports();t.after(()=>{cp.spawn=spawn;syncBuiltinESMExports();});const run=(...a)=>git(root,a);await run('init');for(const[k,v]of [['user.name','T'],['user.email','t@example.invalid'],['core.autocrlf','false'],['commit.gpgsign','false']])await run('config',k,v);await writeFile(path.join(root,'a'),'original');await run('add','a');await run('commit','-m','base');const head=(await run('rev-parse','HEAD:a')).toString().trim();await writeFile(path.join(root,'a'),'staged');await run('add','a');const repo={root,type:'git'},snapshot=await prepareIndexUnstage(repo,{path:'a'}),before=await readFile(path.join(root,'.git','index'));let calls=0,started=false;await assert.rejects(applyIndexUnstage(repo,{snapshot,async assertAuthorized(){if(++calls===3)await rm(path.join(root,'.git','objects',head.slice(0,2),head.slice(2)));},onStart(){started=true;}}));assert.equal(started,false);assert.deepEqual(await readFile(path.join(root,'.git','index')),before);});

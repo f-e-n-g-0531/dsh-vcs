@@ -1,0 +1,7 @@
+# 删除预览的闭合历史限制
+
+当前安全模型要求完整闭合图，因此即使目标很近也会沿当前与目标所有父边到root。长历史可能超过节点／字节／15秒限制，应显示不完整或不支持而非把截断parent当root，更不能改为force。
+
+普通Git merge-base ancestry接口可以提供更高性能但尚非本轮认证路径；后续优化必须保留固定OID与无lazyfetch／replace安全语义，不以性能理由省略目标／HEAD freshness。
+
+返回proof只作解释不作删除授权；新HEAD或目标tip在preview后变化必须重新准备，真正删除尚未实现。

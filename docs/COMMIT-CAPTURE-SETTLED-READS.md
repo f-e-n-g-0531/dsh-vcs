@@ -1,0 +1,7 @@
+# Commit捕获独立读取并行
+
+状态：局部捕获优化，metadata与workPolicy只读并行，非Git事实或配置验证删减。
+
+settledReads启动独立读取并等待所有siblings结束，之后按输入顺序抛首个错误；不让失败后后台读取逃逸。metadata关闭屏障与原始fingerprint不变，配置no-includes顺序与15秒budget不变。
+
+初轮helper＋commitpreview／amend真实golden4/4通过，完整capture／capability75/75、顺序realcommit／amend＋helper5/5通过，独立静态复核无当前范围确认缺陷。build／85文件精确包与隔离安装通过。未测量性能提升比例。此改动不承诺默认全量deadline已修复，也不改变工作区写权限。

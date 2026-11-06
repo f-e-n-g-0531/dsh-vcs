@@ -1,0 +1,5 @@
+# Lightweight RPC接入过程
+
+首个委派worker失败未留路由，重新委派后Lead初轮actualHost调用发生在vcs导出写入之前，报api.prepareLightweightTagCreate不存在；字段契约同轮也遇到尚未完整快照处理。不能以package通过替代真实路由验收。
+
+最终source保存后必须重跑actualHost和字段／grant／token／mutex矩阵，重建最终包；source保存后actualHost＋字段契约5/5、专用及相邻72/72、84文件包与隔离安装通过。全部RPC并行运行触及真实annotated tag请求15s预算导致失败，保留记录；顺序roster最终193/193通过，不提高生产预算。

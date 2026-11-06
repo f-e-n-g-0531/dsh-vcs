@@ -1,0 +1,5 @@
+# Lead当前tag事务验证反馈
+
+独立tag-create-confirm-golden两次apply在15s共享预算超时，已在预算证据保留；尚未验收成功。verify每次调用readLatestCommit约7个Git进程，auth两边重复可能导致常态超预算。实现worker应优化重复固定事实认证但保留fresh effectiveconfig／rawHEAD当前ref／metadata及最终closure，不延长预算。
+
+Lead未编辑tag-create-preview.mjs或专用确认测试，避免与实现writer并发冲突。

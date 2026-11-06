@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync,readFileSync,existsSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+test('characterize installed Git old-OID no-deref deletion with symbolic target',()=>{const root=mkdtempSync(path.join(tmpdir(),'delete-symref-characterize-')),env={...process.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'missing')},git=(...a)=>execFileSync('git',['-C',root,...a],{encoding:'utf8',env,stdio:['ignore','pipe','pipe']}).trim();try{git('init','-q');const tree=git('mktree'),oid=git('-c','user.name=T','-c','user.email=t@x','commit-tree',tree,'-m','fixture');git('update-ref','refs/heads/destination',oid);git('symbolic-ref','refs/heads/target','refs/heads/destination');let refused=false;try{git('update-ref','--no-deref','-d','refs/heads/target',oid);}catch{refused=true;}assert.equal(readFileSync(path.join(root,'.git','refs','heads','destination'),'utf8').trim(),oid);assert.equal(refused,false,'installed Git accepts matching resolved old OID for no-deref symbolic deletion');assert.equal(existsSync(path.join(root,'.git','refs','heads','target')),false);}finally{rmSync(root,{recursive:true,force:true});}});

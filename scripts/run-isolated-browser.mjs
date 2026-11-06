@@ -24,5 +24,8 @@ try {
   await writeFile('test-results/isolated-browser-failure.html',dom.result.value);
   throw Error(JSON.stringify(report));
  }
+ const evaluate=async expression=>{const r=await browser.call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+ await evaluate("import('./image-native-browser.js').then(async m=>{globalThis.disposeNativeImage=await m.mount();})");
+ try{for(const mode of ['overlay','swipe']){await evaluate('nativeImage.focus('+JSON.stringify(mode)+')');for(const [key,vk,expected]of [['Home',36,'0'],['ArrowRight',39,'1'],['End',35,'100'],['ArrowLeft',37,'99']]){for(const type of ['keyDown','keyUp'])await browser.call('Input.dispatchKeyEvent',{type,key,code:key,windowsVirtualKeyCode:vk});const state=await evaluate('nativeImage.state()');if(state.value!==expected||state.calls!==2||!state.trusted.length||!state.trusted.every(Boolean))throw Error('Native image range '+mode+' '+key+' '+JSON.stringify(state));}}await writeFile('test-results/image-native-report.json',JSON.stringify({pass:true,state:await evaluate('nativeImage.state()'),scope:'trusted CDP key events, isolated fixture'}));}finally{await evaluate('disposeNativeImage();delete globalThis.disposeNativeImage');}
  console.log(JSON.stringify(report));
 }finally{try{await browser?.close();}finally{await server?.close();}}

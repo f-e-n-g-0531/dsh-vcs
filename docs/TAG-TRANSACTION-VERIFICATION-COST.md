@@ -1,0 +1,7 @@
+# Tag事务验证成本分析
+
+独立静态复核给出的调用图成本：单次verify嵌套public readLatestCommit为7次Git启动／8次metadata扫描；正常新对象路径约19次verify，即约133次Git启动／152次扫描，尚未含底层原语额外读取。此为结构计数，不伪称实测耗时归因。
+
+建议用私有single-bracket fresh inspector替换public API重复封装：仍新读effective no-includes config并按原policy验证与私有原baseline比对；combined rev-parse canonical目录／format／HEAD；原rawHEAD及currentref字节；固定OID commit认证。完整opening／closing metadata与rootidentity、阶段exactobject／ref／log核对保留。
+
+授权callback前后仍需验证，不能缓存globalconfig或只看localconfig不变；不能提高15秒预算、删除postauth校验或整体rebaseline。独立HEADtype检查只有target==HEAD且当前完整commit已认证时才可条件复用。

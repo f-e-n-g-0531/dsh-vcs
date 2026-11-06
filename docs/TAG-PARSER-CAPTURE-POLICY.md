@@ -1,0 +1,7 @@
+# Tag parser捕获与取消
+
+原始body在读取options／signal之前复制，callbacks不得改变已捕获内容；exact own-data options拒绝getter／未知字段。parser结果仅标量identity与消息，不泄漏bodyBuffer。
+
+纯同步取消是合作式检查，不保证eventloop异步abort中途执行；native AbortSignal与受控同步callback遵循文档约定。Proxy和共享内存不是原子隔离输入。
+
+签名不支持不等于验签失败，目标commit字段只为固定OID字符串，尚无仓库存在性证明。

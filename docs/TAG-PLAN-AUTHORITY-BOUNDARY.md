@@ -1,0 +1,7 @@
+# Tag纯计划权限与对象类型
+
+目标commit body经过hash和header认证，只说明给定bytes确实是该OID的受支持commit，不说明它存在于当前仓库；不能用纯计划替代仓库对象读取。
+
+refs/tags名称来自固定短tag，但目标ref是否存在、packedrefs／symbolic／外部竞争、当前Session权限都在后续仓库事务处理。创建对象或计划不等于创建标签引用。
+
+ID绑定内容不是加密授权token。调用方可修改owned输出body，执行层仍需重验hash和canonical tag目标，不能盲信对象字段。

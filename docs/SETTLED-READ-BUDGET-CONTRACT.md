@@ -1,0 +1,9 @@
+# 并行读取共同预算与取消收齐
+
+本轮仅新增确定性回归，不改生产helper或15秒budget。
+
+AsyncLocalStorage上下文经并行Promise thunk保持同一budget，nesteddeadline严格等于父更早deadline，不重新延长期限。取消后每个sibling的cleanup均结束再抛原始任意reason；显式gate验证第二任务未清理时整体不完成。
+
+首任务慢失败与第二任务快失败仍按输入顺序抛首错，不遗留后台读取。初版测试静态复核发现fail-fast可能逃过微任务等待、catch可能接受fulfillment的假阴性风险；已用setImmediate事件循环检查确认gate关闭时整体未settle，并用assert.rejects强制失败契约，finally释放并收齐。修正后专用3＋既有2项5/5通过。
+
+原始npm test默认并发完整回归已启动，最终3348项3338通过／10失败（1077.2秒），默认并发与15s预算不变。三项amend stale测试observer未识别新增globalpath flags导致mutation未触发，其余七项涉及tag预算或delete finalauth尚未到达的时序断言；全部失败保留，不以专项／顺序结果替代默认全绿。

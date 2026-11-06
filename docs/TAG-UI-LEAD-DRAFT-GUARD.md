@@ -1,0 +1,7 @@
+# Lead draft guard变更说明
+
+Lead根据独立静态复核修复oldprepare闭包A在编辑B后仍提交A问题，src/TagCreate.jsx新增draftGeneration与每次invalidate递增。
+
+初版计数guard在同value编辑时没有state变化导致不rerender，第二次prepare错误被挡；已补rerenderDraft(n=>n+1)保证新handler generation更新，Lead复验component＋golden16/16通过。cancel同样按generation拒绝oldcancel，再递增并rerender。独立tag-stale-draft-golden验证A prepare／cancel不能影响B候选1/1通过。
+
+实现worker后报exclusive scope并发，Lead已停止进一步UI编辑，send_message其subagent UUID无法路由，故此文件记录变更意图供handoff；不要回退安全guard而只让旧测试绿。

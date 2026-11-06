@@ -1,0 +1,5 @@
+# Tag Host实际事务证据
+
+临时真实Git仓库用createTagCreateCoordinator连接prepareTagCreate／applyTagCreate，prepare返回公开safe摘要与token，confirm实际创建固定annotated标签，HEAD与Index保持；重放token拒绝。独立golden1/1通过。
+
+这不是已注册RPC／UI：调用工厂和真实仓库adapter仅在隔离测试，日常GUI／profile不修改，不据此声称用户可创建tag。

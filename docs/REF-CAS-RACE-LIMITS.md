@@ -1,0 +1,9 @@
+# 引用CAS与symbolic引用竞争
+
+Git update-ref携带oldOID避免普通ref竞争覆盖，但OID相等不等于引用类型和HEAD指向未变。--no-deref确保不跟随symbolic引用写另一个目标；若并发将目标direct ref改为symbolic且解析OID相同，它不提供独立的引用类型CAS。
+
+初期原语须在写前／后检查HEAD／目标ref，并明确外部竞争窗口；不能宣称获得跨HEAD／ref／Index全局原子性。后续生产提交必须持本进程writer门禁、排除不支持的外部操作并处理unknown，必要时使用可验证的symref事务能力。
+
+reflog记账身份／文本使用固定受控值或明确capturedcommitter，不从浏览器消息自由构造shell／环境，不运行引用事务hook。自有空hooks目录在子进程close前保持存在并验证身份，清理只尝试删除自有空目录，遇外来内容保留。
+
+这类原语测试仅限临时仓库，不授权真实用户ref变化。

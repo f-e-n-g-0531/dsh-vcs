@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import cp from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
+import {mkdtemp,writeFile,readFile,rm,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {git} from '../local-command.mjs';
+import {listChanges} from '../vcs.mjs';
+import {prepareLineIndexUnstage,selectLineIndexUnstage,applyLineIndexUnstage,applyPartialIndexUnstage} from '../index-change.mjs';
+test('reverse exact line mixture restores only one HEAD line and retains unselected Index line',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'line-independent-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),spawn=cp.spawn;cp.spawn=(c,a,o)=>spawn(c,a,{...o,env:{...o.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'absent-global')}});syncBuiltinESMExports();t.after(()=>{cp.spawn=spawn;syncBuiltinESMExports();});const run=(...a)=>git(root,a);await run('init');for(const[k,v]of [['user.name','T'],['user.email','t@example.invalid'],['core.autocrlf','false'],['commit.gpgsign','false']])await run('config',k,v);const h=Buffer.from('h0\r\nh1\nz\n'),i=Buffer.from('i0\r\ni1\nz\n'),w=Buffer.from('w0\r\nw1\nz\n'),expected=Buffer.from('i1\nh1\nz\n');await writeFile(path.join(root,'a'),h);await run('add','a');await run('commit','-m','base');await writeFile(path.join(root,'a'),i);await run('add','a');await writeFile(path.join(root,'a'),w);const repo={root,type:'git'},id=(await listChanges(repo,'staged'))[0].id,p=await prepareLineIndexUnstage(repo,{id}),chosen=p.plan.operations.filter(op=>op.kind==='delete'&&op.unitOffset===0||op.kind==='insert'&&op.unitOffset===1).map(op=>op.id),s=await selectLineIndexUnstage(repo,{snapshot:p,operationIds:chosen});await assert.rejects(applyPartialIndexUnstage(repo,{snapshot:s,assertAuthorized(){},onStart(){}}),{code:'vcs/index-stale'});await applyLineIndexUnstage(repo,{snapshot:s,assertAuthorized(){},onStart(){}});assert.deepEqual(await run('show',':a'),expected);assert.deepEqual(await readFile(path.join(root,'a')),w);assert.deepEqual(await run('show','HEAD:a'),h);});

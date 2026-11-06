@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {mkdtemp,mkdir,readFile,writeFile,rm,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {parseGitIndex,replaceGitIndexEntry} from '../src/git-index.mjs';
+import {withOwnedIndexLock} from '../index-lock.mjs';
+for(const objectFormat of ['sha1','sha256'])test('real Git unstage candidate publishes through owned lock without changing other staged or work bytes: '+objectFormat,async t=>{
+ const temp=await mkdtemp(path.join(tmpdir(),'index-integration-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp);
+ const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.toUpperCase().startsWith('GIT_')));env.GIT_OPTIONAL_LOCKS='0';
+ const git=args=>execFileSync('git',['-C',root,'-c','core.autocrlf=false','-c','core.fsmonitor=false',...args],{env,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+ git(['init','-q','--object-format='+objectFormat]);
+ for(const file of ['a','b'])await writeFile(path.join(root,file),'initial '+file+'\n');git(['add','--','a','b']);git(['-c','user.name=Test','-c','user.email=t@example.invalid','-c','commit.gpgsign=false','commit','-qm','initial']);
+ const head=git(['rev-parse','HEAD:a']);for(const file of ['a','b'])await writeFile(path.join(root,file),'staged '+file+'\n');git(['add','--','a','b']);await writeFile(path.join(root,'b'),'unstaged b\n');
+ const indexPath=path.join(root,'.git','index'),before=await readFile(indexPath),parsed=parseGitIndex(before,{objectFormat}),a=parsed.entries.find(e=>e.path==='a'),b=parsed.entries.find(e=>e.path==='b'),work=await Promise.all(['a','b'].map(f=>readFile(path.join(root,f))));
+ const candidate=replaceGitIndexEntry(before,{path:'a',expectedOid:a.oid,expectedMode:a.mode,oid:head,mode:a.mode,objectFormat});
+ await withOwnedIndexLock({gitDirectory:path.join(root,'.git'),expectedIndexDigest:createHash('sha256').update(before).digest('hex')},async lock=>{await lock.writeCandidate(candidate);await lock.publish({assertAuthorized(){},beforePublish(){},onStart(){}});});
+ const after=parseGitIndex(await readFile(indexPath),{objectFormat});assert.equal(after.entries.find(e=>e.path==='a').oid,head);assert.deepEqual(after.entries.find(e=>e.path==='b'),b);assert.deepEqual(await Promise.all(['a','b'].map(f=>readFile(path.join(root,f)))),work);assert.equal(git(['diff','--cached','--name-only']),'b');assert.equal(git(['rev-parse','HEAD:a']),head);
+});

@@ -89,8 +89,8 @@ test('any confirm rejection is unknown; no retry or automatic refresh until expl
 });
 
 test('expired prepared confirmation cannot write even through a retained click handler',async()=>{
- const prepared={token:'d'.repeat(64),expiresAt:Date.now()+59000,current:A,target:B};const f=fixture({'vcs/branch-switch-prepare':async()=>prepared});
- try{await f.h.flush();await preview(f);const confirm=button(f.h,'branchConfirm');prepared.expiresAt=Date.now()-1;await confirm.props.onClick();await f.h.flush();assert.equal(f.calls.some(c=>c.e==='vcs/branch-switch-confirm'),false);assert.ok(nodeText(f.h.tree).includes('branchExpired'));assert.equal(button(f.h,'branchConfirm'),undefined);}finally{f.h.dispose();}
+ let now=Date.now();class Clock extends Date{static now(){return now;}}const prepared={token:'d'.repeat(64),expiresAt:now+59000,current:A,target:B};const f=fixture({'vcs/branch-switch-prepare':async()=>prepared},{Date:Clock});
+ try{await f.h.flush();await preview(f);const confirm=button(f.h,'branchConfirm');now+=61001;await confirm.props.onClick();await f.h.flush();assert.equal(f.calls.some(c=>c.e==='vcs/branch-switch-confirm'),false);assert.ok(nodeText(f.h.tree).includes('branchExpired'));assert.equal(button(f.h,'branchConfirm'),undefined);}finally{f.h.dispose();}
 });
 
 test('scope changes abort pending preview and discard old tokens and late success callbacks',async()=>{

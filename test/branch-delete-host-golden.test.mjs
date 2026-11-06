@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createBranchDeleteCoordinator} from '../branch-delete-host.mjs';
+import {createBranchCreateCoordinator} from '../branch-create-host.mjs';
+test('deletion public proof and target mutation cannot replace private snapshot or use create token',async()=>{
+ const binding={entry:{},repository:{type:'git',root:'/delete-host-independent'},cwd:'/w',assertAuthorized(){}},address={sessionId:'s',repositoryId:'r',name:'topic'},current={ref:'refs/heads/main',oid:'1'.repeat(40)},target={ref:'refs/heads/topic',oid:'2'.repeat(40)},snapshot={action:'branch-delete',name:'topic',ref:target.ref,objectFormat:'sha1',current,target,merged:true,proof:[current.oid,target.oid],planId:'3'.repeat(64)};let selected;
+ const api={async prepareBranchDelete(){return snapshot;},async applyBranchDelete(_,r){selected=r.snapshot;r.onStart();return{};},async prepareBranchCreate(){return{action:'branch-create',name:'topic',ref:target.ref,target:{oid:current.oid},head:current.oid,currentRef:current.ref,objectFormat:'sha1'};},async applyBranchCreate(_,r){r.onStart();return{};}};
+ const deletion=createBranchDeleteCoordinator({api}),creation=createBranchCreateCoordinator({api}),d=await deletion.prepare(address,binding),c=await creation.prepare(address,binding);await assert.rejects(deletion.confirm({sessionId:'s',repositoryId:'r',token:c.token},binding),{code:'vcs/branch-delete-confirmation-invalid'});d.target.oid='4'.repeat(40);d.current.ref='refs/heads/other';d.proof.length=0;await deletion.confirm({sessionId:'s',repositoryId:'r',token:d.token},binding);assert.strictEqual(selected,snapshot);assert.equal(snapshot.target.oid,'2'.repeat(40));assert.equal(snapshot.current.ref,'refs/heads/main');assert.equal(snapshot.proof.length,2);await creation.confirm({sessionId:'s',repositoryId:'r',token:c.token},binding);
+});

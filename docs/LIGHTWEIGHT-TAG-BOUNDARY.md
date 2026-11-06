@@ -1,0 +1,7 @@
+# Lightweight与annotated tag区别
+
+Lightweight引用直接指向commitOID，不存在额外tag对象、tagger或消息；annotated引用指向tag对象，再指向commit。两类计划的action／domainID必须分开，不能互换确认能力。
+
+本纯计划认证commit rawbytes与目标身份，不检查仓库目标存在或refs/tags是否空缺；任何force／任意ref输入拒绝。
+
+后续lightweight创建需要独立no-overwrite ref事务及fresh Session权限，不能直接把annotated创建原语expectedTagOid传入commitOID。

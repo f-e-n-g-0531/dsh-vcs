@@ -41,8 +41,12 @@ test('connection handshake has deadline and child exit rejects pending CDP',asyn
  const failure=assert.rejects(client.call('hang'),/Browser exited/);child.emit('exit',7,null);await failure;client.close();
 });
 test('total fixture deadline bounds commands even with larger per-command limit',async()=>{
- const {client}=await connect({deadline:Date.now()+30,commandTimeoutMs:30000});
- try{await assert.rejects(client.call('hang'),/timed out/);await assert.rejects(client.call('later'),/deadline/);}finally{client.close();}
+ const deadline=Date.now()+30,{client}=await connect({deadline,commandTimeoutMs:30000});
+ try{await assert.rejects(client.call('hang'),/timed out/);
+ // Fractional timers may fire just before the wall-clock deadline. Reach the
+ // actual deadline before asserting the next admission is refused synchronously.
+ await new Promise(resolve=>setTimeout(resolve,Math.max(0,deadline-Date.now())+1));
+ await assert.rejects(client.call('later'),/deadline/);}finally{client.close();}
 });
 test('DevTools discovery uses only port from fresh profile and validates same-port page target',async()=>{
  const child=new EventEmitter();child.exitCode=null;child.signalCode=null;const state=observeChild(child);let readPath,requested;

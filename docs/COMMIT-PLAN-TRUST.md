@@ -1,0 +1,9 @@
+# 纯提交计划信任边界
+
+纯计划输入parent与parentTree只是格式正确的调用方数据，不能证明父提交真实类型、父tree归属或授权。用户预览前的生产适配器必须用固定parentOID读取原始commit并解析其tree，独立校验Git哈希；不能信任浏览器parentTree或用于no-op判定的远程值。
+
+raw Index SHA256绑定包含stat与扩展字节，两个语义等价但原字节不同的Index必须不同plan身份。未知扩展不能被忽略成安全；已允许派生扩展也不作为tree事实来源。
+
+输出Buffer是调用方拥有的纯结果，metadata冻结不代表Buffer不可变；不能直接把公开结果作为私有能力。后续写入需要再捕获body／bytes并保存在私有WeakMap，不能接受浏览器发回的plan对象。
+
+工作文件不参与tree内容构建，实际提交确认是否绑定W由生产策略明确；计划层无FS，不假装拥有工作区快照或ref原子性。

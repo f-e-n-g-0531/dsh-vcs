@@ -1,0 +1,7 @@
+# 最近提交消息复用边界
+
+读取旧commit元数据不能自动成为新提交身份。作者通常保留旧author，committer应由用户明确确认；消息可含BOM／CRLF／空白，读取层保持原样，写入层是否支持由明确preview校验决定，不能悄然trim或替换换行。
+
+读取历史root或merge的父列表不代表可amend；amend是替换当前tip而不是给tip新增子提交，parent集合必须按固定旧commit保留并通过单独确认。当前模型不执行这些写操作。
+
+签名旧commit若当前严格parser拒绝，应显示不支持而不是移除签名后重新编码并称已验证。未来支持签名读取需单独解析continuation边界，不能宽松跳过任意header。

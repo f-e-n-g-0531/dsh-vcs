@@ -1,4 +1,11 @@
 import {parseConflictStages} from './conflict-stages.mjs';
+export {prepareCommitPreview,applyCommitPreview,prepareAmendPreview,applyAmendPreview} from './commit-preview.mjs';
+export {readLatestCommit} from './latest-commit.mjs';
+export {prepareBranchCreate,applyBranchCreate} from './branch-create-preview.mjs';
+export {prepareTagCreate,applyTagCreate} from './tag-create-preview.mjs';
+export {prepareLightweightTagCreate,applyLightweightTagCreate} from './lightweight-tag-preview.mjs';
+export {prepareBranchDelete} from './branch-delete-preview.mjs';
+export {prepareSelectedIndexUnstage,applyIndexUnstage,prepareSelectedIndexStage,applyIndexStage,preparePartialIndexStage,selectPartialIndexStage,preparePartialIndexUnstage,selectPartialIndexUnstage,applyPartialIndexUnstage,prepareLineIndexStage,selectLineIndexStage,applyLineIndexStage,prepareLineIndexUnstage,selectLineIndexUnstage,applyLineIndexUnstage} from './index-change.mjs';
 import {parseCommitSignature} from './src/commit-signature.mjs';
 import {parseSvnIdentity} from './src/svn-identity.mjs';
 import {prepareRaster} from './image-preview.mjs';
@@ -17,6 +24,7 @@ import {createHistoricalAccess,validateHistoricalPath} from './src/historical-ac
 import {withComparisonPreview} from './src/preview-capabilities.mjs';
 import {searchContentPage} from './src/content-search.mjs';
 import {withOperationBudget} from './src/operation-budget.mjs';
+import {parseReflog, REFLOG_FORMAT, REFLOG_MAX_OUTPUT} from './src/reflog.mjs';
 
 const historicalAccess = createHistoricalAccess({run:git});
 /** Host invalidates object bytes on grant replacement, expiry and plugin disposal. */
@@ -255,6 +263,27 @@ export async function listReferences(repo,{signal}={}){
  signal?.throwIfAborted();repo=await checkedGitRepo(repo,signal,'References support Git only');
  const raw=await git(repo.root,['for-each-ref','--sort=refname','--count=1001','--format='+REFS_FORMAT,'refs/heads/','refs/tags/','refs/remotes/'],MAX_TEXT,{signal});
  return {references:parseReferences(raw.toString('utf8'))};
+}
+
+/** One read-only HEAD reflog snapshot; selectors are display metadata, never inputs. */
+export async function listReflog(repo,{signal}={}) {
+ return withOperationBudget({signal},async()=>{
+  signal?.throwIfAborted();
+  repo=await checkedGitRepo(repo,signal,'Reflog supports Git only',undefined,false);
+  const run=args=>git(repo.root,args,REFLOG_MAX_OUTPUT,{signal});
+  // Prove an unborn HEAD before reading: never reinterpret a show failure as empty.
+  // Existing HEAD without a log produces successful empty output below.
+  if(await resolveHeadCommit(run)===null) {
+   try { await run(['reflog','exists','HEAD']); }
+   catch(missing) {
+    if(missing.code==='VCS_COMMAND'&&missing.exitCode===1)return {entries:[],truncated:false};
+    throw missing;
+   }
+  }
+  const raw=await run(['reflog','show','-z','--no-show-signature','--encoding=UTF-8','--date=iso-strict','--max-count=201','--format='+REFLOG_FORMAT,'HEAD','--']);
+  signal?.throwIfAborted();
+  return parseReflog(raw);
+ });
 }
 
 const STASH_FORMAT='%H%x00%gs%x00%gd';

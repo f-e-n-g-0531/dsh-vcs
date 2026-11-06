@@ -1,0 +1,7 @@
+# Switch目标与读取任务生命周期
+
+列表读取与目标预览均只读，用户取消或scope切换只丢弃结果，不触发unknown。确认已经发送时取消／卸载维持unknown。两阶段不能共用陈旧闭包清新任务busy。
+
+每次合法目标变化、关闭、取消或新列表读取推进代际。read任务使用自身捕获的operation generation验证，接受列表造成重置必须明确触发新render，避免当前合法prepare被误挡。
+
+测试需区分旧prepare／close／cancel与当前DOM交互，browser detached按钮不证明React闭包行为，保留memory handler直接调用回归。

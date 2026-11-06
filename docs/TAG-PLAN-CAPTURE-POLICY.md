@@ -1,0 +1,7 @@
+# Tag计划输入捕获
+
+raw commit Buffer在查看inputs描述符／prototype前复制；tagger标量与message bytes在执行signal callback前owned capture，选项getter拒绝且不调用。
+
+纯同步取消仅合作式，不提供异步eventloop中断或hostile Proxy／sharedmemory原子隔离。返回的body不与输入或其他计划共享，metadata records冻结但Buffer仍可变。
+
+执行publisher必须将mutablebody视为不可信候选重新核验，不按planID单独发布引用。

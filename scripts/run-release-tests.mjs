@@ -1,12 +1,14 @@
 import {spawnSync} from 'node:child_process';
 import {openSync,closeSync} from 'node:fs';
-import {mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,readdir,rm} from 'node:fs/promises';
 import {verifyTestReport} from './verify-test-report.mjs';
 import {probeTools} from './test-preflight.mjs';
 await mkdir('test-results',{recursive:true});
+// Never leave a prior successful summary available when this attempt fails early.
+await rm('test-results/test-summary.json',{force:true});
 const tools=probeTools();await writeFile('test-results/tools.json',JSON.stringify(tools,null,2));
 const fd=openSync('test-results/release.tap','w');let result;
-try{const files=(await readdir('test')).filter(n=>n.endsWith('.test.mjs')).sort().map(n=>'test/'+n);result=spawnSync(process.execPath,['--test','--test-reporter=tap',...files],{stdio:['ignore',fd,'inherit'],windowsHide:true});}finally{closeSync(fd);}
+try{const files=(await readdir('test')).filter(n=>n.endsWith('.test.mjs')).sort().map(n=>'test/'+n);result=spawnSync(process.execPath,['--test','--test-concurrency=2','--test-reporter=tap',...files],{stdio:['ignore',fd,'inherit'],windowsHide:true});}finally{closeSync(fd);}
 if(result.error)throw result.error;
 const summary=verifyTestReport(await readFile('test-results/release.tap','utf8'));
 await writeFile('test-results/test-summary.json',JSON.stringify(summary,null,2));

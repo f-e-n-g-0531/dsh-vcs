@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import cp from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
+import {mkdtemp,writeFile,readFile,rm,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {git} from '../local-command.mjs';
+import {listChanges} from '../vcs.mjs';
+import {preparePartialIndexUnstage,selectPartialIndexUnstage,applyPartialIndexUnstage,applyIndexStage} from '../index-change.mjs';
+test('reverse selected first block restores HEAD not work while preserving remaining staged block',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'reverse-independent-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),spawn=cp.spawn;cp.spawn=(c,a,o)=>spawn(c,a,{...o,env:{...o.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'absent-global')}});syncBuiltinESMExports();t.after(()=>{cp.spawn=spawn;syncBuiltinESMExports();});const run=(...a)=>git(root,a);await run('init');for(const[k,v]of [['user.name','T'],['user.email','t@example.invalid'],['core.autocrlf','false'],['commit.gpgsign','false']])await run('config',k,v);const h=Buffer.from('HEAD1\r\nanchor\nHEAD2'),i=Buffer.from('INDEX1\r\nanchor\nINDEX2'),w=Buffer.from('WORK1\r\nanchor\nWORK2'),expected=Buffer.from('HEAD1\r\nanchor\nINDEX2');await writeFile(path.join(root,'a'),h);await run('add','a');await run('commit','-m','base');await writeFile(path.join(root,'a'),i);await run('add','a');await writeFile(path.join(root,'a'),w);const repo={root,type:'git'},id=(await listChanges(repo,'staged'))[0].id,original=await readFile(path.join(root,'.git','index')),plan=await preparePartialIndexUnstage(repo,{id});assert.equal(plan.plan.units.length,2);const chosen=await selectPartialIndexUnstage(repo,{snapshot:plan,unitIds:[plan.plan.units[0].id]});assert.deepEqual(await readFile(path.join(root,'.git','index')),original);await assert.rejects(applyIndexStage(repo,{snapshot:chosen,assertAuthorized(){},onStart(){}}),{code:'vcs/index-stale'});await applyPartialIndexUnstage(repo,{snapshot:chosen,assertAuthorized(){},onStart(){}});assert.deepEqual(await run('show',':a'),expected);assert.deepEqual(await readFile(path.join(root,'a')),w);assert.deepEqual(await run('show','HEAD:a'),h);});

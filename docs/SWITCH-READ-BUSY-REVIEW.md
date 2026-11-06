@@ -1,0 +1,5 @@
+# Switch只读任务busy清理复核
+
+独立静态复核发现中间实现把finally解锁也绑定access.current。兄弟mutation使pending=true时，list／prepare正确忽略响应但可能永久locked／busy；pending恢复后无取消按钮，只有remount才能解锁。
+
+响应可用性与cleanup所有权需区分：response／error仍liveaccess，finally只检查alive／非aborted／同controller及正确代际，不能由旧任务清新busy，也不能因暂时blocked永远卡住。实现worker需修正并加pendingsettle→恢复回归。

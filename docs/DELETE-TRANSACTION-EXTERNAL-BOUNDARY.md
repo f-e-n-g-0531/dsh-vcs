@@ -1,0 +1,7 @@
+# 删除事务外部并发边界
+
+本层原始metadata与raw target复验能发现已观察到的修改，不是系统级锁。外部在最后读取后做同OID原始ref类型替换或ABA，Git oldOID事务可能接受；不能因finally仍目标缺失就推断所有外部写者没有竞争。
+
+初期仅内部可信并发原语，后续若提供用户入口需明确承诺范围或采用更强rawref事务机制；不得以自动恢复原ref或删除新ref掩盖结果未知。
+
+闭合hash认证merged证明也只固定预览时图，不独立授权目标删除。当前HEAD与其他worktree占用仍要fresh策略约束，sharedworktrees当前直接拒绝。

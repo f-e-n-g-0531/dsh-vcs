@@ -14,6 +14,35 @@ const ADDRESSED = {
   'vcs/svn-identity': { sessionId: 's', repositoryId: 'r' },
   'vcs/references': { sessionId: 's', repositoryId: 'r' },
   'vcs/stash-list': { sessionId: 's', repositoryId: 'r' },
+  'vcs/reflog': { sessionId: 's', repositoryId: 'r' },
+  'vcs/index-unstage-prepare': { sessionId: 's', repositoryId: 'r', id: A64 },
+  'vcs/index-unstage-confirm': { sessionId: 's', repositoryId: 'r', token: A64 },
+  'vcs/index-stage-prepare': { sessionId: 's', repositoryId: 'r', id: A64 },
+  'vcs/index-stage-confirm': { sessionId: 's', repositoryId: 'r', token: A64 },
+  'vcs/partial-stage-plan': { sessionId: 's', repositoryId: 'r', id: A64 },
+  'vcs/partial-stage-prepare': { sessionId: 's', repositoryId: 'r', planToken: A64, unitIds: [A64] },
+  'vcs/partial-stage-confirm': { sessionId: 's', repositoryId: 'r', token: A64 },
+  'vcs/partial-unstage-plan': { sessionId: 's', repositoryId: 'r', id: A64 },
+  'vcs/partial-unstage-prepare': { sessionId: 's', repositoryId: 'r', planToken: A64, unitIds: [A64] },
+  'vcs/partial-unstage-confirm': { sessionId: 's', repositoryId: 'r', token: A64 },
+  'vcs/line-stage-plan': { sessionId: 's', repositoryId: 'r', id: A64 },
+  'vcs/line-stage-prepare': { sessionId: 's', repositoryId: 'r', planToken: A64, operationIds: [A64] },
+  'vcs/line-stage-confirm': { sessionId: 's', repositoryId: 'r', token: A64 },
+  'vcs/line-unstage-plan': { sessionId: 's', repositoryId: 'r', id: A64 },
+  'vcs/line-unstage-prepare': { sessionId: 's', repositoryId: 'r', planToken: A64, operationIds: [A64] },
+  'vcs/line-unstage-confirm': { sessionId: 's', repositoryId: 'r', token: A64 },
+  'vcs/commit-prepare': {sessionId:'s',repositoryId:'r',author:{name:'T',email:'t@x',timestamp:1,timezone:'+0000'},committer:{name:'T',email:'t@x',timestamp:1,timezone:'+0000'},message:'m'},
+  'vcs/commit-confirm': {sessionId:'s',repositoryId:'r',token:A64},
+  'vcs/latest-commit': {sessionId:'s',repositoryId:'r'},
+  'vcs/branch-create-prepare': {sessionId:'s',repositoryId:'r',name:'topic'},
+  'vcs/branch-delete-preview': {sessionId:'s',repositoryId:'r',name:'topic'},
+  'vcs/tag-create-prepare': {sessionId:'s',repositoryId:'r',name:'release',tagger:{name:'T',email:'t@x',timestamp:1,timezone:'+0000'},message:'EOF'},
+  'vcs/tag-create-confirm': {sessionId:'s',repositoryId:'r',token:A64},
+  'vcs/lightweight-tag-prepare': {sessionId:'s',repositoryId:'r',name:'release'},
+  'vcs/lightweight-tag-confirm': {sessionId:'s',repositoryId:'r',token:A64},
+  'vcs/branch-create-confirm': {sessionId:'s',repositoryId:'r',token:A64},
+  'vcs/amend-prepare': {sessionId:'s',repositoryId:'r',committer:{name:'T',email:'t@x',timestamp:1,timezone:'+0000'},message:'m'},
+  'vcs/amend-confirm': {sessionId:'s',repositoryId:'r',token:A64},
   'vcs/grep': { sessionId: 's', repositoryId: 'r', query: 'needle' },
   'vcs/status': { sessionId: 's', repositoryId: 'r', mode: 'all' },
   'vcs/compare': { sessionId: 's', repositoryId: 'r', mode: 'all', id: 'file' },
@@ -40,7 +69,7 @@ test('action endpoint roster and field whitelists derive from the request contra
     assert.equal((await call(endpoint, payload)).error?.code, 'vcs/rediscover-required', endpoint);
     const unknownField = await call(endpoint, { ...payload, cwd: '/evil' });
     assert.equal(unknownField.error?.code, 'vcs/invalid-request', endpoint + ' unknown field');
-    assert.equal(unknownField.error.message, 'Only Session-addressed repository requests are supported; unknown payload field.');
+    assert.equal(unknownField.error.message, endpoint==='vcs/latest-commit' ? 'Latest commit requires exactly sessionId and repositoryId.' : ['vcs/commit-prepare','vcs/commit-confirm','vcs/amend-prepare','vcs/amend-confirm','vcs/branch-create-prepare','vcs/branch-create-confirm','vcs/branch-delete-preview','vcs/tag-create-prepare','vcs/tag-create-confirm','vcs/lightweight-tag-prepare','vcs/lightweight-tag-confirm'].includes(endpoint) ? 'Commit requests require exactly the declared fields.' : (endpoint.startsWith('vcs/partial-stage-')||endpoint.startsWith('vcs/partial-unstage-')||endpoint.startsWith('vcs/line-stage-')||endpoint.startsWith('vcs/line-unstage-')) ? 'Partial index operations require the exact payload fields.' : 'Only Session-addressed repository requests are supported; unknown payload field.');
   }
   for (const endpoint of ['vcs/svn-log', 'vcs/runtime-info2', 'vcs/statuses', 'unknown', '', null]) {
     assert.equal((await call(endpoint, null)).error?.code, 'vcs/not-found', String(endpoint));

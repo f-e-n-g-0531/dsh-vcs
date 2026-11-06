@@ -1,0 +1,7 @@
+# 删除图捕获与后续仓库层
+
+认证wrapper首先界定所有body合计容量，再owned-copy全部字节，之后才执行signal回调和哈希解析。普通getter拒绝不执行，但Proxy描述符trap及SharedArrayBuffer并发并非原子输入事务，不假装隔离。
+
+生产仓库层应独立沿当前tip与目标tip固定OID遍历原始commit，受节点／body／总字节与共同预算限制；不能从客户端接objects数组直接触发删除。未知header／缺失对象／超限一律拒绝，而不是自动force。
+
+真实引用删除还需目标oldOID CAS和非当前／无其他worktree占用检查，本轮纯组合未实现。

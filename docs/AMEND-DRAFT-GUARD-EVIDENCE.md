@@ -1,0 +1,7 @@
+# Amend旧草稿复现与修正
+
+独立memory UI保存prepareA／cancelA，message编辑B后prepareA实际发1次RPC，本应0次；修复新增代际与owningcontroller校验，同值编辑也强制rerender。独立golden修复后通过，既有amend13项保持。
+
+完整client初轮237/237通过。最终identity／message same-value与A-B-A、lateasync及liveblocked矩阵扩展后31/31、全部client254/254通过；实际隔离browser当前DOM原生编辑／取消后重新ack通过，不声称detachedDOM可验证闭包。
+
+后端私有snapshot仍执行author／parents保留与原Index／HEAD校验，前端修复不提供force或扩展签名／packedrefs范围。

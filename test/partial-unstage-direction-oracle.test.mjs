@@ -1,0 +1,4 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createPartialIndexPlan,applyPartialIndexSelection} from '../src/partial-index.mjs';
+for(const [head,index,expected]of [['old1\r\nanchor\nold2','staged1\r\nanchor\nstaged2','old1\r\nanchor\nstaged2'],['a\nanchor\nb\n','a\ninserted\nanchor\nB\n','a\nanchor\nB\n'],['a\nremoved\nanchor\nb','a\nanchor\nB','a\nremoved\nanchor\nB']])test('reverse partial unstage literal direction '+JSON.stringify([head,index]),()=>{const h=Buffer.from(head),i=Buffer.from(index),plan=createPartialIndexPlan(i,h);assert.equal(plan.units.length,2);assert.deepEqual(applyPartialIndexSelection(i,h,plan,[plan.units[0].id]),Buffer.from(expected));assert.deepEqual(applyPartialIndexSelection(i,h,plan,plan.units.map(u=>u.id)),h);assert.deepEqual(applyPartialIndexSelection(i,h,plan,[]),i);});

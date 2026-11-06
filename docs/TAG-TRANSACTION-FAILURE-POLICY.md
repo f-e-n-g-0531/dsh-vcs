@@ -1,0 +1,7 @@
+# Tag事务失败与阶段授权
+
+对象store在temporary尚存在时也执行授权回调，事务不能误把store自有temp当最终合法metadata，也不能长期豁免所有temp。追加完成后立即核对原基线＋exact对象变化；引用CAS前再次核验完整压缩输入和固定rawbody。
+
+如外来metadata或压缩尾随字节被发现，拒绝引用创建，已追加tag对象保留且结果unknown，不自动GC。对象早已存在时onStart延后到ref实际创建阶段，取消此前不应虚报开始。
+
+后续Host仍需private grant绑定与共享writer；纯摘要不可直接由客户端修改执行。

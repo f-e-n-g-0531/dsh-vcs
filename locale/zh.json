@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "VCS 变更",
-    "description": "Git / SVN 只读审阅与确认式本地 Git 分支切换"
+    "description": "Git / SVN 审阅；确认式受限 Git 暂存／取消暂存、提交／amend、分支及标签；只读删除评估"
   }
 }

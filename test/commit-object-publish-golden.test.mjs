@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,readFile,rm,realpath} from 'node:fs/promises';
+import path from 'node:path';
+import {tmpdir} from 'node:os';
+import {inflateSync} from 'node:zlib';
+import {buildIndexTree} from '../src/index-tree.mjs';
+import {encodeGitCommit} from '../src/git-commit-object.mjs';
+import {publishCommitObjects} from '../commit-object-publish.mjs';
+test('all graph bytes captured before first authorization and existing repeat never starts',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'graph-golden-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),gitDirectory=path.join(root,'.git');await mkdir(path.join(gitDirectory,'objects'),{recursive:true});const graph=buildIndexTree([{path:'d/a',mode:'100644',oid:'1'.repeat(40)}]),person={name:'T',email:'t@x',timestamp:1,timezone:'+0000'},commit=encodeGitCommit({tree:graph.root,parents:['2'.repeat(40)],author:person,committer:person,message:'m'}),saved=[...graph.trees.map(v=>({type:'tree',oid:v.oid,body:Buffer.from(v.body)})),{type:'commit',oid:commit.oid,body:Buffer.from(commit.body)}];let starts=0;await publishCommitObjects({gitDirectory,objectFormat:'sha1',trees:graph.trees,commit,assertAuthorized(){for(const t of graph.trees)t.body.fill(0);commit.body.fill(0);},onStart(){starts++;}});assert.equal(starts,1);for(const value of saved){const packed=await readFile(path.join(gitDirectory,'objects',value.oid.slice(0,2),value.oid.slice(2)));assert.deepEqual(inflateSync(packed),Buffer.concat([Buffer.from(value.type+' '+value.body.length+'\0'),value.body]));}const again=buildIndexTree([{path:'d/a',mode:'100644',oid:'1'.repeat(40)}]),c=encodeGitCommit({tree:again.root,parents:['2'.repeat(40)],author:person,committer:person,message:'m'});await publishCommitObjects({gitDirectory,objectFormat:'sha1',trees:again.trees,commit:c,assertAuthorized(){},onStart(){throw Error('all-existing must remain readonly');}});});

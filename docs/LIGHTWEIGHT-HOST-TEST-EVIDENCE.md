@@ -1,0 +1,5 @@
+# Lightweight Host测试过程
+
+独立real事务与crosskindtoken测试保持通过。新专用测试初生成控制字符／反斜杠字符串SyntaxError，修正后31/32通过，剩余invalid-name矩阵Missing expected rejection待定位。当前test源码含实际Unicode replacement字符，需区分合法U+FFFD与未配对surrogate，不能把普通replacement字符当坏UTF8。
+
+测试writer拥有专用文件，Lead未修改；修正为明确surrogate escape后专用30/30、最终全部Host＋独立golden384/384通过，生产代码无需为错误oracle改动。

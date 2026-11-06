@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,readFile,rm,realpath} from 'node:fs/promises';
+import path from 'node:path';
+import {tmpdir} from 'node:os';
+import {inflateSync} from 'node:zlib';
+import {encodeGitCommit} from '../src/git-commit-object.mjs';
+import {createVerifiedTagPlan} from '../src/verified-tag-plan.mjs';
+import {publishTagObject} from '../tag-object-publish.mjs';
+for(const objectFormat of ['sha1','sha256'])test('tag publisher independently pins authenticated target and exact tag bytes '+objectFormat,async t=>{const temp=await mkdtemp(path.join(tmpdir(),'tag-publisher-golden-'));t.after(()=>rm(temp,{recursive:true,force:true}));const gitDirectory=path.join(await realpath(temp),'.git');await mkdir(path.join(gitDirectory,'objects'),{recursive:true});const identity={name:'T',email:'t@x',timestamp:1,timezone:'+0000'},target=encodeGitCommit({tree:'1'.repeat(objectFormat==='sha1'?40:64),author:identity,committer:identity,message:'base'},{objectFormat}),plan=createVerifiedTagPlan(target.body,{objectFormat,target:target.oid,tag:'release/x',tagger:identity,message:'EOF'}),original=Buffer.from(plan.object.body);let starts=0;const result=await publishTagObject({gitDirectory,objectFormat,target,tag:plan.object,assertAuthorized(){target.body.fill(0);plan.object.body.fill(0);},onStart(){starts++;}});assert.equal(result.oid,plan.object.oid);assert.equal(starts,1);assert.deepEqual(inflateSync(await readFile(path.join(gitDirectory,'objects',result.oid.slice(0,2),result.oid.slice(2)))),Buffer.concat([Buffer.from('tag '+original.length+String.fromCharCode(0)),original]));});

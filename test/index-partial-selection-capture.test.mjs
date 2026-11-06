@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import cp from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
+import {mkdtemp,writeFile,readFile,rm,realpath} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {git} from '../local-command.mjs';
+import {listChanges} from '../vcs.mjs';
+import {preparePartialIndexStage,selectPartialIndexStage,applyIndexStage} from '../index-change.mjs';
+test('partial selection IDs are captured before await while full work remains separately pinned',async t=>{const temp=await mkdtemp(path.join(tmpdir(),'partial-capture-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),spawn=cp.spawn;cp.spawn=(c,a,o)=>spawn(c,a,{...o,env:{...o.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'absent-global')}});syncBuiltinESMExports();t.after(()=>{cp.spawn=spawn;syncBuiltinESMExports();});const run=(...a)=>git(root,a);await run('init');for(const[k,v]of [['user.name','T'],['user.email','t@example.invalid'],['core.autocrlf','false'],['commit.gpgsign','false']])await run('config',k,v);const before=Buffer.from('old1\r\nanchor\nold2'),work=Buffer.from('new1\r\nanchor\nnew2'),expected=Buffer.from('new1\r\nanchor\nold2');await writeFile(path.join(root,'a'),before);await run('add','a');await run('commit','-m','base');await writeFile(path.join(root,'a'),work);const repo={root,type:'git'},id=(await listChanges(repo,'unstaged'))[0].id,plan=await preparePartialIndexStage(repo,{id});assert.equal(plan.plan.units.length,2);const ids=[plan.plan.units[0].id],pending=selectPartialIndexStage(repo,{snapshot:plan,unitIds:ids});ids[0]=plan.plan.units[1].id;const selected=await pending;assert.equal(selected.unitIds[0],plan.plan.units[0].id);assert.equal(selected.target.oid,createHash('sha1').update(Buffer.from('blob '+expected.length+'\0')).update(expected).digest('hex'));await assert.rejects(selectPartialIndexStage(repo,{snapshot:plan,unitIds:[plan.plan.units[1].id]}),{code:'vcs/index-stale'});await applyIndexStage(repo,{snapshot:selected,assertAuthorized(){},onStart(){}});assert.deepEqual(await run('show',':a'),expected);assert.deepEqual(await readFile(path.join(root,'a')),work);assert.match((await run('status','--porcelain')).toString(),/MM a/);});

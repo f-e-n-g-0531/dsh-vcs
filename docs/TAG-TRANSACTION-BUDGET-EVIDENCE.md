@@ -1,0 +1,7 @@
+# Tag事务共享预算证据
+
+独立真实仓库golden首次组合apply在15秒共同预算内未完成，poststart以unknown退出；第二次重跑及专用SHA1正向case同样超时。不延长预算、不reset子操作计时，也不把超时当成功。
+
+独立静态成本分析：单次verify嵌套readLatestCommit约7个Git进程和8次metadata遍历；仅createLocalTag四次授权、每次两边verify即56次Git启动与64次扫描。
+
+需在不弱化原始基线和postauth验证的前提下，使用私有fresh effectiveconfig／rawHEAD与currentref／已核验对象身份等价复验消除冗余，再跑完整测试。超时已追加的对象或ref按unknown保留，不自动回滚。当前尚未验收事务成功，无Host／RPC／UI。

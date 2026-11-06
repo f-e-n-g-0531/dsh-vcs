@@ -1,0 +1,7 @@
+# Lightweight Host真实事务验证
+
+独立临时Git仓库连接createLightweightTagCoordinator与真实prepare/apply，目标固定HEAD，确认创建refs/tags直接commit，HEAD与rawIndex保持，重放token拒绝。golden1/1通过。
+
+独立与annotatedtag同scope token交叉拒绝，公开head修改不能影响私有snapshot，合法annotated原token仍可用（1/1）。
+
+内部factory并非Session路由，仍无RPC／UI。真实事务测试不代表日常GUI安装或完整lightweight用户功能。

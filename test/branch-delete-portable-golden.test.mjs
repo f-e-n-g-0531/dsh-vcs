@@ -1,0 +1,4 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createBranchDeletePlan} from '../src/branch-delete-plan.mjs';
+test('deletion name grammar accepts ordinary topic and config but rejects backslash and format controls',()=>{const oid='1'.repeat(40),commits=[{oid,parents:[]}],current={ref:'refs/heads/main',oid};for(const name of ['topic','config'])assert.equal(createBranchDeletePlan({current,target:{ref:'refs/heads/'+name,oid},commits}).merged,true);for(const name of ['a'+String.fromCharCode(92)+'b','a'+String.fromCharCode(8238)+'b','CON.txt'])assert.throws(()=>createBranchDeletePlan({current,target:{ref:'refs/heads/'+name,oid},commits}));});

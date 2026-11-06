@@ -1,0 +1,5 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createLineIndexPlan,applyLineIndexSelection} from '../src/line-index.mjs';
+for(const[left,right]of [['a','b'],['a\r','\n']])test('independent unsafe raw-line insertion boundary rejects '+JSON.stringify([left,right]),()=>{const before=Buffer.from(left),after=Buffer.from(right),plan=createLineIndexPlan(before,after),insert=plan.operations.find(op=>op.kind==='insert');assert.ok(insert);assert.throws(()=>applyLineIndexSelection(before,after,plan,[insert.id]));assert.deepEqual(applyLineIndexSelection(before,after,plan,plan.operations.map(op=>op.id)),after);});
+test('literal replacement independent line actions preserve remaining original rows then target order',()=>{const before=Buffer.from('old1\r\nold2\n'),after=Buffer.from('new1\rnew2\nnew3\n'),plan=createLineIndexPlan(before,after);assert.equal(plan.operations.length,5);const del=plan.operations.find(op=>op.kind==='delete'&&op.unitOffset===0),ins=plan.operations.find(op=>op.kind==='insert'&&op.unitOffset===1);assert.deepEqual(applyLineIndexSelection(before,after,plan,[del.id,ins.id]),Buffer.from('old2\nnew2\n'));});

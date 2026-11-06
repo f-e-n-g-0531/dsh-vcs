@@ -1,0 +1,13 @@
+# 分支删除事务验证成本优化
+
+状态：内部验证优化已实现并完成既有回归，删除用户入口仍禁用。
+
+重复public readLatestCommit改为onefull认证与fresh effectiveconfig／rawcurrentref屏障，原始完整metadata、HEAD/config、只允许targetref/log删除与空祖先prune规则不降低。
+
+预算仍15秒，global／system配置每屏障重读，pending授权受同deadline控制。rawref类型外部竞争非原子CAS限制保留。
+
+独立success／finalglobalconfig2/2、既有confirm46＋preview85项131/131通过。apply实际两种format均30次Git启动（config19／facts5／checkref2／catfile3／update1）。新freshness初轮错误要求prestart拒绝后日志不存在，修正为目标和原日志保留后完整新鲜度27/27通过，包含global／system、rawcurrentref替换与pendingauthdeadline；静态复核无当前范围确认缺陷。
+
+最终build／84文件包与隔离安装通过，原始ref类型竞争限制仍未解决。
+
+先前默认全量3272项13失败未整体重跑，不能按本轮专项通过宣称全部修复。

@@ -1,0 +1,7 @@
+# Tag事务后置精确变化
+
+始终比较原始metadata基线，不接受整体fresh rebaseline。追加阶段仅允许tag对象及其fanout目录新增，已有对象版本不变；完整inflate输入消费与hash检查必须拒绝trailing压缩字节。
+
+引用阶段再允许固定refs/tags目标与单次审计日志、必要目录新增；祖先目录只放宽size／times而保持identity与mode。HEAD／config／Index及其他refs／objects不属于例外。
+
+final授权回调之后重复检查；未知结果不以自动删除新对象／tagref恢复。外部路径交换与ABA仍明确非原子。

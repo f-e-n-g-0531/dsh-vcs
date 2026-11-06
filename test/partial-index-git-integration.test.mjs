@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,writeFile,readFile,rm,realpath} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {createPartialIndexPlan,applyPartialIndexSelection} from '../src/partial-index.mjs';
+import {storeCapturedBlob} from '../git-blob-store.mjs';
+import {parseGitIndex,replaceGitIndexEntry} from '../src/git-index.mjs';
+import {withOwnedIndexLock} from '../index-lock.mjs';
+for(const objectFormat of ['sha1','sha256'])test('exact partial candidate composes with Git blob and owned Index without changing full work: '+objectFormat,async t=>{const temp=await mkdtemp(path.join(tmpdir(),'partial-git-'));t.after(()=>rm(temp,{recursive:true,force:true}));const root=await realpath(temp),env={...process.env,GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:path.join(root,'absent')};const git=(args,options={})=>execFileSync('git',['-C',root,'-c','core.autocrlf=false',...args],{env,encoding:'utf8',stdio:['ignore','pipe','pipe'],...options});git(['init','-q','--object-format='+objectFormat]);const before=Buffer.from('old1\r\nanchor\nold2'),after=Buffer.from('new1\r\nanchor\nnew2');await writeFile(path.join(root,'a'),before);git(['add','a']);git(['-c','user.name=T','-c','user.email=t@example.invalid','-c','commit.gpgsign=false','commit','-qm','base']);await writeFile(path.join(root,'a'),after);const plan=createPartialIndexPlan(before,after);assert.equal(plan.units.length,2);const candidate=applyPartialIndexSelection(before,after,plan,[plan.units[0].id]);assert.deepEqual(candidate,Buffer.from('new1\r\nanchor\nold2'));const object=await storeCapturedBlob({gitDirectory:path.join(root,'.git'),objectFormat,bytes:candidate,assertAuthorized(){},onStart(){}});const indexPath=path.join(root,'.git','index'),original=await readFile(indexPath),entry=parseGitIndex(original,{objectFormat}).entries[0],next=replaceGitIndexEntry(original,{path:'a',expectedOid:entry.oid,expectedMode:entry.mode,oid:object.oid,mode:entry.mode,objectFormat});await withOwnedIndexLock({gitDirectory:path.join(root,'.git'),expectedIndexDigest:createHash('sha256').update(original).digest('hex')},async lock=>{await lock.writeCandidate(next);await lock.publish({assertAuthorized(){},beforePublish(){},onStart(){}});});assert.deepEqual(git(['show',':a'],{encoding:null}),candidate);assert.deepEqual(await readFile(path.join(root,'a')),after);assert.match(git(['status','--porcelain']),/MM a/);});

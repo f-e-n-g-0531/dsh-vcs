@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createBranchDeletePlan} from '../src/branch-delete-plan.mjs';
+const a='1'.repeat(40),b='2'.repeat(40),c='3'.repeat(40),d='4'.repeat(40);
+test('literal merge parent graph proves target ancestor only in correct direction',()=>{const commits=[{oid:a,parents:[]},{oid:b,parents:[a]},{oid:c,parents:[a]},{oid:d,parents:[b,c]}],current={ref:'refs/heads/main',oid:d},target={ref:'refs/heads/topic',oid:c};const plan=createBranchDeletePlan({current,target,commits});assert.equal(plan.action,'branch-delete');assert.equal(plan.merged,true);assert.deepEqual(plan.proof,[d,c]);assert.throws(()=>createBranchDeletePlan({current:{...current,oid:c},target:{...target,oid:d},commits}));});
+test('incomplete or cyclic graph cannot become a merged deletion authorization',()=>{const current={ref:'refs/heads/main',oid:b},target={ref:'refs/heads/topic',oid:a};assert.throws(()=>createBranchDeletePlan({current,target,commits:[{oid:b,parents:[a]}]}));assert.throws(()=>createBranchDeletePlan({current,target,commits:[{oid:a,parents:[b]},{oid:b,parents:[a]}]}));assert.throws(()=>createBranchDeletePlan({current,target:{...target,ref:current.ref},commits:[{oid:a,parents:[]},{oid:b,parents:[a]}]}));});
