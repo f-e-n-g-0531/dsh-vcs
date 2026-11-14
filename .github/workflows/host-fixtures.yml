@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '24.9.0'
       - name: Prepare exact official host and lock registry integrity
         env:
           HOST_VERSION: ${{ matrix.host }}

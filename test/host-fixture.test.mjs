@@ -20,7 +20,9 @@ test('host packing resolves root-local package/store links but refuses external 
 });
 test('finite fixture budget admits official native members but bounds individual and aggregate materialization',()=>{
  let state={members:0,tarBytes:0};for(const size of [178548224,152357942])state=addFixtureBudget(state,size);assert.equal(state.members,2);
- assert.equal(FIXTURE_LIMITS.memberBytes,256*1024*1024);assert.equal(FIXTURE_LIMITS.archiveBytes,512*1024*1024);assert.equal(FIXTURE_LIMITS.totalBytes,1024*1024*1024);assert.equal(FIXTURE_LIMITS.members,200000);
+ assert.equal(FIXTURE_LIMITS.memberBytes,256*1024*1024);assert.equal(FIXTURE_LIMITS.archiveBytes,512*1024*1024);assert.equal(FIXTURE_LIMITS.totalBytes,2*1024*1024*1024);assert.equal(FIXTURE_LIMITS.members,200000);
+ // rc.3 official dependency trees exceed the former 1 GiB total; retain finite member/archive limits.
+ let rc3={members:0,tarBytes:0};for(let i=0;i<5;i++)rc3=addFixtureBudget(rc3,240*1024*1024);assert.ok(rc3.tarBytes>1024*1024*1024);
  assert.throws(()=>addFixtureBudget(state,FIXTURE_LIMITS.memberBytes+1),/member too large/);
  assert.throws(()=>addFixtureBudget({members:FIXTURE_LIMITS.members,tarBytes:0},0),/Too many/);
  assert.throws(()=>addFixtureBudget({members:1,tarBytes:FIXTURE_LIMITS.totalBytes-10240},0),/total budget/);

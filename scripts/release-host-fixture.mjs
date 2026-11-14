@@ -8,7 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {digest} from './release-evidence.mjs';
 import {validateFixtureRun,validateHostManifest} from './host-compat-policy.mjs';
 import {spawnSync} from 'node:child_process';
-export const FIXTURE_LIMITS=Object.freeze({memberBytes:256*1024*1024,archiveBytes:512*1024*1024,totalBytes:1024*1024*1024,members:200000});
+export const FIXTURE_LIMITS=Object.freeze({memberBytes:256*1024*1024,archiveBytes:512*1024*1024,totalBytes:2*1024*1024*1024,members:200000});
 export function addFixtureBudget(state,size=0){
  assert.ok(Number.isSafeInteger(size)&&size>=0&&size<=FIXTURE_LIMITS.memberBytes,'Host fixture member too large');
  const next={members:state.members+1,tarBytes:state.tarBytes+512+Math.ceil(size/512)*512};

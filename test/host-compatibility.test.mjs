@@ -21,6 +21,7 @@ test('all supported hosts are exact and every host preparation, contract and rel
   const source=await readFile(new URL('../.github/workflows/'+workflow+'.yml',import.meta.url),'utf8');
   const versions=source.match(/host: \[([^\]]+)\]/)?.[1].split(',').map(value=>value.trim().replaceAll("'",''));
   assert.deepEqual(versions,SUPPORTED_HOSTS,workflow+' matrix');
+  assert.ok(source.includes("node-version: '24.9.0'"),workflow+' must satisfy rc.3 host Node >=24.9.0');
  }
  const release=await readFile(new URL('../.github/workflows/release.yml',import.meta.url),'utf8');
  assert.deepEqual(release.match(/for host in ([^;]+); do/)?.[1].split(' '),SUPPORTED_HOSTS);
