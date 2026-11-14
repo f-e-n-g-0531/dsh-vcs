@@ -4,7 +4,7 @@
 
 你可以查看差异、浏览历史、追溯文件。已有确认式本地 Git 分支切换会改变 HEAD、暂存区和工作文件。当前冻结源码在 0.7.3 基础上累积了受限整文件／变更块／逐行暂存与取消暂存、commit／amend、从当前 HEAD 创建分支及两类标签、图片叠加／滑动比较和只读分支删除评估，已以 **0.8.0** 收口，不再扩展功能。写操作必须先预览再明确确认，正文比较仍只读；不提供 fetch／pull／push、stash、merge 或冲突解决。
 
-**0.8.2 已正式发布至 npm 与 GitHub。** 修正工作区操作表单挤占差异区；同标签四矩阵完整测试 **3354/3354**、浏览器及五精确宿主合同均通过，公开包字节一致。未更新或重启日常 DSH。最终工件与验证边界见[发布回执](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.2-RECEIPT.md>)、[本版说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.2.md>)及[当前能力](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/CURRENT-CAPABILITIES.md>)。
+**0.8.4 已正式发布至 npm 与 GitHub。** 新增 DSH `0.2.2-rc.3` 精确兼容并修正宿主工件环境；本地及同标签四矩阵完整测试 **3354/3354**、浏览器和六精确宿主合同均通过，两端公开包字节一致。未更新或重启日常 DSH。最终工件与验证边界见[发布回执](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.4-RECEIPT.md>)、[本版说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.4.md>)及[当前能力](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/CURRENT-CAPABILITIES.md>)。
 
 - npm 包：`@feng0531/dsh-vcs`
 - [下载正式版本](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) · [查看更新](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md)
