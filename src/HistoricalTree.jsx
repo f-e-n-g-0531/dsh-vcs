@@ -28,7 +28,7 @@ function TreeRows({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectComm
  const current=data.legacy||data.requestKey===JSON.stringify([directory,offset,query]);
  const prefix=directory?directory+'/':'',all=current?filterTreeEntries(data.entries,directory,query):[],entries=data.legacy?all.slice(offset,offset+100):all;
  const nextOffset=!current?null:data.legacy?(offset+100<all.length?offset+100:null):data.nextOffset;
- return <section aria-label={t('historicalTree')} aria-busy={busy}>
+ return <section className="vcs-tree-panel" aria-label={t('historicalTree')} aria-busy={busy}>
  {busy&&<p role="status">{t('loading')}</p>}{error&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}<p>{t('historicalTreeScope')}</p><code>{commit}</code><p>{directory||'/'} {directory&&<button onClick={()=>go(directory.includes('/')?directory.slice(0,directory.lastIndexOf('/')):'')}>{t('treeUp')}</button>}</p>
  <nav aria-label={t('treeBreadcrumbs')}>{treeBreadcrumbs(directory).map(crumb=><React.Fragment key={crumb.path}>{crumb.path&&' / '}{crumb.path===directory?<span aria-current="location">{crumb.name}</span>:<button onClick={()=>go(crumb.path)}>{crumb.name}</button>}</React.Fragment>)}</nav>
  <label>{t('treeSearch')} <input aria-label={t('treeSearch')} maxLength={1024} value={query} onChange={e=>{setQuery(e.target.value);setOffset(0);select(null);}}/></label>

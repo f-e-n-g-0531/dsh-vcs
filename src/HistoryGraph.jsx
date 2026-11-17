@@ -4,7 +4,7 @@ import {assignGraphLanes} from './graph-lanes.mjs';
 function Graph({commits,selected,onSelect,t}){
  let graph;try{graph=buildHistoryGraph(commits);}catch{return <p role="alert">{t('graphInvalid')}</p>;}
  const lanes=assignGraphLanes(graph),routes=lanes.edges,width=Math.max(100,24+18*lanes.laneCount),height=Math.max(40,graph.nodes.length*36);
- return <section aria-label={t('historyGraph')}><p>{t('graphScope')}</p>
+ return <section className="vcs-graph-panel" aria-label={t('historyGraph')}><p>{t('graphScope')}</p>
  {lanes.lanesTruncated&&<p role="status">{t('graphLaneLimit')}</p>}
  {(graph.nodesTruncated||graph.edgesTruncated)&&<p role="status">{t('graphLimit')}</p>}
  <div style={{maxHeight:480,overflow:'auto',display:'flex'}}><svg width={width} height={height} aria-hidden="true" style={{flexShrink:0}}>

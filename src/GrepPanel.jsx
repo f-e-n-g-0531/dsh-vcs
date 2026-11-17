@@ -32,7 +32,7 @@ function ScopedGrepPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  };
  const more=()=>{if(busy||!result?.nextCursor)return;search({query:request.query,commit:result.snapshot,cursor:result.nextCursor},[...pages,{...request,commit:result.snapshot}].slice(-100));};
  const previous=()=>{if(!busy&&pages.length)search(pages.at(-1),pages.slice(0,-1));};
- return <section aria-label={t('grepTitle')}><h3>{t('grepTitle')}</h3><p>{t('grepScope')}</p>
+ return <section className="vcs-grep-panel" aria-label={t('grepTitle')}><h3>{t('grepTitle')}</h3><p>{t('grepScope')}</p>
   <form onSubmit={submit}><input aria-label={t('grepQuery')} maxLength={1024} placeholder={t('grepPlaceholder')} value={draft} onChange={e=>setDraft(e.target.value)}/><button type="submit" disabled={busy||!draft.trim()}>{t('grepRun')}</button></form>
   {selected?<><button onClick={back}>{t('historyBack')}</button><HistoricalFile key={JSON.stringify([selected.commit,selected.path,selected.line])} {...{sessionId,repositoryId,rpc,t,onRediscover}} commit={selected.commit} path={selected.path} line={selected.line} initialViewer={selected.viewer} onViewerChange={viewer=>setSelected(old=>old?{...old,viewer:reviewLocation({viewer}).viewer}:old)} onClose={back} onSelectCommit={navigate}/></>:<>
    {busy?<p role="status">{t('loading')}</p>:error?<p role="alert">{error} <button onClick={()=>request&&search(request,pages)}>{t('retry')}</button></p>:matches&&<>

@@ -1,3 +1,36 @@
+/* Supplementary views share form and data presentation, not graph geometry. */
+.vcs-root .vcs-search-modes{flex-wrap:wrap;gap:4px;background:var(--vcs-surface)}
+.vcs-root .vcs-grep-panel h3{margin:0 0 6px}
+.vcs-root .vcs-grep-panel>p{font-size:12px;color:var(--vcs-muted);margin:8px 0}
+.vcs-root .vcs-grep-panel>form{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0;border-bottom:1px solid var(--vcs-border);margin-bottom:12px}
+.vcs-root .vcs-grep-panel>form>input{flex:1 1 220px;min-height:32px}
+.vcs-root .vcs-grep-panel ol{list-style:none;margin:12px 0;padding:0;border:1px solid var(--vcs-border);border-radius:5px;overflow:hidden}
+.vcs-root .vcs-grep-panel li{padding:10px 12px;border-bottom:1px solid var(--vcs-border)}
+.vcs-root .vcs-grep-panel li:last-child{border-bottom:0}
+.vcs-root .vcs-grep-panel li>button{padding:0;border:0;background:transparent;color:var(--vcs-accent);text-align:left}
+.vcs-root .vcs-grep-panel li pre{font:12px/1.7 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--vcs-muted)}
+.vcs-root .vcs-tree-panel{padding-top:10px;border-top:1px solid var(--vcs-border)}
+.vcs-root .vcs-tree-panel ul{list-style:none;margin:8px 0;padding:0}
+.vcs-root .vcs-tree-panel li{padding:4px 0;border-bottom:1px solid var(--vcs-border)}
+.vcs-root .vcs-tree-panel label{display:flex;flex-direction:column;gap:5px;margin:8px 0;font-size:11px;color:var(--vcs-muted)}
+.vcs-root .vcs-tree-panel>p,.vcs-root .vcs-blame-panel>p,.vcs-root .vcs-graph-panel>p{font-size:11px;color:var(--vcs-muted)}
+.vcs-root .vcs-blame-panel table{border-collapse:collapse;width:100%;font-size:12px}
+.vcs-root .vcs-blame-panel th,.vcs-root .vcs-blame-panel td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--vcs-border);vertical-align:top}
+.vcs-root .vcs-blame-panel thead th{position:sticky;top:0;background:var(--vcs-surface);font-size:11px;color:var(--vcs-muted);font-weight:500}
+.vcs-root .vcs-blame-panel td pre{font:12px/1.5 Consolas,monospace}
+.vcs-root .vcs-graph-panel ol{min-width:0;flex:1}
+.vcs-root .vcs-graph-panel li>button{width:100%;border:0;border-radius:3px;background:transparent;text-align:left;height:32px;overflow:hidden;text-overflow:ellipsis}
+.vcs-root .vcs-graph-panel li>button[aria-current=true]{background:var(--vcs-selection);box-shadow:inset 2px 0 var(--vcs-accent)}
+.vcs-root .vcs-consent-panel{padding:14px;border:1px solid var(--vcs-border);border-radius:6px;margin:12px;background:var(--vcs-surface)}
+.vcs-root .vcs-consent-panel dl{display:grid;grid-template-columns:minmax(60px,100px) minmax(0,1fr);gap:8px;font-size:12px}
+.vcs-root .vcs-consent-panel dt{color:var(--vcs-muted)}
+.vcs-root .vcs-consent-panel dd{margin:0;overflow-wrap:anywhere}
+.vcs-root .vcs-consent-panel label:has(input[type=checkbox]){display:flex;align-items:flex-start;gap:8px;margin:12px 0;line-height:1.7}
+.vcs-root .vcs-history-viewer-toolbar,.vcs-root .vcs-toolbar{gap:6px;padding:7px 10px;background:var(--vcs-surface);font-size:11px}
+.vcs-root .vcs-history .vcs-history-viewer-toolbar label,.vcs-root .vcs-history-viewer-toolbar label{display:inline-flex;flex-direction:row;align-items:center;gap:5px;white-space:nowrap}
+.vcs-root .vcs-history-viewer-toolbar input[type=checkbox]{width:auto;margin:0}
+.vcs-root .vcs-history-viewer-toolbar button,.vcs-root .vcs-toolbar button{font-size:11px;min-height:25px}
+@container(max-width:650px){.vcs-root .vcs-files{width:180px;min-width:120px}.vcs-root .vcs-snapshot-date{display:none}.vcs-root .vcs-snapshot-ref{flex-basis:72px}.vcs-root .vcs-snapshot-list button{gap:8px;padding:8px 10px}}
 .vcs-root .vcs-discovery{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%}
 .vcs-root .vcs-discovery input{min-width:160px;max-width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);padding:6px 9px}
 .vcs-root .vcs-discovery span{font-size:12px;color:var(--dsw-alias-label-secondary)}
@@ -181,7 +214,7 @@
 /* Preserve review space even when short/narrow headers and both drawers expand. */
 .vcs-root>.vcs-top{flex:0 1 auto;min-height:0;max-height:35%;overflow:auto}
 /* View navigation and repository controls share one topmost toolbar. */
-.vcs-root>.vcs-primary-toolbar{display:flex;align-items:flex-start;flex-wrap:wrap;flex:0 1 auto;min-height:0;max-height:35%;overflow:auto;padding-left:var(--dsh-frame-leading-clearance,0px);border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1)}
+.vcs-root>.vcs-primary-toolbar{display:flex;align-items:flex-start;flex-wrap:wrap;flex:0 0 auto;min-height:0;max-height:35%;overflow:auto;padding-left:var(--dsh-frame-leading-clearance,0px);border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1)}
 .vcs-root .vcs-primary-toolbar>.vcs-review-views{flex:1 1 auto;border:0;padding:8px 12px;gap:6px}
 .vcs-root .vcs-primary-toolbar>.vcs-repository-controls{display:flex;flex:0 1 auto;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;max-width:100%;padding:8px 12px}
 .vcs-root .vcs-repository-controls>select{min-width:0;max-width:min(100%,320px)}
@@ -212,5 +245,143 @@
 .vcs-root .vcs-commit-sidebar:has(.vcs-commit-summary:not([hidden]))>.vcs-commit-summary{flex:1;max-height:none;overflow:auto;padding-top:10px}
 .vcs-root .vcs-commit-details:has(.vcs-commit-summary:not([hidden]))>.vcs-commit-sidebar{grid-column:1/-1}
 .vcs-root .vcs-history-browser:has(.vcs-commit-summary:not([hidden])):not(:has(.vcs-commit-focused)) .vcs-commit-sidebar{grid-column:1/-1}
+/* Snapshot lists must never impose their content height on the outer column. */
+.vcs-root .vcs-snapshot-panel{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0;overflow:hidden}
+.vcs-root .vcs-snapshot-heading{flex:0 1 auto;min-height:0;max-height:min(20%,100px);overflow:auto;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l2)}
+.vcs-root .vcs-snapshot-heading h3,.vcs-root .vcs-snapshot-heading p{margin:4px 0}
+.vcs-root .vcs-snapshot-list{flex:1 1 0;min-height:0;min-width:0;overflow:auto;padding:8px 12px}
+.vcs-root .vcs-snapshot-list ol{margin:0;padding-left:28px}
+.vcs-root .vcs-snapshot-list li{padding:2px 0}
+.vcs-root .vcs-snapshot-list button{max-width:100%;text-align:left;overflow-wrap:anywhere;white-space:normal}
+.vcs-root .vcs-snapshot-panel:has(.vcs-commit-details)>.vcs-snapshot-list{flex:0 1 30%;min-height:32px}
+.vcs-root .vcs-snapshot-details{flex:1 1 0;min-height:100px;min-width:0;overflow:hidden;border-top:1px solid var(--dsw-alias-border-l2)}
+.vcs-root .vcs-snapshot-details:empty{display:none}
+.vcs-root .vcs-snapshot-details>.vcs-commit-details{height:100%}
 .vcs-root .vcs-op details{margin:6px 0}
 .vcs-root .vcs-op pre{max-height:160px;overflow:auto;white-space:pre-wrap;padding:8px;border-radius:8px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2)}
+
+/* Shared visual language: compact tools, quiet surfaces and readable data rows. */
+.vcs-root {
+  --vcs-accent:var(--dsw-alias-state-business-primary,#5794ef);
+  --vcs-border:var(--dsw-alias-border-l2,#363940);
+  --vcs-muted:var(--dsw-alias-label-secondary,#a1a7b3);
+  --vcs-surface:var(--dsw-alias-bg-layer-1,#24272c);
+  --vcs-hover:var(--dsw-alias-interactive-bg-hover,#30343c);
+  --vcs-selection:var(--dsw-alias-interactive-bg-active,#303f55);
+  font-size:13px;line-height:1.5;
+  scrollbar-color:var(--vcs-border) transparent;scrollbar-width:thin;
+}
+.vcs-root * {scrollbar-width:thin;scrollbar-color:var(--vcs-border) transparent}
+.vcs-root button,.vcs-root select {
+  min-height:28px;border-radius:5px;padding:4px 9px;
+  border-color:var(--vcs-border);background:var(--vcs-surface);
+  transition:background-color .12s ease,border-color .12s ease;
+}
+.vcs-root button:disabled {opacity:.45}
+.vcs-root button:focus-visible,.vcs-root input:focus-visible,.vcs-root select:focus-visible,.vcs-root textarea:focus-visible {
+  outline:2px solid var(--vcs-accent);outline-offset:-2px;
+}
+.vcs-root input:not([type=checkbox]):not([type=range]),.vcs-root textarea {
+  font:inherit;color:inherit;background:var(--dsw-alias-bg-base,#17191d);
+  border:1px solid var(--vcs-border);border-radius:5px;padding:6px 9px;min-width:0;max-width:100%;
+}
+.vcs-root input::placeholder {color:var(--vcs-muted);opacity:.7}
+.vcs-root input[type=checkbox],.vcs-root input[type=range] {accent-color:var(--vcs-accent)}
+.vcs-root code {font-family:Consolas,'Cascadia Code',monospace;font-size:.9em}
+.vcs-root h3 {font-size:14px;line-height:1.5;font-weight:600}
+.vcs-root p {line-height:1.6}
+.vcs-root [role=alert] {border-left:3px solid var(--dsw-alias-state-error-primary,#df7373);padding:8px 12px;overflow-wrap:anywhere}
+.vcs-root .vcs-primary-toolbar {align-items:center;background:var(--vcs-surface);gap:0}
+.vcs-root .vcs-primary-toolbar>.vcs-review-views {gap:3px;padding:7px 10px}
+.vcs-root .vcs-review-views>button,.vcs-root .vcs-search-modes>button,.vcs-root .vcs-commit-detail-tabs>button {
+  background:transparent;border-color:transparent;color:var(--vcs-muted);font-weight:500;
+}
+.vcs-root .vcs-review-views>button:hover,.vcs-root .vcs-search-modes>button:hover,.vcs-root .vcs-commit-detail-tabs>button:hover {background:var(--vcs-hover);color:inherit}
+.vcs-root .vcs-review-views>button[aria-pressed=true],.vcs-root .vcs-search-modes>button[aria-pressed=true],.vcs-root .vcs-commit-detail-tabs>button[aria-pressed=true] {
+  background:var(--vcs-selection);border-color:var(--vcs-border);color:inherit;box-shadow:inset 0 -2px var(--vcs-accent);
+}
+.vcs-root .vcs-primary-toolbar>.vcs-repository-controls {padding:7px 10px;gap:6px}
+.vcs-root .vcs-repository-controls>select {font-weight:500}
+.vcs-root .vcs-top {padding:10px 16px;gap:8px;background:var(--dsw-alias-bg-base)}
+.vcs-root .vcs-title {font-size:15px;letter-spacing:.1px}
+.vcs-root .vcs-top>svg {width:17px;height:17px;color:var(--vcs-muted)}
+.vcs-root .vcs-badge {font-size:10px;padding:2px 7px;border:1px solid var(--vcs-border);border-radius:4px;background:transparent}
+.vcs-root .vcs-path {font-size:11px;color:var(--vcs-muted)}
+.vcs-root .vcs-filter {padding:10px 10px 8px}
+.vcs-root .vcs-status-filter button,.vcs-root .vcs-tree-actions button {border-color:transparent;background:transparent;min-height:24px}
+.vcs-root .vcs-status-filter button[aria-pressed=true] {background:var(--vcs-selection);border-color:var(--vcs-border)}
+.vcs-root .vcs-status-filter small {padding-left:3px;font-variant-numeric:tabular-nums}
+.vcs-root .vcs-repository-heading {padding:7px 9px;font-size:12px}
+.vcs-root .vcs-repository-heading small {font-size:10px}
+.vcs-root .vcs-file {border-radius:4px;padding:6px 8px;align-items:center}
+.vcs-root .vcs-status {font-size:11px;text-align:center;border-radius:3px;background:var(--vcs-surface);padding:0 3px}
+.vcs-root .vcs-filehead {padding:8px 12px;min-height:38px;font-size:12px;background:var(--vcs-surface)}
+.vcs-root .vcs-copy-path {background:transparent;border-color:transparent;font-size:10px}
+.vcs-root .vcs-toolbar {gap:8px;padding:6px 10px;background:var(--vcs-surface)}
+.vcs-root .vcs-context,.vcs-root .vcs-labels {font-size:11px}
+.vcs-root .vcs-message {font-size:12px;color:var(--vcs-muted)}
+.vcs-root .vcs-history-list,.vcs-root .vcs-history-browser .vcs-commit-sidebar {padding:10px 12px}
+.vcs-root .vcs-history-list>p {font-size:11px;margin:4px 0 8px;color:var(--vcs-muted)}
+.vcs-root .vcs-history label,.vcs-root .vcs-commit-picker>label {display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--vcs-muted)}
+.vcs-root .vcs-commit-list {margin:8px 0}
+.vcs-root .vcs-commit-row {border-radius:4px;padding:7px 9px;gap:2px;margin:1px 0}
+.vcs-root .vcs-commit-row[aria-pressed=true] {background:var(--vcs-selection);box-shadow:inset 2px 0 var(--vcs-accent)}
+.vcs-root .vcs-commit-meta {padding:0 9px 6px;font-size:10px}
+.vcs-root .vcs-commit-detail-tabs {padding:6px 8px;gap:4px;background:var(--vcs-surface)}
+.vcs-root .vcs-commit-detail-tabs button {font-size:12px}
+.vcs-root .vcs-commit-picker {padding:10px}
+.vcs-root .vcs-commit-picker>label input {width:100%}
+.vcs-root .vcs-commit-picker>span {display:block;font-size:10px;color:var(--vcs-muted);margin-top:5px}
+.vcs-root .vcs-commit-files {margin:8px 0;border-radius:5px;border-color:var(--vcs-border)}
+.vcs-root .vcs-commit-files button {padding:7px 9px;font-size:12px}
+.vcs-root .vcs-file-status {flex-basis:58px;font-size:10px}
+.vcs-root .vcs-commit-summary {padding:12px}
+.vcs-root .vcs-commit-summary h3 {font-size:16px;font-weight:600}
+.vcs-root .vcs-commit-summary>pre {padding:10px;line-height:1.7;border-radius:5px}
+.vcs-root .vcs-commit-oid {font-size:10px;color:var(--vcs-muted)}
+.vcs-root .vcs-snapshot-heading {padding:8px 14px;background:var(--vcs-surface)}
+.vcs-root .vcs-snapshot-heading h3 {font-size:13px;margin:0 0 3px}
+.vcs-root .vcs-snapshot-heading p {font-size:11px;line-height:1.5;color:var(--vcs-muted);margin:3px 0 6px}
+.vcs-root .vcs-snapshot-list {padding:4px 0}
+.vcs-root .vcs-snapshot-list ol {list-style:none;padding:0;margin:0}
+.vcs-root .vcs-snapshot-list li {padding:0;border-bottom:1px solid var(--vcs-border)}
+.vcs-root .vcs-snapshot-list button {
+  display:flex;align-items:baseline;gap:12px;width:100%;border:0;border-radius:0;
+  padding:8px 14px;background:transparent;text-align:left;min-width:0;
+}
+.vcs-root .vcs-snapshot-list button:hover {background:var(--vcs-hover)}
+.vcs-root .vcs-snapshot-list button[aria-pressed=true] {background:var(--vcs-selection);box-shadow:inset 3px 0 var(--vcs-accent)}
+.vcs-root .vcs-snapshot-ref {flex:0 0 130px;max-width:28%;color:var(--vcs-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vcs-root .vcs-snapshot-subject {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vcs-root .vcs-snapshot-date {flex:0 0 auto;font-size:10px;color:var(--vcs-muted);font-variant-numeric:tabular-nums}
+.vcs-root .vcs-revision-panel {padding:10px 0;border-top:1px solid var(--vcs-border);margin-top:10px}
+.vcs-root .vcs-revision-panel h3 {font-size:12px;margin:0 0 6px}
+.vcs-root .vcs-revision-panel>p {font-size:11px;color:var(--vcs-muted);margin:6px 0}
+.vcs-root .vcs-revision-panel>label {margin:8px 0}
+.vcs-root .vcs-search-modes {padding:7px 12px;gap:4px;background:var(--vcs-surface)}
+.vcs-root .vcs-grep-panel {padding:16px;min-width:0}
+.vcs-root .vcs-grep-panel h3 {margin:0 0 5px;font-size:15px}
+.vcs-root .vcs-grep-panel>p {font-size:12px;color:var(--vcs-muted);margin:6px 0}
+.vcs-root .vcs-grep-panel form {display:flex;gap:8px;margin:16px 0;max-width:760px}
+.vcs-root .vcs-grep-panel form input {flex:1;width:100%}
+.vcs-root .vcs-grep-panel>ol {list-style:none;padding:0;border:1px solid var(--vcs-border);border-radius:6px;overflow:hidden}
+.vcs-root .vcs-grep-panel>ol>li {padding:10px 12px;border-bottom:1px solid var(--vcs-border)}
+.vcs-root .vcs-grep-panel>ol>li:last-child {border-bottom:0}
+.vcs-root .vcs-grep-panel>ol button {background:transparent;border:0;padding:0;color:var(--vcs-accent)}
+.vcs-root .vcs-grep-panel pre {padding:6px 0;color:var(--vcs-muted);white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
+.vcs-root .vcs-consent-panel {padding:12px;border:1px solid var(--vcs-border);border-radius:6px;margin:10px 0}
+.vcs-root .vcs-consent-panel p,.vcs-root .vcs-consent-panel label {font-size:12px;color:var(--vcs-muted)}
+.vcs-root .vcs-consent-panel dl {display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;font-size:12px}
+.vcs-root .vcs-consent-panel dt {color:var(--vcs-muted)}
+.vcs-root .vcs-consent-panel dd {margin:0;overflow-wrap:anywhere}
+@container(max-width:650px) {
+  .vcs-root .vcs-primary-toolbar>.vcs-review-views {gap:2px;padding:6px 8px}
+  .vcs-root .vcs-primary-toolbar>.vcs-repository-controls {padding:4px 8px 7px}
+  .vcs-root .vcs-snapshot-list button {gap:6px;padding:7px 10px;flex-wrap:wrap}
+  .vcs-root .vcs-snapshot-ref {flex-basis:90px}
+  .vcs-root .vcs-snapshot-date {width:100%;padding-left:0}
+  .vcs-root .vcs-grep-panel {padding:12px}
+  .vcs-root .vcs-grep-panel form {flex-wrap:wrap}
+  .vcs-root .vcs-grep-panel form input {flex-basis:100%}
+}
+@media(prefers-reduced-motion:reduce) {.vcs-root button,.vcs-root select {transition:none}}

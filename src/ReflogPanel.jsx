@@ -23,15 +23,15 @@ function ScopedReflogPanel({sessionId,repositoryId,rpc,t,onRediscover}){
   return()=>controller.abort();
  },[sessionId,repositoryId,retry]);
  const cancel=()=>{pending.current?.abort();setSnapshot(null);setSelected(null);setState('cancelled');};
- return <section aria-label={t('reflogTitle')}>
-  <h3>{t('reflogTitle')}</h3><p>{t('reflogScope')}</p>
+ return <section className="vcs-snapshot-panel" aria-label={t('reflogTitle')}>
+  <div className="vcs-snapshot-heading"><h3>{t('reflogTitle')}</h3><p>{t('reflogScope')}</p>
   {state==='loading'?<p role="status">{t('loading')} <button onClick={cancel}>{t('reflogCancel')}</button></p>:<button onClick={()=>setRetry(n=>n+1)}>{t('refresh')}</button>}
   {state==='cancelled'&&<p role="status">{t('reflogCancelled')} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
   {state==='error'&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
-  {snapshot&&<>
+  </div><div className="vcs-snapshot-list">{snapshot&&<>
    {snapshot.truncated&&<p role="status">{t('reflogTruncated')}</p>}
-   {!snapshot.entries.length?<p role="status">{t('reflogEmpty')}</p>:<ol>{snapshot.entries.map((entry,index)=><li key={entry.selector+':'+index}><button aria-pressed={selected===index} onClick={()=>setSelected(index)}><code>{entry.selector}</code> · {entry.message} · <time>{entry.date}</time></button></li>)}</ol>}
-   {selected!==null&&<CommitDetails sessionId={sessionId} repositoryId={repositoryId} commit={snapshot.entries[selected].id} rpc={rpc} t={t} onRediscover={onRediscover}/>}
-  </>}
+   {!snapshot.entries.length?<p role="status">{t('reflogEmpty')}</p>:<ol>{snapshot.entries.map((entry,index)=><li key={entry.selector+':'+index}><button aria-pressed={selected===index} onClick={()=>setSelected(index)}><code className="vcs-snapshot-ref">{entry.selector}</code><span className="vcs-snapshot-subject">{entry.message}</span><time className="vcs-snapshot-date">{entry.date}</time></button></li>)}</ol>}
+  </>}</div><div className="vcs-snapshot-details">{snapshot&&selected!==null&&<CommitDetails sessionId={sessionId} repositoryId={repositoryId} commit={snapshot.entries[selected].id} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+  </div>
  </section>;
 }

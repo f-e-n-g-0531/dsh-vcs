@@ -2,6 +2,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import ReflogPanel from '../src/ReflogPanel.jsx';
+import {checkSnapshotLayout} from './snapshot-layout-browser.jsx';
 
 export async function checkReflog(){
  const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
@@ -52,4 +53,5 @@ export async function checkReflog(){
   mode='ready';button('retry').click();await wait(()=>row(),'expiry retry');
   if(calls.some(c=>!['vcs/reflog','vcs/commit','vcs/tree'].includes(c.e)))throw Error('Read-only reflog used a write/reset endpoint');
  }finally{root.unmount();host.remove();}
+ await checkSnapshotLayout();
 }

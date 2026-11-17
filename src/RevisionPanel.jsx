@@ -27,7 +27,7 @@ function ScopedRevisionPanel({commits,sessionId,repositoryId,rpc,t,onRediscover,
   rpc('vcs/references',{sessionId,repositoryId},controller.signal).then(value=>{if(!controller.signal.aborted){setRefs(value.references);setLoaded(true);onReferencesLoaded?.(value.references);}}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[sessionId,repositoryId,load]);
- return <section aria-label={t('revisionTitle')}><h3>{t('revisionTitle')}</h3><p>{t('revisionScope')}</p>
+ return <section className="vcs-revision-panel" aria-label={t('revisionTitle')}><h3>{t('revisionTitle')}</h3><p>{t('revisionScope')}</p>
  <button disabled={busy} onClick={()=>setLoad(n=>n+1)}>{t('revisionLoadRefs')}</button><p>{t('revisionRefsScope')}</p>
  {loaded&&!busy&&!error&&<p role="status">{refs.length?`${t('revisionRefsCount')}: ${refs.length}`:t('revisionRefsEmpty')}</p>}
  {busy&&<p role="status">{t('loading')}</p>}{error&&<p role="alert">{error}</p>}

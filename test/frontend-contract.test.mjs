@@ -119,7 +119,7 @@ test('stash history and Blame commits render as text instead of no-op navigation
  const A='a'.repeat(40),B='b'.repeat(40),id='d'.repeat(64),calls=[];
  const rpc=async(e,p)=>{calls.push({e,p});if(e==='vcs/stash-list')return {stashes:[{id:A,ref:'stash@{0}',message:'stash'}]};if(e==='vcs/commit')return {id:A,subject:'stash',parents:[],changes:[{id,path:'f',status:'modified'}]};if(e==='vcs/commit-compare')return {path:'f',left:{text:'a'},right:{text:'b'}};if(e==='vcs/file-history')return {path:'f',commits:[{id:B,subject:'earlier',path:'f'}],nextOffset:null};if(e==='vcs/blame')return {lines:[{line:1,commit:B,text:'b'}]};throw Error('Unexpected stash RPC '+e);};
  const h=frontendHarness('src/StashPanel.jsx',{sessionId:'s',repositoryId:'r',rpc,t:k=>k,onRediscover(){}});
- try{await h.flush();button(h,'stash@{0} · stash').props.onClick();await h.flush();button(h,'modified · f').props.onClick();await h.flush();button(h,'fileHistory').props.onClick();button(h,'blame').props.onClick();await h.flush();assert.ok(nodeText(h.tree).includes('earlier'));assert.equal(button(h,'earlier'),undefined);assert.equal(findNode(h,n=>n.type==='button'&&n.props.title===B),undefined);assert.equal(calls.filter(c=>c.e==='vcs/commit').length,1);
+ try{await h.flush();button(h,'stash@{0}stash').props.onClick();await h.flush();button(h,'modified · f').props.onClick();await h.flush();button(h,'fileHistory').props.onClick();button(h,'blame').props.onClick();await h.flush();assert.ok(nodeText(h.tree).includes('earlier'));assert.equal(button(h,'earlier'),undefined);assert.equal(findNode(h,n=>n.type==='button'&&n.props.title===B),undefined);assert.equal(calls.filter(c=>c.e==='vcs/commit').length,1);
  }finally{h.dispose();}
 });
 
