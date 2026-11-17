@@ -61,6 +61,12 @@ test('discovery hung fetch and missing port have deadlines without a browser',as
  await assert.rejects(waitForDevTools(state,'fresh',{deadline:Date.now()+25,read:async()=>{throw Object.assign(Error('missing'),{code:'ENOENT'});}}),/deadline/);
  await assert.rejects(waitForDevTools(state,'fresh',{deadline:Date.now()+25,read:async()=>'45678',fetchImpl:async()=>new Promise(()=>{})}),/timed out/);
 });
+test('port read rejection crossing deadline normalizes timeout and retains original cause',async()=>{
+ const missing=Object.assign(Error('missing'),{code:'ENOENT'}),now=Date.now;let clock=1000;
+ Date.now=()=>clock;
+ try{await assert.rejects(waitForDevTools({check(){}},'fresh',{deadline:1020,read:async()=>{clock=1021;throw missing;}}),error=>/deadline/.test(error.message)&&error.cause===missing);}finally{Date.now=now;}
+});
+
 test('cleanup handles already closed processes and waits for close after kill',async()=>{
  const child=new EventEmitter();child.exitCode=null;child.signalCode=null;child.pid=undefined;
  const state=observeChild(child);let killed=false;child.kill=()=>{killed=true;child.emit('exit',null,'SIGKILL');setImmediate(()=>child.emit('close'));};

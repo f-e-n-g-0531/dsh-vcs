@@ -32,7 +32,7 @@ export async function waitForDevTools(childState, profile, {deadline, read = rea
   while (Date.now() < deadline) {
     childState.check();
     let port;
-    try {port = Number((await within(read(path.join(profile, 'DevToolsActivePort'), 'utf8'), remaining(deadline, 1000), 'DevTools port read')).split(String.fromCharCode(10))[0]);} catch (error) {if (Date.now() >= deadline) throw error;}
+    try {port = Number((await within(read(path.join(profile, 'DevToolsActivePort'), 'utf8'), remaining(deadline, 1000), 'DevTools port read')).split(String.fromCharCode(10))[0]);} catch (error) {childState.check();if (Date.now() >= deadline) throw Error('Browser debugging did not start before deadline', {cause:error});}
     if (Number.isInteger(port) && port > 0 && port <= 65535) {
       // The port comes only from our fresh profile, never a fixed port on another browser.
       const controller = new AbortController();
