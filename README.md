@@ -2,9 +2,9 @@
 
 在 DeepSeek Harness（DSH）Web 中查看 Git / SVN 文件变更和提交历史，**默认只读预览**。
 
-你可以查看差异、浏览历史、追溯文件。0.8.6 候选移除工作区分支切换及插件内更新入口，工作区固定显示全部变更；暂时撤下创建分支、创建标签和分支删除评估面板。依赖已暂存／未暂存模式的提交与暂存写操作也不再通过当前页面进入，底层实现保留。历史引用选择只改变阅读起点，不提供 fetch／pull／push、stash、merge 或冲突解决。
+你可以查看差异、浏览历史、追溯文件。0.8.7 已移除工作区分支切换及插件内更新入口，工作区固定显示全部变更；暂时撤下创建分支、创建标签和分支删除评估面板。依赖已暂存／未暂存模式的提交与暂存写操作也不再通过当前页面进入，底层实现保留。历史引用选择只改变阅读起点，不提供 fetch／pull／push、stash、merge 或冲突解决。
 
-**0.8.5 已正式发布至 npm 与 GitHub。** 本项目切换为 MIT License，本地更改／所有提交和分支选择统一置顶。本地及同标签四矩阵完整测试 **3356/3356**、浏览器和六精确宿主合同均通过，两端公开包字节一致。未更新或重启日常 DSH，当前 GUI 未进行新版实机验收。最终工件与验证边界见[发布回执](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.5-RECEIPT.md>)、[本版说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.5.md>)及[当前能力](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/CURRENT-CAPABILITIES.md>)。
+**0.8.7 已正式发布至 npm 与 GitHub。** 精简顶部控件、合并刷新与仓库重新发现，所有提交新增提交／变更二级标签，并撤下分支切换、内置更新及分支／标签操作面板。本地与同标签四矩阵**3344／3344**、浏览器和六宿主合同通过，公开包字节一致。未安装或重启日常DSH，当前GUI未实机验收；见[发布回执](<docs/releases/0.8.7-RECEIPT.md>)和[本版说明](<docs/releases/0.8.7.md>)。
 
 - npm 包：`@feng0531/dsh-vcs`
 - [下载正式版本](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) · [查看更新](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md)
