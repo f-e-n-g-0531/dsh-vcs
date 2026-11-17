@@ -180,13 +180,16 @@
 .vcs-root>.vcs-operations[hidden]{display:none}
 /* Preserve review space even when short/narrow headers and both drawers expand. */
 .vcs-root>.vcs-top{flex:0 1 auto;min-height:0;max-height:35%;overflow:auto}
-/* Primary view navigation and safe branch selection precede every other control. */
+/* View navigation and repository controls share one topmost toolbar. */
 .vcs-root>.vcs-primary-toolbar{display:flex;align-items:flex-start;flex-wrap:wrap;flex:0 1 auto;min-height:0;max-height:35%;overflow:auto;padding-left:var(--dsh-frame-leading-clearance,0px);border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1)}
 .vcs-root .vcs-primary-toolbar>.vcs-review-views{flex:1 1 auto;border:0;padding:8px 12px;gap:6px}
-.vcs-root .vcs-primary-toolbar>.vcs-branch-switcher{flex:0 1 360px;min-width:0;max-width:100%;max-height:min(25vh,240px);overflow:auto;border:0;padding:8px 12px}
+.vcs-root .vcs-primary-toolbar>.vcs-repository-controls{display:flex;flex:0 1 auto;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;max-width:100%;padding:8px 12px}
+.vcs-root .vcs-repository-controls>select{min-width:0;max-width:min(100%,320px)}
+.vcs-root .vcs-repository-controls .vcs-mode{min-width:0;flex-wrap:wrap}
+.vcs-root .vcs-repository-controls select{min-width:0;max-width:100%}
 .vcs-root .vcs-primary-toolbar .vcs-review-views>button{border-radius:4px}
 .vcs-root .vcs-primary-toolbar button:focus-visible{outline:2px solid var(--dsw-alias-border-l4,currentColor);outline-offset:2px}
-@container(max-width:650px){.vcs-root .vcs-primary-toolbar>.vcs-branch-switcher{flex-basis:100%}}
+@container(max-width:650px){.vcs-root .vcs-primary-toolbar>.vcs-repository-controls{flex-basis:100%}}
 .vcs-root>.vcs-body{flex:1 0 80px;min-height:80px}
 .vcs-root .vcs-op{margin:0;padding:0 12px 8px;border-top:1px solid var(--dsw-alias-border-l2);min-width:0}
 .vcs-root>.vcs-branch-switcher{flex:0 1 auto;min-height:0;max-height:min(25%,240px);overflow:auto}
@@ -202,5 +205,12 @@
 .vcs-root .vcs-op fieldset legend{padding:0 4px}
 .vcs-root .vcs-op-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .vcs-root .vcs-op-actions>button{flex:0 1 auto}
+/* Selected commit secondary views keep comparison state mounted between switches. */
+.vcs-root .vcs-commit-detail-tabs{display:flex;flex-wrap:wrap;gap:6px;flex-shrink:0;padding-bottom:8px;border-bottom:1px solid var(--dsw-alias-border-l2)}
+.vcs-root .vcs-commit-detail-tabs button{border-radius:4px}
+.vcs-root .vcs-commit-summary[hidden],.vcs-root .vcs-commit-picker[hidden],.vcs-root .vcs-commit-review[hidden]{display:none}
+.vcs-root .vcs-commit-sidebar:has(.vcs-commit-summary:not([hidden]))>.vcs-commit-summary{flex:1;max-height:none;overflow:auto;padding-top:10px}
+.vcs-root .vcs-commit-details:has(.vcs-commit-summary:not([hidden]))>.vcs-commit-sidebar{grid-column:1/-1}
+.vcs-root .vcs-history-browser:has(.vcs-commit-summary:not([hidden])):not(:has(.vcs-commit-focused)) .vcs-commit-sidebar{grid-column:1/-1}
 .vcs-root .vcs-op details{margin:6px 0}
 .vcs-root .vcs-op pre{max-height:160px;overflow:auto;white-space:pre-wrap;padding:8px;border-radius:8px;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2)}

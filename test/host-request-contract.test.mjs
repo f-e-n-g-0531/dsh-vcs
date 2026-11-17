@@ -129,14 +129,6 @@ test('multi-field validation keeps the documented precedence order', async () =>
   }
 });
 
-test('update endpoints stay field-free and reachable while reads are budgeted separately', async () => {
-  const info = await call('vcs/runtime-info', {});
-  assert.equal(info.ok, true);
-  assert.equal(info.value.protocol, 1);
-  const rejected = await call('vcs/runtime-info', { registry: 'https://evil.test' });
-  assert.equal(rejected.error?.code, 'vcs/update-failed');
-  assert.equal(rejected.error.message, 'Update requests accept no fields.');
-  const aborted = new AbortController();
-  aborted.abort();
-  assert.equal((await call('vcs/check-update', {}, aborted.signal)).error.code, 'vcs/cancelled');
+test('removed update endpoints reject before workspace or network access', async () => {
+  for(const endpoint of ['vcs/runtime-info','vcs/check-update'])assert.equal((await call(endpoint,{})).error.code,'vcs/not-found');
 });

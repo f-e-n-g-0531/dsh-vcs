@@ -49,7 +49,7 @@ test('Git-only discovery grants and token isolation prevent unauthorized writes'
  const f=fixture();t.after(()=>f.handle.dispose());assert.equal(await code(prepare(f)),'vcs/rediscover-required');await discover(f);await discover(f,'other');let p=await prepare(f);
  assert.equal(await code(f.handle('vcs/commit-confirm',{...f.address,sessionId:'other',token:p.value.token})),'vcs/commit-confirmation-invalid');assert.equal(await code(confirm(f,p.value.token)),'vcs/commit-confirmation-invalid');
  p=await prepare(f);assert.equal(await code(f.handle('vcs/commit-confirm',{...f.address,repositoryId:'r2',token:p.value.token})),'vcs/commit-confirmation-invalid');
- p=await prepare(f);assert.equal(await code(f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token})),'vcs/branch-confirmation-invalid');assert.equal((await confirm(f,p.value.token)).ok,true);
+ p=await prepare(f);assert.equal(await code(f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token})),'vcs/not-found');assert.equal((await confirm(f,p.value.token)).ok,true);
  p=await prepare(f);f.setCwd('/changed');assert.equal(await code(confirm(f,p.value.token)),'vcs/rediscover-required');assert.equal(f.writes(),1);
 });
 test('rediscovery expiry disposal and grant replacement invalidate prepared commits',async t=>{
@@ -58,8 +58,8 @@ test('rediscovery expiry disposal and grant replacement invalidate prepared comm
 test('prepare holds reader lock and confirm shares writer exclusion across handlers and operation kinds',async t=>{
  let finish,start;const gate=new Promise(r=>finish=r),started=new Promise(r=>start=r),root='/rpc-commit-shared-'+Math.random();
  const f=fixture({root,apply:async r=>{r.onStart();start();await gate;return {};}}),g=fixture({root});t.after(()=>{finish();f.handle.dispose();g.handle.dispose();});await discover(f);await discover(g);
- const bp=await g.handle('vcs/branch-switch-prepare',{...g.address,branch:'next'}),ip=await g.handle('vcs/index-stage-prepare',{...g.address,id:'a'.repeat(64)}),p=await prepare(f),pending=confirm(f,p.value.token);await started;
- assert.equal(await code(prepare(g)),'vcs/busy');assert.equal(await code(g.handle('vcs/branches',g.address)),'vcs/busy');assert.equal(await code(g.handle('vcs/branch-switch-confirm',{...g.address,token:bp.value.token})),'vcs/busy');assert.equal(await code(g.handle('vcs/index-stage-confirm',{...g.address,token:ip.value.token})),'vcs/busy');finish();assert.equal((await pending).ok,true);
+ const gp=await prepare(g),ip=await g.handle('vcs/index-stage-prepare',{...g.address,id:'a'.repeat(64)}),p=await prepare(f),pending=confirm(f,p.value.token);await started;
+ assert.equal(await code(prepare(g)),'vcs/busy');assert.equal(await code(g.handle('vcs/status',{...g.address,mode:'all'})),'vcs/busy');assert.equal(await code(confirm(g,gp.value.token)),'vcs/busy');assert.equal(await code(g.handle('vcs/index-stage-confirm',{...g.address,token:ip.value.token})),'vcs/busy');finish();assert.equal((await pending).ok,true);
  let release;const h=fixture({prepare:async(r,s)=>{assert.throws(()=>acquireRepositoryAccess(h.root,true),{code:'vcs/busy'});return s;}});t.after(()=>{release?.();h.handle.dispose();});await discover(h);const q=await prepare(h);assert.equal(q.ok,true);assert.equal((await confirm(h,q.value.token)).ok,true);
 });
 test('cancel, stale failures, adapter unknown and outer budget retain correct outcome semantics',async t=>{

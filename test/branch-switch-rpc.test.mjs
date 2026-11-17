@@ -1,8 +1,47 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {createHandler} from '../index.mjs';
-const a='a'.repeat(40),b='b'.repeat(40),current={ref:'refs/heads/main',name:'main',commit:a},target={ref:'refs/heads/next',name:'next',commit:b};
-function fixture({type='git',root='/rpc-switch-'+Math.random(),switcher,timeout=15000}={}){let cwd=root,writes=0,clears=0;const api={discoverRepositories:async()=>({repositories:[{id:'r',type,root}],warnings:[]}),listLocalBranches:async()=>({current,branches:[current,target]}),prepareLocalBranchSwitch:async()=>({current,target,root,fingerprint:'private'}),switchLocalBranch:async(repo,request)=>{writes++;return switcher?switcher(request): (request.onStart(),{current:target});},getStatus:async()=>({changes:[]}),clearHistoricalCache:()=>clears++};const handle=createHandler({sessions:{get:()=>({header:{cwd}})}},api,4,{operationTimeoutMs:timeout});return {handle,address:{sessionId:'s',repositoryId:'r'},setCwd:v=>cwd=v,writes:()=>writes,clears:()=>clears};}
-const discover=f=>f.handle('vcs/repositories',{sessionId:'s'});const prepare=f=>f.handle('vcs/branch-switch-prepare',{...f.address,branch:'next'});
-test('branch RPC permits writes only after discovered Git grant and valid exact two-phase request',async()=>{const f=fixture();assert.equal((await prepare(f)).error.code,'vcs/rediscover-required');await discover(f);assert.deepEqual((await f.handle('vcs/branches',f.address)).value,{current,branches:[current,target]});for(const extra of [{root:'/bad'},{snapshot:{}},{token:'fake'},{branch:null}])assert.equal((await f.handle('vcs/branch-switch-prepare',{...f.address,branch:'next',...extra})).error.code,'vcs/invalid-request');const p=await prepare(f);assert.equal(p.ok,true);assert.equal(p.value.fingerprint,undefined);for(const extra of [{token:'fake'},{branch:'next'},{cwd:'/bad'}])assert.equal((await f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token,...extra})).error.code,'vcs/invalid-request');assert.equal(f.writes(),0);assert.equal((await f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token})).ok,true);assert.equal(f.writes(),1);assert.equal((await f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token})).error.code,'vcs/branch-confirmation-invalid');f.handle.dispose();});
-test('SVN and stale Session grant cannot prepare or confirm actual switch',async()=>{const svn=fixture({type:'svn'});await discover(svn);assert.equal((await prepare(svn)).error.code,'vcs/invalid-request');const f=fixture();await discover(f);const p=await prepare(f);f.setCwd('/changed');assert.equal((await f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token})).error.code,'vcs/rediscover-required');assert.equal(f.writes(),0);f.handle.dispose();svn.handle.dispose();});
-test('rediscovery disposes prepared snapshots; simultaneous handler readers excluded during write',async()=>{let finish,start;const gate=new Promise(r=>finish=r),started=new Promise(r=>start=r);const root='/rpc-shared-'+Math.random(),f=fixture({root,switcher:async r=>{r.onStart();start();await gate;return {current:target};}}),g=fixture({root});await discover(f);await discover(g);const old=await prepare(f);await discover(f);assert.equal((await f.handle('vcs/branch-switch-confirm',{...f.address,token:old.value.token})).error.code,'vcs/branch-confirmation-invalid');const p=await prepare(f),pending=f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token});await started;assert.equal((await g.handle('vcs/branches',g.address)).error.code,'vcs/busy');assert.equal((await prepare(g)).error.code,'vcs/busy');finish();assert.equal((await pending).ok,true);assert.equal((await g.handle('vcs/branches',g.address)).ok,true);f.handle.dispose();g.handle.dispose();});
-test('abort after mutation admission and operation deadline remain unknown instead of safe cancellation',async()=>{const controller=new AbortController(),f=fixture({switcher:async r=>{r.onStart();controller.abort();r.signal.throwIfAborted();}});await discover(f);const p=await prepare(f);assert.equal((await f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token},controller.signal)).error.code,'vcs/branch-outcome-unknown');const g=fixture({timeout:15,switcher:async r=>{r.onStart();await new Promise(resolve=>setTimeout(resolve,30));return {current:target};}});await discover(g);const q=await prepare(g);assert.equal((await g.handle('vcs/branch-switch-confirm',{...g.address,token:q.value.token})).error.code,'vcs/branch-outcome-unknown');f.handle.dispose();g.handle.dispose();});
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHandler} from '../index.mjs';
+import {acquireRepositoryAccess} from '../confirmed-operation.mjs';
+
+function fixture({type='git',root='/rpc-switch-'+Math.random()}={}){
+ let cwd=root,lookups=0;const calls=[];
+ const removed=name=>async()=>{calls.push(name);throw Error('Removed branch API must never run: '+name);};
+ const api={discoverRepositories:async()=>({repositories:[{id:'r',type,root}],warnings:[]}),
+  listLocalBranches:removed('list'),prepareLocalBranchSwitch:removed('prepare'),switchLocalBranch:removed('switch')};
+ const handle=createHandler({sessions:{get:()=>{lookups++;return {header:{cwd}};}}},api);
+ return {handle,root,address:{sessionId:'s',repositoryId:'r'},setCwd:v=>cwd=v,calls,lookups:()=>lookups};
+}
+const discover=f=>f.handle('vcs/repositories',{sessionId:'s'});
+const requests=f=>[
+ ['vcs/branches',{...f.address}],
+ ['vcs/branch-switch-prepare',{...f.address,branch:'next'}],
+ ['vcs/branch-switch-confirm',{...f.address,token:'a'.repeat(64)}],
+];
+async function assertRemoved(f){
+ const lookups=f.lookups();
+ for(const [endpoint,payload] of requests(f)){
+  const result=await f.handle(endpoint,payload);assert.equal(result.ok,false);assert.equal(result.error.code,'vcs/not-found',endpoint);
+ }
+ assert.equal(f.lookups(),lookups);assert.deepEqual(f.calls,[]);
+}
+test('removed branch listing and switching are unavailable before and after Git discovery',async t=>{
+ const f=fixture();t.after(()=>f.handle.dispose());await assertRemoved(f);assert.equal((await discover(f)).ok,true);await assertRemoved(f);
+});
+test('SVN and stale Session grants cannot revive removed branch endpoints',async t=>{
+ const svn=fixture({type:'svn'}),f=fixture();t.after(()=>{svn.handle.dispose();f.handle.dispose();});
+ assert.equal((await discover(svn)).ok,true);await assertRemoved(svn);
+ await discover(f);f.setCwd('/changed');await assertRemoved(f);
+});
+test('rediscovery disposal and repository writer locks cannot revive removed branch endpoints',async t=>{
+ const f=fixture();t.after(()=>f.handle.dispose());await discover(f);await discover(f);await assertRemoved(f);
+ const release=acquireRepositoryAccess(f.root,true);try{await assertRemoved(f);}finally{release();}
+ f.handle.dispose();await assertRemoved(f);
+});
+test('removed branch requests never validate payloads or dispatch adapters',async t=>{
+ const f=fixture();t.after(()=>f.handle.dispose());await discover(f);let getters=0;
+ const accessor={};Object.defineProperty(accessor,'sessionId',{get(){getters++;throw Error('must not read removed payload');}});
+ for(const [endpoint] of requests(f))for(const payload of [null,{},accessor,{...f.address,root:'/bad',snapshot:{},branch:null,token:'fake'}]){
+  assert.equal((await f.handle(endpoint,payload)).error.code,'vcs/not-found',endpoint);
+ }
+ assert.equal(getters,0);assert.deepEqual(f.calls,[]);
+});

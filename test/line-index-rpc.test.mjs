@@ -104,12 +104,12 @@ test('outer post-work budget failure after publishing stays unknown and clears c
  const f=fixture({timeout:25,apply:async r=>{r.onStart();await new Promise(resolve=>setTimeout(resolve,60));return {};}});t.after(()=>f.handle.dispose());await discover(f);const q=await ready(f),clears=f.clears();const r=await confirm(f,q.value.token);code(r,'vcs/index-outcome-unknown');assert.match(r.error.message,/Append-only object writes/);assert.ok(f.clears()>clears);assert.equal(f.writes(),1);
 });
 
-test('line reads and confirms share process mutex with ordinary readers and other index/branch writers',async t=>{
+test('line reads and confirms share process mutex with ordinary readers and other index writers',async t=>{
  let finish,start;const gate=new Promise(r=>finish=r),started=new Promise(r=>start=r),root='/rpc-partial-shared-'+Math.random();
  const f=fixture({root,apply:async r=>{r.onStart();start();await gate;return {};}}),g=fixture({root});t.after(()=>{finish();f.handle.dispose();g.handle.dispose();});await discover(f);await discover(g);
- const gp=await plan(g),gq=await ready(g),whole=await g.handle('vcs/index-stage-prepare',{...g.address,id}),branch=await g.handle('vcs/branch-switch-prepare',{...g.address,branch:'next'}),q=await ready(f);
+ const gp=await plan(g),gq=await ready(g),whole=await g.handle('vcs/index-stage-prepare',{...g.address,id}),reverse=await g.handle('vcs/index-unstage-prepare',{...g.address,id}),q=await ready(f);
  const pending=confirm(f,q.value.token);await started;
- for(const r of [await plan(g),await prepare(g,gp.value.planToken),await confirm(g,gq.value.token),await g.handle('vcs/branches',g.address),await g.handle('vcs/index-stage-confirm',{...g.address,token:whole.value.token}),await g.handle('vcs/branch-switch-confirm',{...g.address,token:branch.value.token})])code(r,'vcs/busy');
+ for(const r of [await plan(g),await prepare(g,gp.value.planToken),await confirm(g,gq.value.token),await g.handle('vcs/status',{...g.address,mode:'all'}),await g.handle('vcs/index-stage-confirm',{...g.address,token:whole.value.token}),await g.handle('vcs/index-unstage-confirm',{...g.address,token:reverse.value.token})])code(r,'vcs/busy');
  finish();assert.equal((await pending).ok,true);assert.equal((await plan(g)).ok,true);
 });
 

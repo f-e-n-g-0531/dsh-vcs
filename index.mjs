@@ -3,7 +3,6 @@ import {readFileSync} from 'node:fs';
 import {registerFrontendAssets} from './frontend-assets.mjs';
 const runningFrontend=JSON.parse(readFileSync(new URL('./dist/frontend.json',import.meta.url),'utf8'));
 import * as adapter from './vcs.mjs';
-import * as branchAdapter from './branch-switch.mjs';
 import {createIndexUnstageCoordinator} from './index-change-host.mjs';
 import {createIndexStageCoordinator} from './index-stage-host.mjs';
 import {createCommitCoordinator} from './commit-host.mjs';
@@ -15,9 +14,8 @@ import {encodeGitTag} from './src/git-tag-object.mjs';
 import {createPartialStageCoordinator} from './partial-stage-host.mjs';
 import {createPartialUnstageCoordinator} from './partial-unstage-host.mjs';
 import {createLineStageCoordinator,createLineUnstageCoordinator} from './line-index-host.mjs';
-import {createBranchSwitchCoordinator,acquireRepositoryAccess} from './branch-switch-host.mjs';
+import {acquireRepositoryAccess} from './confirmed-operation.mjs';
 import {withOperationBudget} from './src/operation-budget.mjs';
-import {runtimeInfo,checkUpdate} from './dist/updates.mjs';
 import {createSvnHttpsHost} from './dist/svn-host.mjs';
 import {historySearchArgs,validateDateBound,isObjectId,isChangeId} from './git-history.mjs';
 
@@ -452,10 +450,9 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
 }
 
 /** Limit active adapter operations and retain only bounded, short-lived discovery grants. */
-export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, operationTimeoutMs = 15000, bindSvnIdentityResolver } = {}) {
+export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, operationTimeoutMs = 15000, bindSvnIdentityResolver } = {}) {
   let active = 0, activeImages = 0, activeSegments = 0;
   const sessions = new Map();
-  const branchSwitch=createBranchSwitchCoordinator({api,now});
   const commit=createCommitCoordinator({api,now});
   const amend=createAmendCoordinator({api,now});
   const branchCreate=createBranchCreateCoordinator({api,now});
@@ -480,7 +477,6 @@ export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActiv
   const lineUnstage=createLineUnstageCoordinator({api,now});
 
   const clearGrantCache = entry => {
-    branchSwitch.invalidate(entry);
     branchCreate.invalidate(entry);
     tagCreate.invalidate(entry);
     lightweightTag.invalidate(entry);
@@ -531,20 +527,6 @@ export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActiv
       await assertCurrentGrant(address.sessionId, cwd, entry, address.repositoryId, repository, signal);
       return {...identity, cwd};
     });
-  }
-
-  /** Update queries accept no fields and are admitted separately from repository reads. */
-  async function handleUpdateRequest(endpoint, payload, signal) {
-    try {
-      signal?.throwIfAborted();
-      if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length) throw invalid('Update requests accept no fields.');
-      if (endpoint === 'vcs/runtime-info') return {ok: true, value: runtimeInfo()};
-      if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
-      active++;
-      try { return {ok: true, value: await checkUpdate({signal})}; } finally { active--; }
-    } catch (error) {
-      return failure(signal?.aborted ? 'vcs/cancelled' : 'vcs/update-failed', error.message);
-    }
   }
 
   /** Discovery creates, replaces or merges grants; a stale scan can never resurrect one. */
@@ -613,7 +595,7 @@ export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActiv
   }
 
   const execute = async (endpoint, payload, signal) => {
-    if (UPDATE_ENDPOINTS.has(endpoint)) return handleUpdateRequest(endpoint, payload, signal);
+    if (UPDATE_ENDPOINTS.has(endpoint) || ['vcs/branches','vcs/branch-switch-prepare','vcs/branch-switch-confirm'].includes(endpoint)) return failure('vcs/not-found', 'This VCS feature has been removed.');
     if (!ACTION_ENDPOINTS.has(endpoint)) return failure('vcs/not-found', 'Unknown VCS endpoint.');
     if (active >= maxActive) return failure('vcs/busy', 'Too many VCS requests. Please retry.');
     active++;
@@ -655,10 +637,6 @@ export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActiv
         try{return {ok:true,value:await commit.confirm(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};}
         finally{api.clearHistoricalCache?.(repository.root);}
       }
-      if(endpoint==='vcs/branch-switch-confirm'){
-        try{return {ok:true,value:await branchSwitch.confirm(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};}
-        finally{api.clearHistoricalCache?.(repository.root);}
-      }
       if(endpoint==='vcs/index-unstage-confirm'){
         try{return {ok:true,value:await indexUnstage.confirm(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};}
         finally{api.clearHistoricalCache?.(repository.root);}
@@ -687,8 +665,6 @@ export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActiv
       if(endpoint==='vcs/branch-create-prepare')return {ok:true,value:await branchCreate.prepare(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};
       if(endpoint==='vcs/amend-prepare')return {ok:true,value:await amend.prepare(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};
       if(endpoint==='vcs/commit-prepare')return {ok:true,value:await commit.prepare(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};
-      if(endpoint==='vcs/branches'){const value=await api.listLocalBranches({...repository},{signal});await authorize();return {ok:true,value};}
-      if(endpoint==='vcs/branch-switch-prepare')return {ok:true,value:await branchSwitch.prepare(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};
       if(endpoint==='vcs/index-unstage-prepare')return {ok:true,value:await indexUnstage.prepare({...payload,path:payload.id},{entry,repository,cwd,signal,assertAuthorized:authorize})};
       if(endpoint==='vcs/index-stage-prepare')return {ok:true,value:await indexStage.prepare({...payload,path:payload.id},{entry,repository,cwd,signal,assertAuthorized:authorize})};
       if(endpoint==='vcs/partial-stage-plan')return {ok:true,value:await partialStage.plan(payload,{entry,repository,cwd,signal,assertAuthorized:authorize})};
@@ -746,7 +722,7 @@ export function createHandler(ctx, api = {...adapter,...branchAdapter}, maxActiv
       return failure(error?.code === 'TIMEOUT' ? 'vcs/timeout' : 'vcs/operation-failed', error.message);
     }
   };
-  handle.dispose=()=>{lightweightTag.clear();tagCreate.clear();branchCreate.clear();amend.clear();commit.clear();branchSwitch.clear();indexUnstage.clear();indexStage.clear();partialStage.clear();partialUnstage.clear();lineStage.clear();lineUnstage.clear();for(const id of sessions.keys())revokeSession(id);};
+  handle.dispose=()=>{lightweightTag.clear();tagCreate.clear();branchCreate.clear();amend.clear();commit.clear();indexUnstage.clear();indexStage.clear();partialStage.clear();partialUnstage.clear();lineStage.clear();lineUnstage.clear();for(const id of sessions.keys())revokeSession(id);};
   return handle;
 }
 
@@ -797,7 +773,7 @@ export function registerDirectAssets(ctx, load = filename => readFile(new URL('.
 export function apply(ctx) {
   // Pass the plugin owner explicitly: the nested rpc getter can retain the
   // connection service context, which does not inject webServer.
-  const host=createSvnHttpsHost(ctx,{...adapter,...branchAdapter});
+  const host=createSvnHttpsHost(ctx,adapter);
   ctx.effect(()=>()=>{ host.dispose(); adapter.clearHistoricalCache?.(); });
   ctx.connection.register(ctx, RPC_CHANNEL, host.handle);
   registerAssets(ctx);

@@ -12,11 +12,13 @@
 | 大仓库文件与目录 | [定点读取及缓存](<../src/historical-access.mjs>)、[目录页](<../src/HistoricalTree.jsx>) | [历史读取](<../test/historical-access.test.mjs>)、[目录交互](<../scripts/history-tree-pages-browser.jsx>) | 单目录最多 10 万项／16MiB 输出；每页最多 100；旧整树 API 上限不变 |
 | 大文件与结构化能力 | [预览能力](<../src/preview-capabilities.mjs>)、[前端适配](<../src/preview-actions.mjs>) | [能力测试](<../test/preview-capabilities.test.mjs>)、[完整比较](<../test/large-compare.test.mjs>) | 普通每侧 2MiB，显式完整比较每侧 8MiB，历史分段 16MiB；不承诺无限文件 |
 | SVN HTTPS 历史 | [生产组合](<../src/svn-https-host.mjs>)、[运行时](<../src/svn-runtime.mjs>) | [TLS 授权链](<../test/svn-dav-chain-tls.test.mjs>) | 显式同意、系统信任、无额外认证；逐步骤授权；不复用磁盘凭据 |
-| 已有本地 Git 分支切换（0.6.0） | [适配器](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch.mjs>)、[一次性确认](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch-host.mjs>) | [适配器用例](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/test/branch-switch.test.mjs>)、[Host 用例](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/test/branch-switch-host.test.mjs>)、[浏览器用例](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/scripts/branch-switch-browser.jsx>)；具体结果以对应测试及同标签发布运行报告为准 | 独立预览和明确确认，约60秒一次性token；仅干净普通仓库，含ignored也拒绝；不支持filters／命令hooks、attributes、sparse／partial、特殊Index flags、链接／子模块或进行中操作；该切换入口不执行 stage／commit／stash／force／网络；写后失败可能结果未知，手动刷新核对，不盲重试 |
+| 工作区分支切换／插件内更新 | 当前开发源码已移除 UI 与公开 RPC | [移除断言](<../test/updates.test.mjs>) | 历史引用导航仍只读；外部 Git 客户端及 DSH 插件管理器管理相应操作 |
 | 编辑器资源与性能 | [编辑器](<../src/editor.js>)、[采样工具](<../scripts/performance-baseline.mjs>) | [资源循环](<../scripts/performance-browser.jsx>)、[统计测试](<../test/performance-baseline.test.mjs>) | 环境／规模／内容一致才能比较；基线不是通用性能承诺 |
 | 候选包与发布证据 | [预检](<../scripts/release-preflight.mjs>)、[发布工作流](<../.github/workflows/release.yml>) | [证据负例](<../test/release-evidence.test.mjs>)、[CLI 验证](<../test/release-preflight-cli.test.mjs>) | 同标签／SHA／run attempt；四包一致；渠道显式；缺证据阻断 |
 
-### 0.8.0 冻结范围（已接入，发布验证 PENDING）
+### 保留的底层操作实现
+
+0.8.6 候选已撤下分支／标签／删除评估面板，并移除模式选择；下表写操作底层实现与协议保留，但不再通过当前页面进入。不应将独立组件回归解读为生产 UI 仍提供入口。
 
 | 能力 | 实现与验证入口 | 主要边界 |
 | --- | --- | --- |

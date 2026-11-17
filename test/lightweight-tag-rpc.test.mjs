@@ -82,10 +82,20 @@ test('Git grants only, token session/repository binding and single use',async t=
  p=await prepare(f);assert.equal(await code(f.handle('vcs/lightweight-tag-confirm',{...f.address,repositoryId:'r2',token:p.value.token})),'vcs/lightweight-tag-create-confirmation-invalid');
  p=await prepare(f);f.setCwd('/changed');assert.equal(await code(confirm(f,p.value.token)),'vcs/rediscover-required');assert.equal(f.writes(),0);
 });
+test('removed branch switch endpoints cannot consume an active capability',async t=>{
+ const f=fixture();t.after(()=>f.handle.dispose());await discover(f);const p=await prepare(f);assert.equal(p.ok,true);
+ assert.equal(await code(f.handle('vcs/branch-switch-prepare',{...f.address,branch:'next'})),'vcs/not-found');
+ assert.equal(await code(f.handle('vcs/branch-switch-confirm',{...f.address,token:p.value.token})),'vcs/not-found');
+ assert.equal(f.writes(),0);assert.equal((await confirm(f,p.value.token)).ok,true);assert.equal(f.writes(),1);
+});
+test('direct repository writer blocks preparation and confirmation',async t=>{
+ const f=fixture();t.after(()=>f.handle.dispose());await discover(f);const p=await prepare(f),release=acquireRepositoryAccess(f.root,true);
+ try{assert.equal(await code(prepare(f)),'vcs/busy');assert.equal(await code(confirm(f,p.value.token)),'vcs/busy');assert.equal(f.writes(),0);}finally{release();}
+ assert.equal((await prepare(f)).ok,true);
+});
 const otherKinds=[
  ['tag-create',{name:'annotated',tagger:identity(),message:'Release'},'vcs/tag-create-confirmation-invalid'],
  ['branch-create',{name:'branch'},'vcs/branch-create-confirmation-invalid'],
- ['branch-switch',{branch:'next'},'vcs/branch-confirmation-invalid'],
  ['commit',{author:identity(),committer:identity(),message:'Subject'},'vcs/commit-confirmation-invalid'],
  ['amend',{committer:identity(),message:'Subject'},'vcs/amend-confirmation-invalid'],
  ['index-stage',{id},'vcs/index-confirmation-invalid'],
@@ -110,7 +120,7 @@ test('prepare reader and confirm writer share exclusion across handlers and all 
  t.after(()=>{finish.resolve();f.handle.dispose();g.handle.dispose();});await discover(f);await discover(g);
  const others=[];for(const [kind,fields] of otherKinds){const q=await g.handle('vcs/'+kind+'-prepare',{...g.address,...fields});assert.equal(q.ok,true);others.push([kind,q.value.token]);}
  const q=await prepare(g),p=await prepare(f),pending=confirm(f,p.value.token);await started.promise;
- assert.equal(await code(prepare(g)),'vcs/busy');assert.equal(await code(g.handle('vcs/branches',g.address)),'vcs/busy');assert.equal(await code(confirm(g,q.value.token)),'vcs/busy');
+ assert.equal(await code(prepare(g)),'vcs/busy');assert.equal(await code(g.handle('vcs/status',{...g.address,mode:'all'})),'vcs/busy');assert.equal(await code(confirm(g,q.value.token)),'vcs/busy');
  for(const [kind,token] of others)assert.equal(await code(g.handle('vcs/'+kind+'-confirm',{...g.address,token})),'vcs/busy');
  finish.resolve();assert.equal((await pending).ok,true);
  const h=fixture({prepare:async(r,s)=>{assert.throws(()=>acquireRepositoryAccess(h.root,true),{code:'vcs/busy'});return s;}});t.after(()=>h.handle.dispose());await discover(h);assert.equal((await prepare(h)).ok,true);
@@ -118,7 +128,7 @@ test('prepare reader and confirm writer share exclusion across handlers and all 
 });
 for(const [kind,fields] of otherKinds)test('existing '+kind+' writer blocks tag creation reader/writer',async t=>{
  const f=fixture();t.after(()=>f.handle.dispose());await discover(f);const p=await prepare(f),started=gate(),finish=gate();
- const applyName={'tag-create':'applyTagCreate','branch-create':'applyBranchCreate',commit:'applyCommitPreview',amend:'applyAmendPreview','branch-switch':'switchLocalBranch','index-stage':'applyIndexStage','index-unstage':'applyIndexUnstage'}[kind];
+ const applyName={'tag-create':'applyTagCreate','branch-create':'applyBranchCreate',commit:'applyCommitPreview',amend:'applyAmendPreview','index-stage':'applyIndexStage','index-unstage':'applyIndexUnstage'}[kind];
  f.api[applyName]=async(repo,r)=>{r.onStart();started.resolve();await finish.promise;return {};};
  t.after(()=>finish.resolve());const q=await f.handle('vcs/'+kind+'-prepare',{...f.address,...fields});const pending=f.handle('vcs/'+kind+'-confirm',{...f.address,token:q.value.token});await started.promise;
  assert.equal(await code(prepare(f)),'vcs/busy');assert.equal(await code(confirm(f,p.value.token)),'vcs/busy');finish.resolve();assert.equal((await pending).ok,true);

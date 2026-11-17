@@ -1,10 +1,10 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
-  "description": "Git and SVN change preview with confirmed safe local Git branch switching for DSH",
+  "description": "Git and SVN change preview and confirmed local Git index and commit operations for DSH",
   "exports": {
     ".": "./index.mjs",
     "./client": "./dist/client.js",

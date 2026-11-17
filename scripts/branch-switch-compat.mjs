@@ -9,9 +9,15 @@ export async function checkBranchSwitchRpc(ctx,invoke){
  try{
  git('init','-q','-b','main');git('config','user.name','Compat fixture');git('config','user.email','fixture@example.test');git('config','core.autocrlf','false');git('config','commit.gpgsign','false');git('config','core.hooksPath',path.join(root,'.git','empty-hooks'));await fs.mkdir(path.join(root,'.git','empty-hooks'));await fs.writeFile(path.join(root,'file'),'main\n');git('add','.');git('commit','-qm','main');git('branch','target');
  ctx.sessions.set(sessionId,{header:{cwd:root}});const discovered=await invoke('vcs/repositories',{sessionId});assert.equal(discovered.ok,true);const repositoryId=discovered.value.repositories.find(r=>r.type==='git').id,address={sessionId,repositoryId};
- const list=await invoke('vcs/branches',address);assert.equal(list.ok,true);assert.equal(list.value.current.name,'main');const p=await invoke('vcs/branch-switch-prepare',{...address,branch:'target'});assert.equal(p.ok,true,JSON.stringify(p));assert.match(p.value.token,/^[a-f0-9]{64}$/);assert.equal(git('symbolic-ref','--short','HEAD').trim(),'main');
- const switched=await invoke('vcs/branch-switch-confirm',{...address,token:p.value.token});assert.equal(switched.ok,true,JSON.stringify(switched));assert.equal(switched.value.current.name,'target');assert.equal(git('symbolic-ref','--short','HEAD').trim(),'target');assert.equal((await invoke('vcs/branch-switch-confirm',{...address,token:p.value.token})).error.code,'vcs/branch-confirmation-invalid');
- await fs.writeFile(path.join(root,'file'),'dirty\n');const dirty=await invoke('vcs/branch-switch-prepare',{...address,branch:'main'});assert.equal(dirty.error.code,'vcs/branch-dirty');assert.equal(git('symbolic-ref','--short','HEAD').trim(),'target');assert.equal(await fs.readFile(path.join(root,'file'),'utf8'),'dirty\n');
- console.log('Authenticated branch RPC list/prepare/confirm/replay/dirty rejection passed in a real isolated Git worktree. Machine global/system filter config isolated for fixture only.');
+ const snapshot=async()=>({head:git('rev-parse','HEAD'),symbolicHead:git('symbolic-ref','HEAD'),refs:git('show-ref'),status:git('status','--porcelain=v1','--untracked-files=all'),index:await fs.readFile(path.join(root,'.git','index')),file:await fs.readFile(path.join(root,'file'))});
+ for(const dirty of [false,true]){
+  if(dirty){await fs.writeFile(path.join(root,'file'),'dirty\n');await fs.writeFile(path.join(root,'untracked'),'preserve untracked\n');}
+  const before=await snapshot();
+  for(const [endpoint,payload] of [['vcs/branches',address],['vcs/branch-switch-prepare',{...address,branch:'target'}],['vcs/branch-switch-confirm',{...address,token:'a'.repeat(64)}]]){
+   const result=await invoke(endpoint,payload);assert.equal(result.ok,false,JSON.stringify(result));assert.equal(result.error.code,'vcs/not-found',endpoint);assert.match(result.error.message,/removed/i,endpoint);assert.deepEqual(await snapshot(),before,endpoint+' must not modify HEAD, refs, index or worktree');
+   if(dirty)assert.equal(await fs.readFile(path.join(root,'untracked'),'utf8'),'preserve untracked\n');
+  }
+ }
+ console.log('Authenticated removed branch RPC list/prepare/confirm rejection passed for clean and dirty isolated Git worktrees; HEAD, refs, index and workspace unchanged. Machine global/system filter config isolated for fixture only.');
  }finally{cp.spawn=originalSpawn;syncBuiltinESMExports();ctx.sessions.delete(sessionId);await fs.rm(root,{recursive:true,force:true,maxRetries:5});}
 }

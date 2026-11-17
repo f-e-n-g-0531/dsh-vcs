@@ -46,6 +46,7 @@ test('primary navigation precedes repository controls and uses Fork view names i
     const toolbar=html.indexOf('<div class="vcs-primary-toolbar"');
     assert.ok(toolbar>=0);
     assert.ok(toolbar<html.indexOf('<header'));
+    assert.doesNotMatch(html, /aria-label="(?:Git 变更|Git changes)"/);
     const navigation=html.slice(toolbar,html.indexOf('</nav>',toolbar));
     for(const label of labels)assert.ok(navigation.includes(label));
   }
@@ -54,8 +55,11 @@ test('primary navigation precedes repository controls and uses Fork view names i
   const end=source.indexOf('<PanelHeader',start);
   const primary=source.slice(start,end);
   assert.ok(primary.includes('<RepositoryToolbar'));
-  assert.ok(primary.includes('<BranchSwitcher'));
-  assert.equal(source.split('<BranchSwitcher').length-1,1);
+  assert.ok(primary.includes('<RepositoryControls'));
+  for(const name of ['BranchSwitcher','BranchCreate','TagCreate','LightweightTagCreate','BranchDeletePreview'])assert.equal(source.split('<'+name+' ').length-1,0,name);
+  const bootstrap=await readFile(new URL('../src/client-bootstrap.jsx',import.meta.url),'utf8');
+  assert.ok(!bootstrap.includes('UpdatePanel'));
+  assert.ok(!bootstrap.includes('pluginManager'));
 });
 
 test('activation adds uniquely keyed entries without replacing workspace or shell slots',async()=>{

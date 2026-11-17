@@ -14,7 +14,8 @@ const rect = node => {const r = node.getBoundingClientRect(); return {top:r.top,
 // Only authenticated RPC responses and host services are fixtures. DOM, forms,
 // state transitions, locale strings and CSS all come from the production page.
 export async function checkOperationLayout(config) {
-  const {language, width, height, mode} = config;
+  const {language, width, height, status} = config;
+  let activeState='short-reference';
   const host = document.createElement('div');
   host.style.cssText = 'height:100%;width:100%';
   document.body.append(host);
@@ -25,37 +26,27 @@ export async function checkOperationLayout(config) {
   const target = {name:name + '-target', ref:'refs/heads/' + name + '-target', commit:'b'.repeat(40)};
   const rpc = async (endpoint, payload) => {
     calls.push(endpoint);
-    if (endpoint === 'vcs/repositories') return {cwd:'/fixture', repositories:[{id:'operation-layout', type:'git', root:'/fixture'}]};
-    if (endpoint === 'vcs/status') return {changes:[{id:'changed', path:'layout.txt', status:'modified', indexStatus:payload.mode === 'unstaged' ? ' ' : 'M', worktreeStatus:payload.mode === 'staged' ? ' ' : 'M'}]};
-    if (endpoint === 'vcs/branches') return {current, branches:[current,target]};
-    if (endpoint === 'vcs/branch-switch-prepare') return {current, target, token:'c'.repeat(64), expiresAt:Date.now()+60000};
+    if (endpoint === 'vcs/repositories') return {cwd:'/fixture', warnings:activeState==='scan-warning'?['Synthetic scan warning '.repeat(20)]:[], repositories:[{id:'operation-layout', type:'git', root:'/fixture',relativePath:activeState==='long-reference'?name:'project',branch:activeState==='long-reference'?name:'main'}]};
+    if (endpoint === 'vcs/status') {if(payload.mode!=='all')throw Error('Expected default all mode');if(status==='status-error')throw Error('Synthetic status failure');return {changes:status==='empty'?[]:[{id:'changed',path:'layout.txt',status:'modified',indexStatus:'M',worktreeStatus:'M'}]};}
     throw Error('Unexpected operation-layout endpoint: ' + endpoint);
   };
   const Page = createPage({locale:{bind:()=>t, subscribe:()=>()=>{}, getSnapshot:()=>language}, layout:{selectPanel:()=>{}}, connection:{rpc:{call:async (_route, endpoint, payload)=>({ok:true, value:await rpc(endpoint,payload)})}}});
   const button = key => [...host.querySelectorAll('button')].find(node => node.textContent === t(key));
   try {
     flushSync(() => root.render(<Page useSessions={select=>select({byId:{layout:{id:'layout', cwd:'/fixture', retainedBy:{mainView:1}}}})}/>));
-    await wait(() => host.querySelector('.vcs-file'), 'production status');
+    await wait(() => host.querySelector('.vcs-repository'), 'production status');
     const modeSelect = host.querySelector('select[aria-label="' + t('gitMode') + '"]');
-    if (modeSelect.value !== mode) flushSync(() => {modeSelect.value = mode; modeSelect.dispatchEvent(new Event('change', {bubbles:true}));});
-    await wait(() => host.querySelector('.vcs-file') && (mode !== 'staged' || host.querySelector('textarea')), 'mode forms');
+    if(modeSelect)throw Error('Removed change mode selector rendered');
+    await wait(() => host.querySelector('.vcs-repository'), 'all changes');
     // With no selected file, production Monaco may keep its empty surface lazy.
     await settle();
     const page = host.querySelector('.vcs-root');
     // This fails if CSS is absent, escaped into literal backslash-n, or ignored.
     if (getComputedStyle(page).display !== 'flex' || getComputedStyle(page).flexDirection !== 'column' || page.querySelector('style').sheet.cssRules.length < 50) throw Error('Production stylesheet is not active');
     for (const state of operationLayoutStates) {
-      if (state === 'list') {
-        button('branchSwitcher').click();
-        await wait(() => host.querySelector('select[aria-label="' + t('branchTarget') + '"]'), 'long branch refs');
-      }
-      if (state === 'preview') {
-        const select = host.querySelector('select[aria-label="' + t('branchTarget') + '"]');
-        flushSync(() => {select.value = target.name; select.dispatchEvent(new Event('change', {bubbles:true}));});
-        await wait(() => !button('branchPrepare').disabled, 'branch target');
-        button('branchPrepare').click();
-        await wait(() => button('branchConfirm'), 'branch preview');
-      }
+      activeState=state;const before=calls.length;button('refresh').click();await wait(()=>calls.length>before&&host.querySelector('.vcs-repository'),'rescan state');await settle();
+      const toolbar=host.querySelector('.vcs-primary-toolbar');
+      if(modeSelect||!toolbar.contains(button('refresh'))||!toolbar.contains(button('back'))||button('branchSwitcher'))throw Error('Unified toolbar controls missing or removed feature visible');
       for (const help of [false, true]) {
         for (const details of host.querySelectorAll('.vcs-help')) details.open = help;
         await settle();
@@ -67,8 +58,8 @@ export async function checkOperationLayout(config) {
           if (r.width < 5 || r.left < container.left - 1 || r.right > container.right + 1 || r.left < pageRect.left - 1 || r.right > pageRect.right + 1) errors.push('input overflow: ' + input.getAttribute('aria-label'));
         }
         const scrolling = [];
-        const branch = button('branchSwitcher').closest('.vcs-op');
-        for (const [label, node] of [['operations',ops], ['branch',branch]]) {
+        const branch = host.querySelector('.vcs-primary-toolbar');
+        for (const [label, node] of [['toolbar',branch]]) {
           if (node.scrollWidth > node.clientWidth + 1) errors.push(label + ' horizontal overflow');
           const max = node.scrollHeight - node.clientHeight;
           if (max > 1) {
@@ -79,8 +70,8 @@ export async function checkOperationLayout(config) {
           }
           scrolling.push({label,clientHeight:node.clientHeight,scrollHeight:node.scrollHeight,max});
         }
-        if (ops.scrollHeight <= ops.clientHeight + 1) errors.push('operation fixture did not exercise scrolling');
-        if (state !== 'closed' && branch.scrollHeight <= branch.clientHeight + 1 && height === 480) errors.push('expanded long branch fixture did not exercise independent scrolling');
+        if(!ops.hidden||host.querySelector('.vcs-branch-create,.vcs-tag-create,.vcs-lightweight-tag,.vcs-branch-delete-preview'))errors.push('Deferred branch/tag operation area rendered');
+        if(toolbar.scrollWidth>toolbar.clientWidth+1)errors.push('unified toolbar horizontal overflow');
         samples.push({state,help,bodyHeight:bodyRect.height,scrolling});
         for (const error of errors) failures.push({state,help,error});
       }

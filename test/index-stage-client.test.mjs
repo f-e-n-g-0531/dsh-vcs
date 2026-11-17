@@ -113,51 +113,29 @@ test('cancelling pending confirmation aborts but reports unknown and ignores lat
  let finish;const f=fixture({'vcs/index-stage-confirm':()=>new Promise(done=>{finish=done;})});try{await f.h.flush();await preview(f);await acknowledge(f);const pending=button(f.h,'stageConfirm').props.onClick();await f.h.flush();button(f.h,'stageClose').props.onClick();await f.h.flush();assert.equal(f.calls.at(-1).signal.aborted,true);assert.match(nodeText(f.h.tree),/stageUnknown/);finish(result(f.prepared));await pending;await f.h.flush();assert.equal(f.refreshes,0);assert.equal(f.unknowns,1);}finally{f.h.dispose();}
 });
 
-test('production unstaged modified selection only; success rediscovery clears selection',async()=>{
- for(const change of [{status:'modified',indexStatus:' ',worktreeStatus:'M'},{status:'modified',indexStatus:'M',worktreeStatus:'M'},{status:'added',indexStatus:'A',worktreeStatus:' '},{status:'modified',indexStatus:' ',worktreeStatus:'M',submodule:{}},{status:'modified',indexStatus:' ',worktreeStatus:'M',oldPath:'old'}]){
- const calls=[],p=snapshot();const entry={id:'f',path:'f',...change};
- const rpc=async(e,args)=>{calls.push({e,args});if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'}]};if(e==='vcs/status')return {changes:[entry]};if(e==='vcs/compare')return {...entry,left:{label:'HEAD',text:'a'},right:{label:'Index',text:'b'}};if(e==='vcs/index-stage-prepare')return p;if(e==='vcs/index-stage-confirm')return result(p);throw Error('unexpected '+e);};
- const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
- try{await h.flush();assert.equal(button(h,'stagePrepare'),undefined);input(h,'gitMode').props.onChange({target:{value:'unstaged'}});await h.flush();findNode(h,n=>n.type==='button'&&n.props['data-vcs-change']).props.onClick();await h.flush();const allowed=change.indexStatus===' '&&change.worktreeStatus==='M'&&!change.submodule&&!change.oldPath;assert.equal(!!button(h,'stagePrepare'),allowed);
- if(allowed){await preview({h});await acknowledge({h});await button(h,'stageConfirm').props.onClick();await h.flush();assert.equal(calls.filter(c=>c.e==='vcs/repositories').length,2);assert.equal(button(h,'stagePrepare'),undefined);assert.equal(calls.filter(c=>c.e==='vcs/status').length,3);}
- }finally{h.dispose();}
- }
-});
-
-test('production unknown latch survives mode/selection and focus refresh until explicit header refresh',async()=>{
- const calls=[],listeners=new Map(),p=snapshot(),entry={id:'f',path:'f',status:'modified',indexStatus:' ',worktreeStatus:'M'};
- const rpc=async(e,args)=>{calls.push({e,args});if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'}]};if(e==='vcs/status')return {changes:[entry]};if(e==='vcs/compare')return {...entry,left:{label:'HEAD',text:'a'},right:{label:'Index',text:'b'}};if(e==='vcs/index-stage-prepare')return p;if(e==='vcs/index-stage-confirm')throw Error('lost response');throw Error('unexpected '+e);};
- const win={addEventListener:(name,fn)=>listeners.set(name,fn),removeEventListener:name=>listeners.delete(name)};
- const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})},{window:win});
- const select=async()=>{findNode(h,n=>n.type==='button'&&n.props['data-vcs-change']).props.onClick();await h.flush();};
- try{await h.flush();input(h,'gitMode').props.onChange({target:{value:'unstaged'}});await h.flush();await select();await preview({h});await acknowledge({h});await button(h,'stageConfirm').props.onClick();await h.flush();assert.equal(calls.filter(c=>c.e==='vcs/repositories').length,1);
- listeners.get('focus')({target:win});await h.flush();assert.equal(button(h,'stagePrepare').props.disabled,true);
- for(const mode of ['all','unstaged']){input(h,'gitMode').props.onChange({target:{value:mode}});await h.flush();}await select();assert.equal(button(h,'stagePrepare').props.disabled,true);await button(h,'stagePrepare').props.onClick();assert.equal(calls.filter(c=>c.e==='vcs/index-stage-prepare').length,1);
- button(h,'refresh').props.onClick();await h.flush();await select();assert.equal(button(h,'stagePrepare').props.disabled,false);assert.equal(button(h,'stageConfirm'),undefined);
- }finally{h.dispose();}
-});
-
-test('refreshing another repository cannot clear an unknown outcome latch',async()=>{
- const p=snapshot(),entry={id:'f',path:'f',status:'modified',indexStatus:' ',worktreeStatus:'M'};
- const rpc=async(e,args)=>{if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'},{id:'other',type:'git',relativePath:'other'}]};if(e==='vcs/status')return {changes:[entry]};if(e==='vcs/compare')return {...entry,left:{label:'HEAD',text:'a'},right:{label:'Index',text:'b'}};if(e==='vcs/index-stage-prepare')return p;if(e==='vcs/index-stage-confirm')throw Error('lost');throw Error(e);};
- const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
- const select=async()=>{findNode(h,n=>n.type==='button'&&n.props['data-vcs-change']).props.onClick();await h.flush();};
- try{await h.flush();input(h,'gitMode').props.onChange({target:{value:'unstaged'}});await h.flush();await select();await preview({h});await acknowledge({h});await button(h,'stageConfirm').props.onClick();await h.flush();input(h,'repositories').props.onChange({target:{value:'other'}});await h.flush();button(h,'refresh').props.onClick();await h.flush();input(h,'repositories').props.onChange({target:{value:'r'}});await h.flush();await select();assert.equal(button(h,'stagePrepare').props.disabled,true);}finally{h.dispose();}
-});
-test('stage and unstage share the same repository unknown latch in both directions',async()=>{
- for(const first of ['stage','unstage']){
-  const calls=[],p=snapshot();let currentMode='all';
-  const entry=()=>({id:'f',path:'f',status:'modified',indexStatus:currentMode==='staged'?'M':' ',worktreeStatus:currentMode==='staged'?' ':'M'});
-  const rpc=async(e,args)=>{calls.push({e,args});if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'}]};if(e==='vcs/status'){currentMode=args.mode;return {changes:[entry()]};}if(e==='vcs/compare')return {...entry(),left:{label:'Index',text:'a'},right:{label:'Worktree',text:'b'}};if(e.endsWith('-prepare'))return {...p,action:first};if(e.endsWith('-confirm'))throw Error('lost response');throw Error(e);};
+test('production index-stage: strict default all keeps mutation panels absent without RPC across loaded and pending states',async()=>{
+ for(const state of ['modified','added','deleted','MM','empty','error','pending-status','scanning','svn']){
+  const calls=[];let discover;
+  const entry={id:'f',path:'f',status:['added','deleted'].includes(state)?state:'modified',indexStatus:state==='MM'?'M':' ',worktreeStatus:'M'};
+  const rpc=async(e,p)=>{calls.push({e,p});if(e==='vcs/repositories'){const value={cwd:'/w',repositories:[{id:'r',type:state==='svn'?'svn':'git',relativePath:'.'}]};if(state==='scanning')return new Promise(done=>discover=()=>done(value));return value;}if(e==='vcs/status'){assert.equal(p.mode,'all');if(state==='pending-status')return new Promise(()=>{});if(state==='error')throw Error('status failed');return {changes:state==='empty'?[]:[entry]};}if(e==='vcs/compare'){assert.equal(p.mode,'all');return {...entry,left:{label:'HEAD',text:'a'},right:{label:'Worktree',text:'b'}};}if(e==='vcs/svn-identity')return {};throw Error('Unexpected production RPC '+e);};
   const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
-  const select=async()=>{findNode(h,n=>n.type==='button'&&n.props['data-vcs-change']).props.onClick();await h.flush();};
-  const mode=async value=>{input(h,'gitMode').props.onChange({target:{value}});await h.flush();await select();};
-  try{await h.flush();await mode(first==='stage'?'unstaged':'staged');button(h,first+'Prepare').props.onClick();await h.flush();input(h,first+'Acknowledge').props.onChange({target:{checked:true}});await h.flush();await button(h,first+'Confirm').props.onClick();await h.flush();
-   const other=first==='stage'?'unstage':'stage';await mode(other==='stage'?'unstaged':'staged');assert.equal(button(h,other+'Prepare').props.disabled,true);await button(h,other+'Prepare').props.onClick();assert.equal(calls.filter(c=>c.e.endsWith('-prepare')).length,1);
-   button(h,'refresh').props.onClick();await h.flush();await select();assert.equal(button(h,other+'Prepare').props.disabled,false);
-  }finally{h.dispose();}
+  const absent=()=>{assert.ok(calls.filter(c=>['vcs/status','vcs/compare'].includes(c.e)).every(c=>c.p.mode==='all'));assert.equal(input(h,'gitMode'),undefined);for(const name of ['BranchSwitcher','BranchCreate','TagCreate','LightweightTagCreate','BranchDeletePreview','CommitPanel','AmendPanel','IndexStage','IndexUnstage','PartialStage','PartialUnstage','LineStage','LineUnstage'])assert.equal(findNode(h,n=>typeof n.type==='function'&&n.type.name===name),undefined,name);for(const label of ['branchSwitcher','branchCreatePrepare','tagCreatePrepare','lightweightTagPrepare','branchDeletePreviewAssess','commitPrepare','amendPrepare','stagePrepare','unstagePrepare','partialPlan','partialUnstagePlan','linePlan'])assert.equal(button(h,label),undefined,label);assert.deepEqual(calls.filter(c=>!['vcs/repositories','vcs/status','vcs/compare','vcs/svn-identity'].includes(c.e)),[]);};
+  try{await h.flush();absent();if(discover){discover();await h.flush();absent();}const file=findNode(h,n=>n.type==='button'&&n.props['data-vcs-change']);if(file){file.props.onClick();await h.flush();absent();assert.ok(calls.some(c=>c.e==='vcs/compare'));}assert.ok(calls.some(c=>c.e==='vcs/status'));}finally{h.dispose();}
  }
 });
+
+test('production index-stage: refresh, focus, repository selection and review return never expose mutation entry points',async()=>{
+ const calls=[],events=new Map(),win={addEventListener:(e,fn)=>events.set(e,fn),removeEventListener:e=>events.delete(e)};
+ const rpc=async(e,p)=>{calls.push({e,p});if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'},{id:'other',type:'git',relativePath:'other'},{id:'svn',type:'svn',relativePath:'svn'}]};if(e==='vcs/status'){assert.equal(p.mode,'all');return {changes:[]};}if(e==='vcs/history')return {snapshot:'a'.repeat(40),commits:[],nextOffset:null};if(e==='vcs/svn-identity')return {};throw Error('Unexpected production RPC '+e);};
+ const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})},{window:win});
+ const absent=()=>{assert.ok(calls.filter(c=>['vcs/status','vcs/compare'].includes(c.e)).every(c=>c.p.mode==='all'));assert.equal(input(h,'gitMode'),undefined);assert.equal(findNode(h,n=>typeof n.type==='function'&&['BranchSwitcher','BranchCreate','TagCreate','LightweightTagCreate','BranchDeletePreview','CommitPanel','AmendPanel','IndexStage','IndexUnstage','PartialStage','PartialUnstage','LineStage','LineUnstage'].includes(n.type.name)),undefined);assert.deepEqual(calls.filter(c=>!['vcs/repositories','vcs/status','vcs/history','vcs/svn-identity'].includes(c.e)),[]);};
+ try{await h.flush();absent();for(const id of ['other','svn','r']){input(h,'repositories').props.onChange({target:{value:id}});await h.flush();absent();}const before=calls.filter(c=>c.e==='vcs/status').length;button(h,'refresh').props.onClick();await h.flush();events.get('focus')?.({target:win});await h.flush();absent();assert.ok(calls.filter(c=>c.e==='vcs/status').length>before);button(h,'allCommits').props.onClick();await h.flush();absent();assert.ok(calls.some(c=>c.e==='vcs/history'));button(h,'localChanges').props.onClick();await h.flush();absent();}finally{h.dispose();}
+});
+
+
+
+
+
 
 test('UI and dedicated browser scenario compile in memory with complete bilingual labels',async()=>{
  for(const entry of ['src/IndexStage.jsx','src/client.jsx','scripts/index-stage-browser.jsx']){const result=await build({entryPoints:[entry],bundle:true,write:false,platform:'browser',format:'esm',external:['react','react-dom/client','react-dom'],loader:{'.css':'text'}});assert.ok(result.outputFiles[0].contents.length);}

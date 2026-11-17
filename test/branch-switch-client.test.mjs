@@ -105,11 +105,15 @@ test('list errors and mismatched confirmation responses never appear as successf
  const g=fixture({'vcs/branch-switch-confirm':async()=>({current:A})});try{await g.h.flush();await preview(g);await button(g.h,'branchConfirm').props.onClick();await g.h.flush();assert.match(nodeText(g.h.tree),/branchUnknown/);assert.equal(g.refreshes,0);}finally{g.h.dispose();}
 });
 
-test('production switch success clears selection and re-discovers status/history; SVN has no switch entry',async()=>{
- let switched=false;const calls=[];
- const rpc=async(e,p)=>{calls.push({e,p});if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.',branch:switched?B.name:A.name},{id:'svn',type:'svn',relativePath:'svn'}]};if(e==='vcs/status')return {changes:[{id:'f',path:'f',status:'modified'}]};if(e==='vcs/history')return {snapshot:switched?B.commit:A.commit,commits:[],nextOffset:null};if(e==='vcs/branches')return {current:A,branches:[A,B]};if(e==='vcs/branch-switch-prepare')return {token:'f'.repeat(64),expiresAt:Date.now()+59000,current:A,target:B};if(e==='vcs/branch-switch-confirm'){switched=true;return {current:B};}throw Error('unexpected '+e);};
- const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),options:{initialView:'history'},useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
- try{await h.flush();assert.ok(nodeText(h.tree).includes('reviewWithBranchSwitch'));await preview({h});await button(h,'branchConfirm').props.onClick();await h.flush();assert.equal(calls.filter(c=>c.e==='vcs/repositories').length,2);assert.equal(calls.filter(c=>c.e==='vcs/status').length,2);assert.equal(calls.filter(c=>c.e==='vcs/history').length,2);input(h,'repositories').props.onChange({target:{value:'svn'}});await h.flush();assert.equal(button(h,'branchSwitcher'),undefined);assert.ok(nodeText(h.tree).includes('readonly'));}finally{h.dispose();}
+test('production client and bootstrap never mount or invoke removed branch switching for Git or SVN',async()=>{
+ for(const entry of ['src/client.jsx']){
+  const calls=[];const rpc=async(e,p)=>{calls.push({e,p});if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.',branch:A.name},{id:'svn',type:'svn',relativePath:'svn'}]};if(e==='vcs/status')return {changes:[]};if(e==='vcs/history')return {snapshot:A.commit,commits:[],nextOffset:null};if(e==='vcs/svn-identity')return {};throw Error('unexpected '+e);};
+  const h=frontendHarness(entry,{ctx:workspaceContext(rpc),options:{initialView:'history'},useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
+  const absent=()=>{assert.equal(findNode(h,n=>typeof n.type==='function'&&n.type.name==='BranchSwitcher'),undefined);assert.equal(button(h,'branchSwitcher'),undefined);assert.equal(input(h,'branchTarget'),undefined);assert.equal(button(h,'branchConfirm'),undefined);assert.equal(calls.some(c=>['vcs/branches','vcs/branch-switch-prepare','vcs/branch-switch-confirm'].includes(c.e)),false);};
+  try{await h.flush();absent();input(h,'repositories').props.onChange({target:{value:'svn'}});await h.flush();absent();input(h,'repositories').props.onChange({target:{value:'r'}});await h.flush();absent();assert.ok(calls.some(c=>c.e==='vcs/history'));}finally{h.dispose();}
+ }
+ const bundled=await build({entryPoints:['src/client-bootstrap.jsx'],bundle:true,write:false,metafile:true,platform:'browser',format:'esm',external:['react','react-dom/client','react-dom'],loader:{'.css':'text'}});for(const name of ['BranchSwitcher','BranchCreate','TagCreate','LightweightTagCreate','BranchDeletePreview','UpdatePanel'])assert.equal(Object.keys(bundled.metafile.inputs).some(path=>path.endsWith('/'+name+'.jsx')),false,name);
+ const source=await readFile('src/client.jsx','utf8'),bootstrap=await readFile('src/client-bootstrap.jsx','utf8');assert.doesNotMatch(source,/import\s+BranchSwitcher|<BranchSwitcher\b/);assert.match(bootstrap,/export\s*\{inject,apply\}\s*from\s*['"]\.\/client\.jsx['"]/);
 });
 
 test('switch UI, production client and dedicated browser scenario compile in memory with bilingual labels',async()=>{

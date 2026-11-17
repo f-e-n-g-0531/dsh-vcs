@@ -68,32 +68,32 @@ function fixture(overrides={},environment={}){
  return {h,calls,props,get refreshes(){return refreshes;}};
 }
 async function preview(f){button(f.h,'branchSwitcher').props.onClick();await f.h.flush();input(f.h,'branchTarget').props.onChange({target:{value:B.name}});await f.h.flush();button(f.h,'branchPrepare').props.onClick();await f.h.flush();}
-
 test('fixed preview expires against live clock without relying on mutable RPC metadata',async()=>{
  let now=Date.now();class Clock extends Date {static now(){return now;}}const f=fixture({}, {Date:Clock});try{await f.h.flush();await preview(f);const old=button(f.h,'branchConfirm');now+=62000;await old.props.onClick();await f.h.flush();assert.equal(f.calls.some(c=>c.e==='vcs/branch-switch-confirm'),false);assert.match(nodeText(f.h.tree),/branchExpired/);}finally{f.h.dispose();}
 });
-
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
-const endpoints=['index-stage','index-unstage','partial-stage','partial-unstage','line-stage','line-unstage','commit','amend','branch-create'];
-function production(overrides={}){
- const calls=[],events=new Map();const win={addEventListener:(e,fn)=>events.set(e,fn),removeEventListener:(e,fn)=>{if(events.get(e)===fn)events.delete(e);}};
- const rpc=async(e,p,signal)=>{calls.push({e,p,signal});if(overrides[e])return overrides[e](p,signal);if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'},{id:'other',type:'git',relativePath:'other'}]};if(e==='vcs/status')return {changes:[{id:'f',path:'f',status:'modified',indexStatus:'M',worktreeStatus:' '}]};if(e==='vcs/compare')return {path:'f',status:'modified',left:{text:'a',label:'HEAD'},right:{text:'b',label:'Index'}};if(e==='vcs/branches')return {current:A,branches:[A,B]};if(e==='vcs/branch-switch-prepare')return {token:'f'.repeat(64),expiresAt:Date.now()+59000,current:A,target:B};if(e==='vcs/branch-switch-confirm')return {current:B};throw Error(e);};
- const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})},{window:win});return {h,calls,focus:()=>events.get('focus')?.({target:win})};
-}
-const component=(h,name)=>findNode(h,n=>typeof n.type==='function'&&n.type.name===name);
-const switchProps=h=>component(h,'BranchSwitcher').props;
 const count=(f,e)=>f.calls.filter(c=>c.e===e).length;
-const mode=async(h,value)=>{input(h,'gitMode').props.onChange({target:{value}});await h.flush();};
 
-test('all nine neighboring confirms exclude switch both directions synchronously through retained shared RPC',async()=>{
- for(const op of endpoints)for(const direction of ['switch-first','neighbor-first']){
-  const held=deferred(),endpoint='vcs/'+op+'-confirm',first=direction==='switch-first'?'vcs/branch-switch-confirm':endpoint,second=direction==='switch-first'?endpoint:'vcs/branch-switch-confirm';
-  const f=production({[first]:()=>held.promise});try{await f.h.flush();const rpc=switchProps(f.h).rpc;const pending=rpc(first,{sessionId:'s',repositoryId:'r',token:'a'},new AbortController().signal);await assert.rejects(rpc(second,{sessionId:'s',repositoryId:'r',token:'b'}),e=>e.code==='vcs/busy');
-   for(const read of ['vcs/branches','vcs/branch-switch-prepare'])await assert.rejects(rpc(read,{sessionId:'s',repositoryId:'r'}),e=>e.code==='vcs/busy');
-   assert.equal(count(f,second),0);assert.equal(count(f,first),1);held.resolve({});await pending;
-  }finally{held.resolve({});f.h.dispose();}
+test('production branch-switch-shared: strict default all keeps mutation panels absent without RPC across loaded and pending states',async()=>{
+ for(const state of ['modified','added','deleted','MM','empty','error','pending-status','scanning','svn']){
+  const calls=[];let discover;
+  const entry={id:'f',path:'f',status:['added','deleted'].includes(state)?state:'modified',indexStatus:state==='MM'?'M':' ',worktreeStatus:'M'};
+  const rpc=async(e,p)=>{calls.push({e,p});if(e==='vcs/repositories'){const value={cwd:'/w',repositories:[{id:'r',type:state==='svn'?'svn':'git',relativePath:'.'}]};if(state==='scanning')return new Promise(done=>discover=()=>done(value));return value;}if(e==='vcs/status'){assert.equal(p.mode,'all');if(state==='pending-status')return new Promise(()=>{});if(state==='error')throw Error('status failed');return {changes:state==='empty'?[]:[entry]};}if(e==='vcs/compare'){assert.equal(p.mode,'all');return {...entry,left:{label:'HEAD',text:'a'},right:{label:'Worktree',text:'b'}};}if(e==='vcs/svn-identity')return {};throw Error('Unexpected production RPC '+e);};
+  const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
+  const absent=()=>{assert.ok(calls.filter(c=>['vcs/status','vcs/compare'].includes(c.e)).every(c=>c.p.mode==='all'));assert.equal(input(h,'gitMode'),undefined);for(const name of ['BranchSwitcher','BranchCreate','TagCreate','LightweightTagCreate','BranchDeletePreview','CommitPanel','AmendPanel','IndexStage','IndexUnstage','PartialStage','PartialUnstage','LineStage','LineUnstage'])assert.equal(findNode(h,n=>typeof n.type==='function'&&n.type.name===name),undefined,name);for(const label of ['branchSwitcher','branchCreatePrepare','tagCreatePrepare','lightweightTagPrepare','branchDeletePreviewAssess','commitPrepare','amendPrepare','stagePrepare','unstagePrepare','partialPlan','partialUnstagePlan','linePlan'])assert.equal(button(h,label),undefined,label);assert.deepEqual(calls.filter(c=>!['vcs/repositories','vcs/status','vcs/compare','vcs/svn-identity'].includes(c.e)),[]);};
+  try{await h.flush();absent();if(discover){discover();await h.flush();absent();}const file=findNode(h,n=>n.type==='button'&&n.props['data-vcs-change']);if(file){file.props.onClick();await h.flush();absent();assert.ok(calls.some(c=>c.e==='vcs/compare'));}assert.ok(calls.some(c=>c.e==='vcs/status'));}finally{h.dispose();}
  }
 });
+
+test('production branch-switch-shared: refresh, focus, repository selection and review return never expose mutation entry points',async()=>{
+ const calls=[],events=new Map(),win={addEventListener:(e,fn)=>events.set(e,fn),removeEventListener:e=>events.delete(e)};
+ const rpc=async(e,p)=>{calls.push({e,p});if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'},{id:'other',type:'git',relativePath:'other'},{id:'svn',type:'svn',relativePath:'svn'}]};if(e==='vcs/status'){assert.equal(p.mode,'all');return {changes:[]};}if(e==='vcs/history')return {snapshot:'a'.repeat(40),commits:[],nextOffset:null};if(e==='vcs/svn-identity')return {};throw Error('Unexpected production RPC '+e);};
+ const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})},{window:win});
+ const absent=()=>{assert.ok(calls.filter(c=>['vcs/status','vcs/compare'].includes(c.e)).every(c=>c.p.mode==='all'));assert.equal(input(h,'gitMode'),undefined);assert.equal(findNode(h,n=>typeof n.type==='function'&&['BranchSwitcher','BranchCreate','TagCreate','LightweightTagCreate','BranchDeletePreview','CommitPanel','AmendPanel','IndexStage','IndexUnstage','PartialStage','PartialUnstage','LineStage','LineUnstage'].includes(n.type.name)),undefined);assert.deepEqual(calls.filter(c=>!['vcs/repositories','vcs/status','vcs/history','vcs/svn-identity'].includes(c.e)),[]);};
+ try{await h.flush();absent();for(const id of ['other','svn','r']){input(h,'repositories').props.onChange({target:{value:id}});await h.flush();absent();}const before=calls.filter(c=>c.e==='vcs/status').length;button(h,'refresh').props.onClick();await h.flush();events.get('focus')?.({target:win});await h.flush();absent();assert.ok(calls.filter(c=>c.e==='vcs/status').length>before);button(h,'allCommits').props.onClick();await h.flush();absent();assert.ok(calls.some(c=>c.e==='vcs/history'));button(h,'localChanges').props.onClick();await h.flush();absent();}finally{h.dispose();}
+});
+
+
 
 test('old switch read prepare confirm handlers honor current blocked and pending props',async()=>{
  for(const flag of ['blocked','pending']){const f=fixture();try{await f.h.flush();await preview(f);const oldConfirm=button(f.h,'branchConfirm'),oldRead=button(f.h,'branchRead');button(f.h,'branchCancel').props.onClick();await f.h.flush();const oldPrepare=button(f.h,'branchPrepare');button(f.h,'branchPrepare').props.onClick();await f.h.flush();const currentConfirm=button(f.h,'branchConfirm');f.h.update({...f.props,[flag]:true});await f.h.flush();const before=f.calls.length;await oldRead.props.onClick();await oldPrepare.props.onClick();await oldConfirm.props.onClick();await currentConfirm.props.onClick();assert.equal(f.calls.length,before);}finally{f.h.dispose();}}
@@ -105,14 +105,4 @@ test('old confirmation cannot consume a new candidate and validated metadata is 
 
 test('cancel unmount and every scope change mark parent unknown and suppress late confirm success',async()=>{
  for(const action of ['cancel','sessionId','repositoryId','refresh','mode','scope','unmount']){const held=deferred();let unknowns=0;const f=fixture({'vcs/branch-switch-confirm':()=>held.promise});f.props.onUnknown=()=>unknowns++;try{await f.h.flush();await preview(f);const old=button(f.h,'branchConfirm'),pending=old.props.onClick();await f.h.flush();if(action==='cancel')button(f.h,'branchCancel').props.onClick();else if(action==='unmount')f.h.dispose();else f.h.update({...f.props,[action]:'next'});if(action!=='unmount')await f.h.flush();assert.equal(f.calls.at(-1).signal.aborted,true,action);assert.equal(unknowns,1,action);held.resolve({current:B});await pending;await old.props.onClick();assert.equal(f.refreshes,0);assert.equal(count(f,'vcs/branch-switch-confirm'),1);}finally{held.resolve({current:B});f.h.dispose();}}
-});
-
-test('shared unknown survives mode focus and repository changes, blocks reads, explicit recovery clears only that repo',async()=>{
- const f=production({'vcs/branch-switch-confirm':async()=>{throw Error('lost');}});try{await f.h.flush();await preview(f);await button(f.h,'branchConfirm').props.onClick();await f.h.flush();assert.equal(switchProps(f.h).blocked,true);const stale=switchProps(f.h).rpc;await mode(f.h,'staged');f.focus();await f.h.flush();assert.equal(switchProps(f.h).blocked,true);input(f.h,'repositories').props.onChange({target:{value:'other'}});await f.h.flush();assert.equal(switchProps(f.h).blocked,false);input(f.h,'repositories').props.onChange({target:{value:'r'}});await f.h.flush();assert.equal(switchProps(f.h).blocked,true);for(const e of ['vcs/branches','vcs/branch-switch-prepare'])await assert.rejects(stale(e,{repositoryId:'r',sessionId:'s'}));const before=count(f,'vcs/repositories');switchProps(f.h).onRediscover();await f.h.flush();assert.equal(switchProps(f.h).blocked,false);assert.equal(count(f,'vcs/repositories'),before+1);
-  await assert.rejects(switchProps(f.h).rpc('vcs/branch-switch-confirm',{repositoryId:'r',sessionId:'s'}));await f.h.flush();button(f.h,'refresh').props.onClick();await f.h.flush();assert.equal(switchProps(f.h).blocked,false);
- }finally{f.h.dispose();}
-});
-
-test('switch preview survives file selection; pending recovery and explicit refresh do not clear the barrier',async()=>{
- const held=deferred(),f=production({'vcs/branch-switch-confirm':()=>held.promise});try{await f.h.flush();await mode(f.h,'staged');await preview(f);findNode(f.h,n=>n.type==='button'&&n.props['data-vcs-change']).props.onClick();await f.h.flush();assert.ok(button(f.h,'branchConfirm'));const old=switchProps(f.h),pending=button(f.h,'branchConfirm').props.onClick();old.onRediscover();button(f.h,'refresh').props.onClick();await f.h.flush();assert.equal(switchProps(f.h).pending,true);button(f.h,'branchCancel').props.onClick();await f.h.flush();assert.equal(switchProps(f.h).blocked,true);held.resolve({current:B});await pending;await f.h.flush();assert.equal(count(f,'vcs/repositories'),1);assert.equal(switchProps(f.h).blocked,true);}finally{held.resolve({current:B});f.h.dispose();}
 });

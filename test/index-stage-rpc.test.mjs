@@ -43,12 +43,12 @@ test('outer post-work deadline cannot turn completed index mutation into safe ti
 test('adapter unknown wins over aborted signal in both catches',async t=>{
  const c=new AbortController(),f=fixture({apply:async()=>{c.abort();throw Object.assign(Error('uncertain'),{code:'vcs/index-outcome-unknown'});}});t.after(()=>f.handle.dispose());await discover(f);const p=await prepare(f);assert.equal((await confirm(f,p.value.token,c.signal)).error.code,'vcs/index-outcome-unknown');
 });
-test('index confirmations share process mutex with readers and branch writes across handlers',async t=>{
+test('index confirmations share process mutex with readers and index writes across handlers',async t=>{
  let finish,start;const gate=new Promise(r=>finish=r),started=new Promise(r=>start=r),root='/rpc-index-shared-'+Math.random();
  const f=fixture({root,apply:async r=>{r.onStart();start();await gate;return {};}}),g=fixture({root});t.after(()=>{finish();f.handle.dispose();g.handle.dispose();});await discover(f);await discover(g);
  const up=await g.handle('vcs/index-unstage-prepare',{...g.address,id});
- const bp=await g.handle('vcs/branch-switch-prepare',{...g.address,branch:'next'}),p=await prepare(f),pending=confirm(f,p.value.token);await started;
- assert.equal((await g.handle('vcs/index-unstage-confirm',{...g.address,token:up.value.token})).error.code,'vcs/busy');assert.equal((await prepare(g)).error.code,'vcs/busy');assert.equal((await g.handle('vcs/branches',g.address)).error.code,'vcs/busy');assert.equal((await g.handle('vcs/branch-switch-confirm',{...g.address,token:bp.value.token})).error.code,'vcs/busy');finish();assert.equal((await pending).ok,true);assert.equal((await prepare(g)).ok,true);
+ const gp=await prepare(g),p=await prepare(f),pending=confirm(f,p.value.token);await started;
+ assert.equal((await g.handle('vcs/index-unstage-confirm',{...g.address,token:up.value.token})).error.code,'vcs/busy');assert.equal((await prepare(g)).error.code,'vcs/busy');assert.equal((await g.handle('vcs/status',{...g.address,mode:'all'})).error.code,'vcs/busy');assert.equal((await confirm(g,gp.value.token)).error.code,'vcs/busy');finish();assert.equal((await pending).ok,true);assert.equal((await prepare(g)).ok,true);
 });
 test('stage and unstage tokens never cross operation namespaces and both invalidate on rediscovery',async t=>{
  const f=fixture();t.after(()=>f.handle.dispose());await discover(f);
