@@ -37,6 +37,27 @@ test('regression: localized sidebar label is a renderable string, never a locale
   assert.throws(()=>renderToString(React.createElement('span',null,{en:'VCS',zh:'变更'})),/Objects are not valid as a React child/);
 });
 
+test('primary navigation precedes repository controls and uses Fork view names in both locales',async()=>{
+  const {registrations,locale}=await loadClient();
+  const Page=registrations.find(r=>r.options.name==='main').component;
+  for(const [language,labels] of [['zh',['本地更改','所有提交']],['en',['Local Changes','All Commits']]]){
+    locale.active=language;
+    const html=renderToString(React.createElement(Page,{useSessions:select=>select({byId:{}})}));
+    const toolbar=html.indexOf('<div class="vcs-primary-toolbar"');
+    assert.ok(toolbar>=0);
+    assert.ok(toolbar<html.indexOf('<header'));
+    const navigation=html.slice(toolbar,html.indexOf('</nav>',toolbar));
+    for(const label of labels)assert.ok(navigation.includes(label));
+  }
+  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
+  const start=source.indexOf('<div className="vcs-primary-toolbar">');
+  const end=source.indexOf('<PanelHeader',start);
+  const primary=source.slice(start,end);
+  assert.ok(primary.includes('<RepositoryToolbar'));
+  assert.ok(primary.includes('<BranchSwitcher'));
+  assert.equal(source.split('<BranchSwitcher').length-1,1);
+});
+
 test('activation adds uniquely keyed entries without replacing workspace or shell slots',async()=>{
   const {registrations}=await loadClient();
   assert.deepEqual(registrations.map(r=>r.options.name),['main','sidebar.panellist']);

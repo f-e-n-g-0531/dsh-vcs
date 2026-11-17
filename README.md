@@ -8,7 +8,7 @@
 
 - npm 包：`@feng0531/dsh-vcs`
 - [下载正式版本](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) · [查看更新](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md)
-- 采用[非商业许可证](<LICENSE>)，商业用途须另行书面授权。
+- 当前源码自 0.8.5 起采用 [MIT License](<LICENSE>)，允许商业使用、修改和分发，须保留版权及许可声明；第三方材料仍适用各自许可证。已发布旧版本的许可条款以对应发行包为准。
 
 ## 能做什么
 

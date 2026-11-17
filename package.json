@@ -1,6 +1,6 @@
 {
   "name": "@feng0531/dsh-vcs",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
@@ -139,7 +139,7 @@
   "bugs": {
     "url": "https://github.com/f-e-n-g-0531/dsh-vcs/issues"
   },
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "keywords": [
     "deepseek-harness",
     "dsh-plugin",

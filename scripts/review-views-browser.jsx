@@ -22,7 +22,9 @@ export async function checkReviewViews(){
   flushSync(()=>root.render(<Page key={language} useSessions={select=>select({byId:{s:{id:'s',cwd:'/fixture',retainedBy:{mainView:1}}}})}/>));
   await wait(()=>host.querySelector('.vcs-file'));host.querySelector('.vcs-file').click();await wait(()=>pending);
   const old=pending;const button=text=>[...host.querySelectorAll('button')].find(node=>node.textContent===text);
-  button(t('history')).click();await wait(()=>button('COMMITTED SUBJECT')&&old.signal.aborted);
+  const primary=host.querySelector('.vcs-primary-toolbar'),header=host.querySelector('.vcs-top');
+  if(!primary.contains(button(t('localChanges')))||!primary.contains(button(t('allCommits')))||!primary.contains(button(t('branchSwitcher')))||primary.getBoundingClientRect().bottom>header.getBoundingClientRect().top+1)throw Error('Primary navigation and branch selector must precede repository controls');
+  button(t('allCommits')).click();await wait(()=>button('COMMITTED SUBJECT')&&old.signal.aborted);
   if(getComputedStyle(host.querySelector('.vcs-body')).display!=='none')throw Error('Local workspace still visible in history mode');
   old.resolve({path:'same.txt',left:{label:'HEAD',text:'LOCAL BEFORE'},right:{label:'WORKING',text:'LOCAL AFTER'}});
   button('COMMITTED SUBJECT').click();await wait(()=>[...host.querySelectorAll('.vcs-history button')].some(node=>node.textContent==='modified · same.txt'));
@@ -42,7 +44,7 @@ export async function checkReviewViews(){
   await new Promise(r=>setTimeout(r,100));
   if(host.querySelector('.vcs-history-details')!==detail||detail.querySelector('.monaco-diff-editor')!==editor||calls.filter(c=>c.endpoint==='vcs/commit-compare').length!==1)throw Error('Window focus remounted historical review');
   for(const key of ['fileHistory','blame','imageCompare']){const controls=[...detail.querySelectorAll('button')].filter(b=>b.textContent===t(key));if(controls.length>1)throw Error('Duplicate historical controls: '+key+' count='+controls.length+' html='+detail.innerHTML.slice(-6000));}
-  button(t('workspaceView')).click();await wait(()=>!host.querySelector('.vcs-history')&&getComputedStyle(host.querySelector('.vcs-body')).display!=='none');
+  button(t('localChanges')).click();await wait(()=>!host.querySelector('.vcs-history')&&getComputedStyle(host.querySelector('.vcs-body')).display!=='none');
   if(calls.filter(c=>c.endpoint==='vcs/compare').length!==1)throw Error('Returning to workspace revived old selection');
  }
  }finally{root.unmount();host.remove();}
