@@ -25,13 +25,18 @@ function ScopedReflogPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  const cancel=()=>{pending.current?.abort();setSnapshot(null);setSelected(null);setState('cancelled');};
  return <section className="vcs-snapshot-panel" aria-label={t('reflogTitle')}>
   <div className="vcs-snapshot-heading"><h3>{t('reflogTitle')}</h3><p>{t('reflogScope')}</p>
-  {state==='loading'?<p role="status">{t('loading')} <button onClick={cancel}>{t('reflogCancel')}</button></p>:<button onClick={()=>setRetry(n=>n+1)}>{t('refresh')}</button>}
-  {state==='cancelled'&&<p role="status">{t('reflogCancelled')} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
-  {state==='error'&&<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
-  </div><div className="vcs-snapshot-list">{snapshot&&<>
-   {snapshot.truncated&&<p role="status">{t('reflogTruncated')}</p>}
-   {!snapshot.entries.length?<p role="status">{t('reflogEmpty')}</p>:<ol>{snapshot.entries.map((entry,index)=><li key={entry.selector+':'+index}><button aria-pressed={selected===index} onClick={()=>setSelected(index)}><code className="vcs-snapshot-ref">{entry.selector}</code><span className="vcs-snapshot-subject">{entry.message}</span><time className="vcs-snapshot-date">{entry.date}</time></button></li>)}</ol>}
-  </>}</div><div className="vcs-snapshot-details">{snapshot&&selected!==null&&<CommitDetails sessionId={sessionId} repositoryId={repositoryId} commit={snapshot.entries[selected].id} rpc={rpc} t={t} onRediscover={onRediscover}/>}
+   {state!=='loading'&&<button onClick={()=>setRetry(n=>n+1)}>{t('refresh')}</button>}
+  </div>
+  <div className="vcs-snapshot-list">
+   {state==='loading'&&<p className="vcs-snapshot-feedback" role="status">{t('loading')} <button onClick={cancel}>{t('reflogCancel')}</button></p>}
+   {state==='cancelled'&&<p className="vcs-snapshot-feedback" role="status">{t('reflogCancelled')} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
+   {state==='error'&&<p className="vcs-snapshot-feedback" role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
+   {snapshot&&<>
+    {snapshot.truncated&&<p className="vcs-snapshot-feedback" role="status">{t('reflogTruncated')}</p>}
+    {!snapshot.entries.length?<p className="vcs-snapshot-feedback" role="status">{t('reflogEmpty')}</p>:<ol>{snapshot.entries.map((entry,index)=><li key={entry.selector+':'+index}><button aria-pressed={selected===index} onClick={()=>setSelected(index)}><code className="vcs-snapshot-ref" title={entry.selector}>{entry.selector}</code><span className="vcs-snapshot-subject" title={entry.message}>{entry.message}</span><time className="vcs-snapshot-date">{entry.date}</time></button></li>)}</ol>}
+   </>}
+  </div>
+  <div className="vcs-snapshot-details">{snapshot&&selected!==null&&<CommitDetails sessionId={sessionId} repositoryId={repositoryId} commit={snapshot.entries[selected].id} rpc={rpc} t={t} onRediscover={onRediscover}/>}
   </div>
  </section>;
 }

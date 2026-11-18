@@ -15,7 +15,9 @@ test('history review uses scoped rows, a grid form and collapsed explanatory hel
  assert.ok(css.includes('.vcs-root .vcs-commit-files>li+li'));
  assert.ok(history.includes('vcs-history-browser'));
  assert.ok(details.includes('className="vcs-commit-sidebar"'));
- assert.ok(css.includes('grid-column:2;grid-row:1/3'));
+ assert.ok(css.includes('grid-template-columns:clamp(230px,30%,420px) minmax(0,1fr)'));
+ assert.ok(css.includes('.vcs-root .vcs-history-browser>.vcs-history-details {'));
+ assert.ok(history.includes('compactSummary'));
  assert.ok(details.includes('vcs-commit-detail-tabs'));
  assert.ok(details.includes("hidden={detailTab!=='commit'}"));
  assert.ok(details.includes("hidden={detailTab!=='changes'}"));

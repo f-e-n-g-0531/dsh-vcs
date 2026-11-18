@@ -14,7 +14,7 @@ export async function checkReviewViews(){
    if(endpoint==='vcs/status')return {changes:[{id:'local',path:'same.txt',status:'modified'}]};
    if(endpoint==='vcs/compare')return new Promise(resolve=>pending={resolve,signal});
    if(endpoint==='vcs/history')return {snapshot:a,nextOffset:null,commits:Array.from({length:50},(_,i)=>({id:i===0?a:i.toString(16).padStart(40,'0'),subject:i===0?'COMMITTED SUBJECT':'ROW '+i,author:'author',date:'2026-10-08',parents:[b]}))};
-   if(endpoint==='vcs/commit')return {id:a,subject:'COMMITTED SUBJECT',parents:[b],parent:b,changes:[{id,path:'same.txt',status:'modified'}]};
+   if(endpoint==='vcs/commit')return {id:a,subject:'COMMITTED SUBJECT',message:'COMMITTED SUBJECT\n',parents:[b],parent:b,changes:[{id,path:'same.txt',status:'modified'}]};
    if(endpoint==='vcs/commit-compare')return {path:'same.txt',left:{label:b,text:'COMMITTED BEFORE'},right:{label:a,text:'COMMITTED AFTER'}};
    throw Error('Unexpected top-level RPC '+endpoint);
   };
@@ -32,10 +32,17 @@ export async function checkReviewViews(){
   const summary=host.querySelector('.vcs-commit-summary'),picker=host.querySelector('.vcs-commit-picker'),review=host.querySelector('.vcs-commit-review');
   const beforeTabs=calls.length;button(t('commitInfoTab')).click();await wait(()=>!summary.hidden&&picker.hidden&&review.hidden);
   if(button(t('commitInfoTab')).getAttribute('aria-pressed')!=='true')throw Error('Commit secondary tab not selected');
+  if(summary.querySelector('pre')||summary.querySelector('.vcs-commit-oid').title!==a||!button(t('copyCommitId')))throw Error('Commit summary duplicated subject or lost full ID');
+  const list=host.querySelector('.vcs-history-list'), historyBody=host.querySelector('.vcs-history');
+  const detailPane=host.querySelector('.vcs-history-details'), box=n=>n.getBoundingClientRect();
+  if(box(list).height<box(historyBody).height-2||box(detailPane).left<box(list).right-1||Math.abs(box(list).top-box(summary).top)>90)throw Error('Wide commit view must keep a full height list beside details');
+  host.style.width='600px';
+  if(box(detailPane).top<box(list).bottom-1||Math.abs(box(detailPane).width-box(list).width)>2||box(detailPane).bottom>box(historyBody).bottom+1||getComputedStyle(list).overflowY!=='auto'||getComputedStyle(summary).overflowY!=='auto')throw Error('Narrow commit view must have independently scrolling stacked panes');
+  host.style.width='1000px';
   button(t('commitChangesTab')).click();await wait(()=>summary.hidden&&!picker.hidden&&!review.hidden);if(calls.length!==beforeTabs)throw Error('Secondary tab switch reloaded commit data');
   const bounds=host.querySelector('.vcs-history').getBoundingClientRect(),rect=file.getBoundingClientRect();
   if(rect.top<bounds.top||rect.bottom>bounds.bottom||rect.left<bounds.left||rect.right>bounds.right)throw Error('Selected commit files are outside history viewport with 50 rows');
-  const list=host.querySelector('.vcs-history-list');list.scrollTop=list.scrollHeight;
+  list.scrollTop=list.scrollHeight;
   if(file.getBoundingClientRect().top!==rect.top)throw Error('History list scrolling moves commit files out of view');
   file.click();await wait(()=>host.querySelector('.vcs-history').textContent.replaceAll('\u00a0',' ').includes('COMMITTED AFTER'));
   if(host.querySelector('.vcs-history').textContent.includes('LOCAL AFTER')||getComputedStyle(host.querySelector('.vcs-history')).maxHeight!=='none')throw Error('History body contaminated or capped');

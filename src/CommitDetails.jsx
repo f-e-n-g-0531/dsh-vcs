@@ -7,9 +7,13 @@ import {filterCommitFiles,selectExactHistoryPath} from './history-filter.mjs';
 export default function CommitDetails(props){
  return <ScopedCommitDetails key={JSON.stringify([props.sessionId,props.repositoryId,props.commit])} {...props}/>;
 }
-function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit,initialPath,initialLocation,onLocationChange}){
+function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,onSelectCommit,initialPath,initialLocation,onLocationChange,compactSummary=false}){
  const navigationPending=useRef(true);
- const [detailTab,setDetailTab]=useState('changes');
+ const [detailTab,setDetailTab]=useState('changes'),[copyStatus,setCopyStatus]=useState('');
+ const copyCommit=async()=>{
+  try{await navigator.clipboard.writeText(details.id);setCopyStatus('commitIdCopied');}
+  catch{setCopyStatus('commitIdCopyFailed');}
+ };
  const initial=reviewLocation({...initialLocation,path:initialPath||initialLocation?.path});
  const report=patch=>onLocationChange?.(patch);
  const navigate=(id,path,options={})=>onSelectCommit?.(id,path,{returnLocation:{source:'comparison',origin:null},...options});
@@ -23,12 +27,11 @@ function ScopedCommitDetails({sessionId,repositoryId,commit,rpc,t,onRediscover,o
  if(error)return <p role="alert">{error} <button onClick={()=>setRetry(x=>x+1)}>{t('retry')}</button></p>;
  if(!details)return <p role="status">{t('loading')}</p>;
  const files=filterCommitFiles(details.changes,query);
- return <section className={'vcs-commit-details'+(focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}><div className="vcs-commit-sidebar"><nav className="vcs-commit-detail-tabs" aria-label={t('commitDetails')}>{['commit','changes'].map(tab=><button key={tab} type="button" aria-pressed={detailTab===tab} onClick={()=>setDetailTab(tab)}>{t(tab==='commit'?'commitInfoTab':'commitChangesTab')}</button>)}</nav><header className="vcs-commit-summary" hidden={detailTab!=='commit'}><h3>{details.subject}</h3><code className="vcs-commit-oid">{details.id}</code>
- <p>{details.author} · {details.date}</p>
+ return <section className={'vcs-commit-details'+(focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}><div className="vcs-commit-sidebar"><nav className="vcs-commit-detail-tabs" aria-label={t('commitDetails')}>{['commit','changes'].map(tab=><button key={tab} type="button" aria-pressed={detailTab===tab} onClick={()=>setDetailTab(tab)}>{t(tab==='commit'?'commitInfoTab':'commitChangesTab')}</button>)}</nav><header className="vcs-commit-summary" hidden={detailTab!=='commit'}><h3>{details.subject}</h3>{compactSummary?<div className="vcs-commit-summary-meta"><span>{details.author} · {details.date}</span><code className="vcs-commit-oid" title={details.id}>{details.id.slice(0,10)}</code><button type="button" onClick={copyCommit}>{t('copyCommitId')}</button><span role="status">{copyStatus&&t(copyStatus)}</span></div>:<><code className="vcs-commit-oid">{details.id}</code><p>{details.author} · {details.date}</p></>}
  {details.committer&&details.committer!==details.author&&<p>{t('commitCommitter')} {details.committer}{details.committerDate?` · ${details.committerDate}`:''}</p>}
  {details.signature?.signed===true&&<p><span title={t('commitSignatureUnverified')}>{t('commitSigned',{format:details.signature.format})}</span></p>}
  {details.messageTruncated&&<p role="status">{t('commitMessageLimit')}</p>}
- {details.message&&<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:240,overflow:'auto'}}>{details.message}</pre>}
+ {details.message&&(!compactSummary||details.message.trim()!==details.subject?.trim())&&<pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',maxHeight:240,overflow:'auto'}}>{details.message}</pre>}
  {details.parents.length>1&&<label>{t('commitParent')} <select aria-label={t('commitParent')} value={parentIndex} onChange={e=>{setSelected(null);setDetails(null);setLine(null);setParentIndex(Number(e.target.value));report({source:'comparison',origin:null,parentIndex:Number(e.target.value),path:null,line:null});}}>{details.parents.map((id,index)=><option key={id} value={index}>{index+1}: {id.slice(0,10)}</option>)}</select></label>}
  <p>{details.parent||t('commitRoot')} → {details.id.slice(0,10)}</p>
  </header><aside className="vcs-commit-picker" hidden={detailTab!=='changes'}><label>{t('commitFileSearch')} <input aria-label={t('commitFileSearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);setLine(null);report({fileQuery:e.target.value,path:null,line:null});}}/></label><span> {files.length} / {details.changes.length}</span>

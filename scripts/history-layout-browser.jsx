@@ -33,9 +33,15 @@ export async function checkHistoryLayout(){
    const panel=host.querySelector('.vcs-history').getBoundingClientRect();
    const comparison=host.querySelector('.vcs-commit-comparison').getBoundingClientRect();
    if(comparison.height<80||comparison.top<panel.top-1||comparison.bottom>panel.bottom+1)throw Error('Comparison not visible with 120 files at '+width);
-   const sidebar=host.querySelector('.vcs-commit-sidebar').getBoundingClientRect(),records=host.querySelector('.vcs-history-list').getBoundingClientRect();
-   if(sidebar.right>comparison.left+1||Math.abs(sidebar.left-records.left)>1||sidebar.top<records.bottom-1)throw Error('History navigation not unified on left at '+width);
-   const picker=host.querySelector('.vcs-commit-picker');picker.scrollTop=picker.scrollHeight;
+   const records=host.querySelector('.vcs-history-list').getBoundingClientRect(), detail=host.querySelector('.vcs-history-details').getBoundingClientRect();
+   const picker=host.querySelector('.vcs-commit-picker'), files=picker.getBoundingClientRect();
+   if(width>700){
+    if(Math.abs(records.height-panel.height)>1||detail.left<records.right-1||files.left<detail.left-1||files.right>comparison.left+1)throw Error('History list or file comparison not split correctly at '+width);
+   }else if(detail.top<records.bottom-1||Math.abs(records.width-detail.width)>1||files.bottom>comparison.top+1){
+    throw Error('History list, files and comparison not stacked correctly at '+width);
+   }
+   picker.scrollTop=picker.scrollHeight;
+   if(picker.scrollTop<=0)throw Error('File list not independently scrollable at '+width);
    if(Math.abs(host.querySelector('.vcs-commit-comparison').getBoundingClientRect().top-comparison.top)>1)throw Error('File scroll moved Diff');
    const row=host.querySelector('.vcs-commit-files button'),list=row.parentElement.parentElement;
    if(row.getBoundingClientRect().width>list.getBoundingClientRect().width+1)throw Error('File row overflow at '+width+' row='+row.getBoundingClientRect().width+' list='+list.getBoundingClientRect().width);

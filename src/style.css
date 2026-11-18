@@ -30,7 +30,7 @@
 .vcs-root .vcs-history .vcs-history-viewer-toolbar label,.vcs-root .vcs-history-viewer-toolbar label{display:inline-flex;flex-direction:row;align-items:center;gap:5px;white-space:nowrap}
 .vcs-root .vcs-history-viewer-toolbar input[type=checkbox]{width:auto;margin:0}
 .vcs-root .vcs-history-viewer-toolbar button,.vcs-root .vcs-toolbar button{font-size:11px;min-height:25px}
-@container(max-width:650px){.vcs-root .vcs-files{width:180px;min-width:120px}.vcs-root .vcs-snapshot-date{display:none}.vcs-root .vcs-snapshot-ref{flex-basis:72px}.vcs-root .vcs-snapshot-list button{gap:8px;padding:8px 10px}}
+@container(max-width:650px){.vcs-root .vcs-files{width:180px;min-width:120px}.vcs-root .vcs-snapshot-ref{flex-basis:72px}.vcs-root .vcs-snapshot-list li>button{gap:8px;padding:8px 10px}}
 .vcs-root .vcs-discovery{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%}
 .vcs-root .vcs-discovery input{min-width:160px;max-width:100%;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);padding:6px 9px}
 .vcs-root .vcs-discovery span{font-size:12px;color:var(--dsw-alias-label-secondary)}
@@ -193,21 +193,54 @@
 .vcs-root .vcs-title{font-size:16px}
 }
 .vcs-root .vcs-commit-files .vcs-svn-file-actions{display:flex;flex-wrap:wrap;gap:4px;padding:4px 8px}.vcs-root .vcs-commit-files .vcs-svn-file-actions button{width:auto;padding:4px 6px;font-size:11px}
-/* One navigation column; the comparison owns the entire right viewport. */
-.vcs-root .vcs-history-browser{grid-template-columns:minmax(280px,32%) minmax(0,1fr);grid-template-rows:minmax(120px,38%) minmax(0,1fr)}
-.vcs-root .vcs-history-browser>.vcs-history-list{grid-column:1;grid-row:1;border-bottom:1px solid var(--dsw-alias-border-l2)}
-.vcs-root .vcs-history-browser>.vcs-history-details,.vcs-root .vcs-history-browser>.vcs-history-details>.vcs-commit-details{display:contents}
-.vcs-root .vcs-history-browser .vcs-commit-sidebar{grid-column:1;grid-row:2;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:12px 16px;border-right:1px solid var(--dsw-alias-border-l2)}
-.vcs-root .vcs-history-browser .vcs-commit-summary{max-height:40%}
-.vcs-root .vcs-history-browser .vcs-commit-picker{flex:1;padding-top:10px}
-.vcs-root .vcs-history-browser .vcs-commit-review{grid-column:2;grid-row:1/3;display:flex;padding:16px;min-width:0}
-.vcs-root .vcs-history-browser .vcs-commit-comparison{flex:1}
-.vcs-root .vcs-history-browser:has(.vcs-commit-focused){grid-template-columns:0 minmax(0,1fr)}
-.vcs-root .vcs-history-browser:has(.vcs-commit-focused)>.vcs-history-list,.vcs-root .vcs-history-browser .vcs-commit-focused .vcs-commit-sidebar{display:none}
+/* Keep the history list and the selected commit in independent viewports. */
+.vcs-root .vcs-history-browser {
+  grid-template-columns:clamp(230px,30%,420px) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr);
+}
+.vcs-root .vcs-history-browser>.vcs-history-details {
+  grid-column:2;grid-row:1;padding:0;overflow:hidden;
+}
+.vcs-root .vcs-history-browser .vcs-history-details>.vcs-history-back {
+  flex:0 0 auto;margin:0;padding:6px 10px;border-bottom:1px solid var(--vcs-border);
+}
+.vcs-root .vcs-history-browser .vcs-history-details>.vcs-commit-details {
+  height:auto;grid-template-columns:minmax(145px,30%) minmax(0,1fr);
+  grid-template-rows:auto minmax(0,1fr);
+}
+.vcs-root .vcs-history-browser .vcs-commit-details>.vcs-commit-sidebar {display:contents}
+.vcs-root .vcs-history-browser .vcs-commit-detail-tabs {grid-column:1/-1;grid-row:1}
+.vcs-root .vcs-history-browser .vcs-commit-summary {
+  grid-column:1/-1;grid-row:2;max-height:none;padding:20px;overflow:auto;border:0;
+}
+.vcs-root .vcs-history-browser .vcs-commit-summary>* {max-width:76ch}
+.vcs-root .vcs-history-browser .vcs-commit-picker {
+  grid-column:1;grid-row:2;border-right:1px solid var(--vcs-border);
+}
+.vcs-root .vcs-history-browser .vcs-commit-review {grid-column:2;grid-row:2;padding:12px}
+.vcs-root .vcs-history-browser:has(.vcs-commit-focused) {grid-template: minmax(0,1fr) / minmax(0,1fr)}
+.vcs-root .vcs-history-browser:has(.vcs-commit-focused)>.vcs-history-list,
+.vcs-root .vcs-history-browser .vcs-commit-focused>.vcs-commit-sidebar {display:none}
+.vcs-root .vcs-history-browser:has(.vcs-commit-focused)>.vcs-history-details,
+.vcs-root .vcs-history-browser .vcs-commit-focused>.vcs-commit-review {grid-area:1/1/-1/-1}
+.vcs-root .vcs-history-browser .vcs-history-details>.vcs-commit-focused {grid-template:minmax(0,1fr) / minmax(0,1fr)}
 .vcs-root .vcs-svn-remote{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:auto}
 .vcs-root .vcs-svn-remote>p,.vcs-root .vcs-svn-remote>button{flex-shrink:0;margin:4px 16px;align-self:flex-start}
-.vcs-root .vcs-history-browser>.vcs-history-details>p{grid-column:2;grid-row:1;overflow:auto;padding:12px}
-@container(max-width:650px){.vcs-root .vcs-history-browser{grid-template-columns:minmax(130px,42%) minmax(0,1fr);grid-template-rows:minmax(120px,38%) minmax(0,1fr)}.vcs-root .vcs-history-browser .vcs-commit-sidebar,.vcs-root .vcs-history-browser .vcs-commit-review{padding:8px}}
+@container(max-width:700px) {
+  .vcs-root .vcs-history-browser {grid-template:minmax(0,34%) minmax(0,1fr) / minmax(0,1fr)}
+  .vcs-root .vcs-history-browser>.vcs-history-list {border-right:0;border-bottom:1px solid var(--vcs-border)}
+  .vcs-root .vcs-history-browser>.vcs-history-details {grid-area:2/1}
+  .vcs-root .vcs-history-browser .vcs-history-details>.vcs-commit-details {
+    grid-template:auto minmax(0,26%) minmax(0,1fr) / minmax(0,1fr);
+  }
+  .vcs-root .vcs-history-browser .vcs-commit-summary {grid-row:2/-1;padding:12px}
+  .vcs-root .vcs-history-browser .vcs-commit-picker {border-right:0;border-bottom:1px solid var(--vcs-border)}
+  .vcs-root .vcs-history-browser .vcs-commit-review {grid-area:3/1;padding:8px}
+  .vcs-root .vcs-history-browser .vcs-history-details>.vcs-commit-focused {
+    grid-template:minmax(0,1fr) / minmax(0,1fr);
+  }
+  .vcs-root .vcs-history-browser .vcs-commit-focused>.vcs-commit-review {grid-area:1/1}
+}
 /* Bound the combined operation stack rather than each individual form. */
 .vcs-root>.vcs-operations{flex:0 1 auto;min-height:0;max-height:min(38%,360px);overflow:auto;border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1)}
 .vcs-root>.vcs-operations[hidden]{display:none}
@@ -244,7 +277,6 @@
 .vcs-root .vcs-commit-summary[hidden],.vcs-root .vcs-commit-picker[hidden],.vcs-root .vcs-commit-review[hidden]{display:none}
 .vcs-root .vcs-commit-sidebar:has(.vcs-commit-summary:not([hidden]))>.vcs-commit-summary{flex:1;max-height:none;overflow:auto;padding-top:10px}
 .vcs-root .vcs-commit-details:has(.vcs-commit-summary:not([hidden]))>.vcs-commit-sidebar{grid-column:1/-1}
-.vcs-root .vcs-history-browser:has(.vcs-commit-summary:not([hidden])):not(:has(.vcs-commit-focused)) .vcs-commit-sidebar{grid-column:1/-1}
 /* Snapshot lists must never impose their content height on the outer column. */
 .vcs-root .vcs-snapshot-panel{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0;overflow:hidden}
 .vcs-root .vcs-snapshot-heading{flex:0 1 auto;min-height:0;max-height:min(20%,100px);overflow:auto;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l2)}
@@ -252,7 +284,7 @@
 .vcs-root .vcs-snapshot-list{flex:1 1 0;min-height:0;min-width:0;overflow:auto;padding:8px 12px}
 .vcs-root .vcs-snapshot-list ol{margin:0;padding-left:28px}
 .vcs-root .vcs-snapshot-list li{padding:2px 0}
-.vcs-root .vcs-snapshot-list button{max-width:100%;text-align:left;overflow-wrap:anywhere;white-space:normal}
+.vcs-root .vcs-snapshot-list li>button{max-width:100%;text-align:left;overflow-wrap:anywhere;white-space:normal}
 .vcs-root .vcs-snapshot-panel:has(.vcs-commit-details)>.vcs-snapshot-list{flex:0 1 30%;min-height:32px}
 .vcs-root .vcs-snapshot-details{flex:1 1 0;min-height:100px;min-width:0;overflow:hidden;border-top:1px solid var(--dsw-alias-border-l2)}
 .vcs-root .vcs-snapshot-details:empty{display:none}
@@ -339,18 +371,24 @@
 .vcs-root .vcs-commit-summary h3 {font-size:16px;font-weight:600}
 .vcs-root .vcs-commit-summary>pre {padding:10px;line-height:1.7;border-radius:5px}
 .vcs-root .vcs-commit-oid {font-size:10px;color:var(--vcs-muted)}
+.vcs-root .vcs-commit-summary-meta {display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;color:var(--vcs-muted)}
+.vcs-root .vcs-commit-summary-meta .vcs-commit-oid {font-size:12px}
+.vcs-root .vcs-commit-summary-meta button {font-size:11px}
+.vcs-root .vcs-snapshot-feedback,.vcs-root .vcs-grep-feedback {margin:8px 12px;padding:10px 12px;background:var(--vcs-surface);border-radius:5px;overflow-wrap:anywhere}
+.vcs-root .vcs-grep-panel .vcs-grep-path,.vcs-root .vcs-grep-path code,.vcs-root .vcs-grep-snapshot {max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}
+.vcs-root .vcs-grep-truncation {font-size:11px;color:var(--vcs-muted)}
 .vcs-root .vcs-snapshot-heading {padding:8px 14px;background:var(--vcs-surface)}
 .vcs-root .vcs-snapshot-heading h3 {font-size:13px;margin:0 0 3px}
 .vcs-root .vcs-snapshot-heading p {font-size:11px;line-height:1.5;color:var(--vcs-muted);margin:3px 0 6px}
 .vcs-root .vcs-snapshot-list {padding:4px 0}
 .vcs-root .vcs-snapshot-list ol {list-style:none;padding:0;margin:0}
 .vcs-root .vcs-snapshot-list li {padding:0;border-bottom:1px solid var(--vcs-border)}
-.vcs-root .vcs-snapshot-list button {
+.vcs-root .vcs-snapshot-list li>button {
   display:flex;align-items:baseline;gap:12px;width:100%;border:0;border-radius:0;
   padding:8px 14px;background:transparent;text-align:left;min-width:0;
 }
-.vcs-root .vcs-snapshot-list button:hover {background:var(--vcs-hover)}
-.vcs-root .vcs-snapshot-list button[aria-pressed=true] {background:var(--vcs-selection);box-shadow:inset 3px 0 var(--vcs-accent)}
+.vcs-root .vcs-snapshot-list li>button:hover {background:var(--vcs-hover)}
+.vcs-root .vcs-snapshot-list li>button[aria-pressed=true] {background:var(--vcs-selection);box-shadow:inset 3px 0 var(--vcs-accent)}
 .vcs-root .vcs-snapshot-ref {flex:0 0 130px;max-width:28%;color:var(--vcs-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vcs-root .vcs-snapshot-subject {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vcs-root .vcs-snapshot-date {flex:0 0 auto;font-size:10px;color:var(--vcs-muted);font-variant-numeric:tabular-nums}
@@ -377,9 +415,9 @@
 @container(max-width:650px) {
   .vcs-root .vcs-primary-toolbar>.vcs-review-views {gap:2px;padding:6px 8px}
   .vcs-root .vcs-primary-toolbar>.vcs-repository-controls {padding:4px 8px 7px}
-  .vcs-root .vcs-snapshot-list button {gap:6px;padding:7px 10px;flex-wrap:wrap}
+  .vcs-root .vcs-snapshot-list li>button {gap:6px;padding:7px 10px;flex-wrap:wrap}
   .vcs-root .vcs-snapshot-ref {flex-basis:90px}
-  .vcs-root .vcs-snapshot-date {width:100%;padding-left:0}
+  .vcs-root .vcs-snapshot-date {flex:0 0 100%;overflow-wrap:anywhere}
   .vcs-root .vcs-grep-panel {padding:12px}
   .vcs-root .vcs-grep-panel form {flex-wrap:wrap}
   .vcs-root .vcs-grep-panel form input {flex-basis:100%}

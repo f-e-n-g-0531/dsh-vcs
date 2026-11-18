@@ -35,12 +35,12 @@ function ScopedGrepPanel({sessionId,repositoryId,rpc,t,onRediscover}){
  return <section className="vcs-grep-panel" aria-label={t('grepTitle')}><h3>{t('grepTitle')}</h3><p>{t('grepScope')}</p>
   <form onSubmit={submit}><input aria-label={t('grepQuery')} maxLength={1024} placeholder={t('grepPlaceholder')} value={draft} onChange={e=>setDraft(e.target.value)}/><button type="submit" disabled={busy||!draft.trim()}>{t('grepRun')}</button></form>
   {selected?<><button onClick={back}>{t('historyBack')}</button><HistoricalFile key={JSON.stringify([selected.commit,selected.path,selected.line])} {...{sessionId,repositoryId,rpc,t,onRediscover}} commit={selected.commit} path={selected.path} line={selected.line} initialViewer={selected.viewer} onViewerChange={viewer=>setSelected(old=>old?{...old,viewer:reviewLocation({viewer}).viewer}:old)} onClose={back} onSelectCommit={navigate}/></>:<>
-   {busy?<p role="status">{t('loading')}</p>:error?<p role="alert">{error} <button onClick={()=>request&&search(request,pages)}>{t('retry')}</button></p>:matches&&<>
-    <p role="status">{t('grepPageCount',{count:matches.length})}</p><code>{result.snapshot}</code>
+   {busy?<p className="vcs-grep-feedback" role="status">{t('loading')}</p>:error?<p className="vcs-grep-feedback" role="alert">{error} <button onClick={()=>request&&search(request,pages)}>{t('retry')}</button></p>:matches&&<>
+    <p role="status">{t('grepPageCount',{count:matches.length})}</p><code className="vcs-grep-snapshot">{result.snapshot}</code>
     <p role="status">{t(result.complete===true?'grepComplete':result.nextCursor?'grepMoreAvailable':'grepPartial')}</p>
     {result.reason&&<p role="status">{t('grepReason')}: {t(({"page-limit":'grepPageLimit',"scan-budget":'grepScanBudget',"unsupported-content":'grepUnsupported'})[result.reason]||'grepPartial')}</p>}
     {(result.warnings||[]).map((warning,i)=><p role="status" key={i}>{typeof warning==='string'?warning:warning.message||warning.code}</p>)}
-    {!matches.length?<p role="status">{t(result.nextCursor?'grepEmptyPage':'grepEmpty')}</p>:<ol>{matches.map((m,i)=><li key={i}><button onClick={()=>{setTrail([]);setSelected({path:m.path,line:m.line,commit:result.snapshot,viewer:reviewLocation().viewer});}}><code>{m.path}:{m.line}</code></button> <pre style={{margin:0}}>{m.text}</pre>{m.textTruncated&&<span> · {t('grepTextTruncated')}</span>}</li>)}</ol>}
+    {!matches.length?<p className="vcs-grep-feedback" role="status">{t(result.nextCursor?'grepEmptyPage':'grepEmpty')}</p>:<ol>{matches.map((m,i)=><li key={i}><button className="vcs-grep-path" onClick={()=>{setTrail([]);setSelected({path:m.path,line:m.line,commit:result.snapshot,viewer:reviewLocation().viewer});}}><code>{m.path}:{m.line}</code></button><pre style={{margin:0}}>{m.text}</pre>{m.textTruncated&&<span className="vcs-grep-truncation">{t('grepTextTruncated')}</span>}</li>)}</ol>}
    </>}
    {!!pages.length&&<button disabled={busy} onClick={previous}>{t('grepPreviousPage')}</button>}
    {!error&&result?.nextCursor&&<button disabled={busy} onClick={more}>{t('grepNextPage')}</button>}
