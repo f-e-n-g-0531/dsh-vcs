@@ -173,14 +173,16 @@ function RepositoryToolbar({t,gitSelected,historyActive,stashActive,reflogActive
   return <nav className="vcs-review-views" aria-label={t('reviewView')}><button aria-pressed={!reviewActive} onClick={()=>setReviewView('workspace')}>{t('localChanges')}</button><button aria-pressed={historyActive} aria-expanded={historyActive} onClick={()=>openReviewView('history')}>{t('allCommits')}</button>{gitSelected&&<><button aria-pressed={stashActive} aria-expanded={stashActive} onClick={()=>openReviewView('stash')}>{t('stash')}</button><button aria-pressed={reflogActive} aria-expanded={reflogActive} onClick={()=>openReviewView('reflog')}>{t('reflog')}</button><button aria-pressed={grepActive} aria-expanded={grepActive} onClick={()=>openReviewView('grep')}>{t('grep')}</button></>}</nav>;
 }
 
-// Review view bodies; each panel keys its own request scope so it remounts on scope changes.
+// History and Reflog reset with the history scope; Stash and Search keep their own lifecycle.
 function ReviewPanels({sessionId,repositoryId,historyRefresh,scan,rpc,t,rediscover,historyActive,stashActive,reflogActive,grepActive,svnSelected,gitSelected}){
+  const panelProps={sessionId,repositoryId,rpc,t,onRediscover:rediscover};
+  const historyScopeKey=JSON.stringify([sessionId,repositoryId,historyRefresh,scan]);
   return <>
-    {historyActive&&svnSelected&&<SvnRemote key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} {...{sessionId,repositoryId,rpc,t}} onRediscover={rediscover}/>}
-    {historyActive&&gitSelected&&<HistoryPanel key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
-    {stashActive&&<StashPanel sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
-    {reflogActive&&gitSelected&&<ReflogPanel key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
-    {grepActive&&<SearchPanel sessionId={sessionId} repositoryId={repositoryId} rpc={rpc} t={t} onRediscover={rediscover}/>}
+    {historyActive&&svnSelected&&<SvnRemote key={historyScopeKey} {...panelProps}/>}
+    {historyActive&&gitSelected&&<HistoryPanel key={JSON.stringify([sessionId,repositoryId,historyRefresh,scan])} {...panelProps}/>}
+    {stashActive&&<StashPanel {...panelProps}/>}
+    {reflogActive&&gitSelected&&<ReflogPanel key={historyScopeKey} {...panelProps}/>}
+    {grepActive&&<SearchPanel {...panelProps}/>}
   </>;
 }
 

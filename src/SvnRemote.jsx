@@ -12,6 +12,7 @@ function Scoped({sessionId, repositoryId, rpc, t, onRediscover}) {
   const [grant, setGrant] = useState(null);
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState('');
+  const [authRequired, setAuthRequired] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   // Best-effort cleanup is independent of any already-aborted view request.
@@ -64,6 +65,7 @@ function Scoped({sessionId, repositoryId, rpc, t, onRediscover}) {
   const onApproved = value => {
     try {
       validateSvnUiGrant(value);
+      setAuthRequired(false);
       setError('');
       setAttempt(0);
       setGrant(value);
@@ -77,7 +79,12 @@ function Scoped({sessionId, repositoryId, rpc, t, onRediscover}) {
       return await rpc(...args);
     } catch (failure) {
       // A late cancelled request must not invalidate the current consent view.
-      if (failure.code === 'vcs/svn-consent-required' && !args[2]?.aborted) {
+      if (failure.code === 'vcs/svn-auth-required' && !args[2]?.aborted) {
+        setAuthRequired(true);
+        setGrant(null);
+        setAttempt(0);
+        setError(t('svnAuthRequired'));
+      } else if (failure.code === 'vcs/svn-consent-required' && !args[2]?.aborted) {
         setGrant(null);
         setAttempt(0);
         setError(t('svnExpired'));
@@ -88,7 +95,7 @@ function Scoped({sessionId, repositoryId, rpc, t, onRediscover}) {
 
   return <section className="vcs-svn-remote">
     {!grant && error && <p role="status">{error}</p>}
-    {!grant ? <SvnConsent {...{sessionId, repositoryId, rpc, t, onRediscover}} onApproved={onApproved}/> : <>
+    {!grant ? <SvnConsent {...{sessionId, repositoryId, rpc, t, onRediscover, authRequired}} onApproved={onApproved}/> : <>
       <p>{t('svnGrantScope')}</p>
       <button disabled={revoking} onClick={() => setAttempt(value => value + 1)}>{t('svnRevoke')}</button>
       {error && <p role="alert">{error}</p>}

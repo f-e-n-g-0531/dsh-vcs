@@ -1,12 +1,13 @@
 # 文档入口
 
-第一次使用不需要阅读全部文件。先看[项目说明](<../README.md>)，再按你的目的选择下面的文档。
+从[项目说明](<../README.md>)了解可用功能，再按使用或维护场景查阅下列文档。
 
 ## 我要安装或使用
 
 - [安装、升级与回滚](<INSTALL.md>)：具体命令和安装后检查。
-- [运行环境与兼容性](<COMPATIBILITY.md>)：DSH、Node、操作系统以及Windows SVN中文路径问题。
+- [运行环境与兼容性](<COMPATIBILITY.md>)：DSH、Node.js、操作系统与 Windows 下的 SVN 中文路径问题。
 - [实机验证状态](<LIVE-ACCEPTANCE.md>)：哪些是用户实际反馈，哪些仅有自动测试。
+- [SVN 远程历史与认证](<SVN-RUNTIME-SCOPE.md>)：网络授权、HTTPS Basic 与 401 排查。
 - [安全说明](<../SECURITY.md>)：插件会读什么、保护什么、不能保证什么。
 - [更新记录](<../CHANGELOG.md>)：每个版本改了什么。
 
@@ -22,10 +23,10 @@
 ## 我要了解功能边界
 
 - [已交付功能](<REVIEW-ROADMAP.md>)与[历史功能计划](<FEATURE-PLAN.md>)。
-- [SVN历史范围](<SVN-RUNTIME-SCOPE.md>)和[协议说明](<SVN-HISTORY-DESIGN.md>)。
+- [SVN 历史协议](<SVN-HISTORY-DESIGN.md>)：固定修订、传输与授权生命周期。
 - [两个提交的比较](<REVISION-COMPARE-DESIGN.md>)、[重命名追溯](<RENAME-FOLLOW-SCOPE.md>)、[Blame定位](<BLAME-LOCATION-SCOPE.md>)。
 - [图片范围](<IMAGE-EXTENSION-SCOPE.md>)、[JPEG](<JPEG-SCOPE.md>)、[WebP](<WEBP-SCOPE.md>)及[大文件阅读](<LARGE-FILE-SCOPE.md>)。
 
 ## 旧版本材料
 
-CANDIDATE表示当时的候选版本检查，RELEASE表示当时的发布记录；它们用于追查历史，不是安装指南，也不代表当前能力。版本专属的新发布说明放在releases目录。旧测试结果不会改写成当前实机通过。
+`CANDIDATE-*.md` 和 `RELEASE-*.md` 分别保留当时的候选检查与发布记录。各版本说明见 [releases](<releases>)。这些材料用于追溯，不代表当前功能或实机验收状态。

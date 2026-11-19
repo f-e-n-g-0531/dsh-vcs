@@ -91,6 +91,44 @@ test('production createPage wires SVN consent log and revoke identities across r
  }finally{h.dispose();}
 });
 
+test('production review views preserve keyed scope boundaries and hide the workspace',async()=>{
+ const A='a'.repeat(40),calls=[];let finishCompare;
+ const rpc=(e,p,signal)=>{
+  calls.push({e,p,signal});
+  if(e==='vcs/repositories')return {cwd:'/w',repositories:[{id:'git',type:'git',relativePath:''}]};
+  if(e==='vcs/status')return {changes:[{id:'local',path:'f',status:'modified'}]};
+  if(e==='vcs/compare')return new Promise(resolve=>{finishCompare=resolve;});
+  if(e==='vcs/history')return {snapshot:A,commits:[{id:A,subject:'history only',parents:[]}],nextOffset:null};
+  if(e==='vcs/reflog')return {entries:[]};
+  if(e==='vcs/stash-list')return {stashes:[]};
+  throw Error('Unexpected review endpoint '+e);
+ };
+ const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
+ const view=()=>findNode(h,n=>n.type?.name==='ReviewPanels');
+ const checkPanel=(name,keyed)=>{
+  const owner=view(),panel=findNode(h,n=>n.type?.name===name),p=owner.props;
+  assert.ok(panel,name);
+  assert.equal(panel.props.key,keyed?JSON.stringify([p.sessionId,p.repositoryId,p.historyRefresh,p.scan]):undefined);
+  assert.equal(panel.props.sessionId,p.sessionId);assert.equal(panel.props.repositoryId,p.repositoryId);
+  assert.equal(panel.props.rpc,p.rpc);assert.equal(panel.props.t,p.t);assert.equal(panel.props.onRediscover,p.rediscover);
+  return panel;
+ };
+ const navigate=async name=>{const nav=findNode(h,n=>n.type?.name==='RepositoryToolbar');nav.props.openReviewView(name);await h.flush();};
+ try{
+  await h.flush();
+  findNode(h,n=>n.type?.name==='FileBrowser').props.onSelect('git','local');await h.flush();
+  const comparison=calls.find(c=>c.e==='vcs/compare');assert.ok(comparison&&finishCompare);
+  await navigate('history');checkPanel('HistoryPanel',true);
+  assert.equal(findNode(h,n=>n.props?.className==='vcs-body').props.hidden,true);
+  assert.equal(comparison.signal.aborted,true);
+  finishCompare({path:'f',left:{text:'obsolete comparison'},right:{text:'obsolete comparison'}});
+  await h.flush();assert.ok(button(h,'history only'));assert.ok(!nodeText(h.tree).includes('obsolete comparison'));
+  await navigate('reflog');checkPanel('ReflogPanel',true);assert.equal(button(h,'history only'),undefined);
+  await navigate('stash');checkPanel('StashPanel',false);
+  await navigate('grep');checkPanel('SearchPanel',false);
+ }finally{h.dispose();}
+});
+
 test('production status category counts do not depend on file selection or filters',async()=>{
  const changes={r1:[{id:'m',path:'m',status:'modified'},{id:'a',path:'a',status:'added'}],r2:[{id:'d',path:'d',status:'deleted'}]};
  const rpc=async(e,p)=>e==='vcs/repositories'?{cwd:'/w',repositories:['r1','r2'].map(id=>({id,type:'git',relativePath:id}))}:e==='vcs/status'?{changes:changes[p.repositoryId]}:e==='vcs/compare'?{path:'m',left:{text:''},right:{text:'x'}}:null;

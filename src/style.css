@@ -422,4 +422,57 @@
   .vcs-root .vcs-grep-panel form {flex-wrap:wrap}
   .vcs-root .vcs-grep-panel form input {flex-basis:100%}
 }
+/* Shared review surfaces. Keep existing grid tracks, scroll origins and editor geometry. */
+.vcs-root {
+  --vcs-canvas:var(--dsw-alias-bg-base,#17191d);
+  --vcs-panel:color-mix(in srgb,var(--vcs-surface) 45%,var(--vcs-canvas));
+  --vcs-tint:color-mix(in srgb,var(--vcs-accent) 12%,var(--vcs-surface));
+  --vcs-danger:var(--dsw-alias-state-error-primary,#df7373);
+  --vcs-radius:8px;
+  background:var(--vcs-canvas);
+}
+.vcs-root .vcs-top {background:linear-gradient(110deg,var(--vcs-tint),var(--vcs-canvas) 65%);padding-inline-start:max(16px,var(--dsh-frame-leading-clearance,0px))}
+.vcs-root .vcs-top>svg {color:var(--vcs-accent)}
+.vcs-root .vcs-title {font-weight:650}
+.vcs-root .vcs-badge {background:var(--vcs-surface);border-radius:999px;font-weight:500}
+.vcs-root .vcs-primary-toolbar>.vcs-review-views>button,.vcs-root .vcs-search-modes>button,.vcs-root .vcs-commit-detail-tabs>button {border-radius:6px}
+.vcs-root .vcs-review-views>button[aria-pressed=true],.vcs-root .vcs-search-modes>button[aria-pressed=true],.vcs-root .vcs-commit-detail-tabs>button[aria-pressed=true] {background:var(--vcs-tint);box-shadow:inset 0 -2px var(--vcs-accent)}
+.vcs-root :is(.vcs-files,.vcs-history-list,.vcs-commit-picker,.vcs-snapshot-list) {background:var(--vcs-panel)}
+.vcs-root .vcs-filter input,.vcs-root .vcs-grep-panel input,.vcs-root .vcs-history-search input {border-radius:var(--vcs-radius)}
+.vcs-root .vcs-file[aria-current=true] {background:var(--vcs-selection);box-shadow:inset 3px 0 var(--vcs-accent)}
+.vcs-root .vcs-status {flex:0 0 auto;min-width:18px;border:1px solid var(--vcs-border);border-radius:4px}
+.vcs-root .vcs-filehead {border-bottom-color:var(--vcs-border);font-weight:500}
+.vcs-root .vcs-filehead strong,.vcs-root .vcs-context>* {min-width:0}
+.vcs-root .vcs-labels {background:var(--vcs-panel);font-variant-numeric:tabular-nums}
+.vcs-root .vcs-message {overflow-wrap:anywhere}
+.vcs-root p[role=alert] {background:color-mix(in srgb,var(--vcs-danger) 9%,var(--vcs-panel));border-radius:0 var(--vcs-radius) var(--vcs-radius) 0}
+.vcs-root :is(.vcs-history-search fieldset,.vcs-commit-files,.vcs-grep-panel>ol,.vcs-op fieldset) {border-radius:var(--vcs-radius);background:var(--vcs-panel)}
+.vcs-root .vcs-commit-list>li {border-bottom:1px solid var(--vcs-border)}
+.vcs-root .vcs-commit-list>li:has(>.vcs-commit-row[aria-pressed=true]) {background:var(--vcs-tint);border-radius:6px}
+.vcs-root .vcs-commit-meta {font-size:11px;font-variant-numeric:tabular-nums}
+.vcs-root .vcs-commit-files button:hover:not(:disabled) {background:var(--vcs-hover)}
+.vcs-root .vcs-commit-files button[aria-pressed=true] {background:var(--vcs-tint);box-shadow:inset 3px 0 var(--vcs-accent)}
+.vcs-root .vcs-commit-summary-meta .vcs-commit-oid {padding:2px 6px;background:var(--vcs-panel);border:1px solid var(--vcs-border);border-radius:5px}
+.vcs-root :is(.vcs-snapshot-heading,.vcs-grep-panel h3,.vcs-revision-panel h3) {letter-spacing:.015em}
+.vcs-root .vcs-snapshot-list li:nth-child(even),.vcs-root .vcs-blame-panel tbody tr:nth-child(even) {background:var(--vcs-canvas)}
+.vcs-root .vcs-grep-panel>ol>li:focus-within,.vcs-root .vcs-tree-panel li:focus-within {background:var(--vcs-tint)}
+.vcs-root .vcs-grep-panel>ol button {text-align:start;overflow-wrap:anywhere;max-width:100%}
+.vcs-root .vcs-tree-panel li {padding-inline:6px}
+.vcs-root .vcs-tree-panel li button {max-width:100%;overflow-wrap:anywhere;text-align:start}
+.vcs-root .vcs-properties :is(th,td),.vcs-root .vcs-blame-panel :is(th,td) {border-color:var(--vcs-border)}
+.vcs-root .vcs-op {background:var(--vcs-panel);border-color:var(--vcs-border)}
+.vcs-root .vcs-consent-panel {margin:12px 16px;background:var(--vcs-panel);border-radius:var(--vcs-radius)}
+.vcs-root .vcs-consent-panel dl {padding:10px;background:var(--vcs-canvas);border:1px solid var(--vcs-border);border-radius:6px}
+.vcs-root .vcs-consent-panel .vcs-consent-actions {display:flex;flex-wrap:wrap;gap:6px}
+.vcs-root .vcs-consent-actions button {max-width:100%;overflow-wrap:anywhere}
+.vcs-root .vcs-consent-actions .vcs-consent-basic:not(:disabled) {border-color:var(--vcs-accent);background:var(--vcs-tint)}
+.vcs-root .vcs-svn-remote>p[role=status] {padding:6px 10px;background:var(--vcs-panel);border-radius:6px;overflow-wrap:anywhere}
+@container(max-width:460px) {
+  .vcs-root .vcs-top {padding-block:8px}
+  .vcs-root .vcs-files {width:36%;min-width:105px}
+  .vcs-root .vcs-filehead {padding-inline:8px;gap:6px}
+  .vcs-root .vcs-consent-panel {margin:8px}
+  .vcs-root .vcs-consent-panel dl {grid-template-columns:minmax(42px,64px) minmax(0,1fr);gap:6px}
+  .vcs-root .vcs-svn-remote>p,.vcs-root .vcs-svn-remote>button {margin-inline:8px}
+}
 @media(prefers-reduced-motion:reduce) {.vcs-root button,.vcs-root select {transition:none}}

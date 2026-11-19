@@ -5,7 +5,7 @@ const failure=(code,message)=>({ok:false,error:{code,message,details:{}}});
 const FIELDS = {
   revoke: ['token'],
   describe: [],
-  approve: ['offer', 'explicit'],
+  approve: ['offer', 'explicit', 'useBasic'],
   log: ['token', 'snapshot', 'cursor', 'limit'],
   detail: ['token', 'snapshot', 'revision'],
   compare: ['token', 'snapshot', 'revision', 'id'],
@@ -26,6 +26,7 @@ function validatePayload(method, payload) {
     }
   }
   if (method === 'approve') {
+    if (payload.useBasic !== undefined && payload.useBasic !== true) throw Error('Invalid SVN authentication selection');
     if (payload.explicit !== true || typeof payload.offer !== 'string' || !/^[a-f0-9]{64}$/.test(payload.offer)) {
       throw Error('Explicit scoped offer required');
     }
@@ -85,7 +86,7 @@ export function createSvnRpc(runtime, {timeoutMs = 15000} = {}) {
     } catch (error) {
       const code = signal?.aborted || error?.name === 'AbortError'
         ? 'vcs/cancelled'
-        : ['vcs/rediscover-required', 'vcs/svn-consent-required'].includes(error?.code)
+        : ['vcs/rediscover-required', 'vcs/svn-consent-required', 'vcs/svn-auth-required'].includes(error?.code)
           ? error.code
           : 'vcs/operation-failed';
       const reason = controller.signal.aborted ? controller.signal.reason : error;

@@ -62,6 +62,7 @@ export function createSvnRuntime({
   now = Date.now,
   timeoutMs = DEFAULT_TRANSPORT_TIMEOUT_MS,
   transportFormat = 'cli',
+  readBasicCredentials,
 } = {}) {
   if (!['cli', 'dav'].includes(transportFormat)) throw Error('Invalid SVN transport format');
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > DEFAULT_TRANSPORT_TIMEOUT_MS) {
@@ -81,7 +82,12 @@ export function createSvnRuntime({
     }
   };
   const offers = createSvnConsent({now});
-  const grants = createSvnConsent({now, onRevoke: token => cancelToken(token)});
+  const authentication = new Map();
+  const grants = createSvnConsent({now, onRevoke: token => {
+    clearTimeout(authentication.get(token)?.timer);
+    authentication.delete(token);
+    cancelToken(token);
+  }});
 
   const remoteEnabled = typeof transport === 'function';
   const assertRemoteEnabled = () => {
@@ -157,11 +163,13 @@ export function createSvnRuntime({
         timeoutMs,
         signal: controller.signal,
         assertAuthorized,
+        ...(authentication.has(options.token) ? {authentication: authentication.get(options.token).value} : {}),
       });
       controller.signal.throwIfAborted();
       return normalizeTransportOutput(value, plan, options.maxBytes);
     } catch (error) {
       if (controller.signal.aborted) throw controller.signal.reason;
+      if (error?.code === 'vcs/svn-auth-required') grants.revoke(options.token);
       throw error;
     } finally {
       const tasks = inFlight.get(options.token);
@@ -186,16 +194,33 @@ export function createSvnRuntime({
         origin: new URL(identity.root).origin,
         expiresAt: now() + CONSENT_TTL_MS,
         remoteEnabled,
+        ...(readBasicCredentials?.(identity, false) ? {basicAuthEnabled: true} : {}),
       };
     },
 
-    async approve(address, {offer, explicit = false, signal} = {}) {
+    async approve(address, {offer, explicit = false, signal, useBasic = false} = {}) {
       if (explicit !== true) throw Error('Explicit SVN network consent required');
       const identity = await resolve(address, signal);
       offers.assert(offer, identity);
       assertRemoteEnabled();
       const snapshot = localSnapshot(identity);
+      let value;
+      if (useBasic === true) {
+        const basic = transportFormat === 'dav' && readBasicCredentials?.(identity, true);
+        if (!basic
+          || typeof basic.username !== 'string' || !basic.username || Buffer.byteLength(basic.username) > 256
+          || typeof basic.password !== 'string' || !basic.password || Buffer.byteLength(basic.password) > 1024
+          || /[:\x00-\x1f\x7f]/.test(basic.username) || /[\x00-\x1f\x7f]/.test(basic.password)) {
+          throw Error('Invalid or unsupported SVN Basic credentials');
+        }
+        value = {root: identity.root, header: 'Basic ' + Buffer.from(basic.username + ':' + basic.password).toString('base64')};
+      }
       const token = grants.grant(identity, {explicit: true});
+      if (value) {
+        const timer = setTimeout(() => grants.revoke(token), CONSENT_TTL_MS);
+        timer.unref();
+        authentication.set(token, {value, timer});
+      }
       offers.revoke(offer);
       return {...snapshot, token, expiresAt: now() + CONSENT_TTL_MS};
     },

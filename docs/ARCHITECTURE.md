@@ -4,7 +4,7 @@
 
 ## 依赖方向
 
-浏览器视图 → 认证RPC → Session／仓库授权 → 默认只读适配器 → 有界本地命令或已同意HTTPS。0.6.0增加独立的确认式本地分支切换链；当前源码另接入受限Index、commit／amend、当前HEAD分支及标签创建链，不改变历史引用导航的只读语义。0.8.0仍为计划发布，源码与历史专项记录不代表本次发布门禁通过或日常GUI已更新。视图不能直接读取文件系统；解析和展示模型不负责发起网络或授予权限。
+浏览器视图 → 认证RPC → Session／仓库授权 → 默认只读适配器 → 有界本地命令或已同意HTTPS。历史引用导航只读。以下写操作章节说明保留模块及历史接口，不代表当前页面开放写入口；当前范围见[能力清单](<CURRENT-CAPABILITIES.md>)。视图不能直接读取文件系统；解析和展示模型不负责发起网络或授予权限。
 
 ## 宿主与本地读取
 
@@ -13,7 +13,7 @@
 - [历史解析](<../git-history.mjs>)负责Git输出协议及分页／搜索参数；[路径边界](<../repository-path.mjs>)负责词法包含、现存链接和真实祖先校验；[文本解码](<../text-content.mjs>)负责有界字节解码。
 - [图片准备](<../image-preview.mjs>)与浏览器解码共同把关格式和尺寸，不绕过路径或选中ID验证。
 
-## 确认式本地 Git 分支切换（0.6.0）
+## 历史接口：确认式本地 Git 分支切换（0.6.0）
 
 独立界面经 `vcs/branches` 读取已有本地分支，`vcs/branch-switch-prepare` 预览服务器快照，再用 `vcs/branch-switch-confirm` 提交一次性 token；不接受客户端提供的仓库路径或替代快照。协调器绑定 Session／cwd／发现授权／仓库，默认 60 秒过期、最多 32 个 token，确认即消费；按仓库排斥插件内读写冲突，读取完成前不开始写入。模块为[分支适配器](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch.mjs>)、[确认协调器](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/branch-switch-host.mjs>)与[独立界面](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/src/BranchSwitcher.jsx>)。
 
@@ -38,7 +38,7 @@
 
 ## SVN HTTPS组合
 
-[固定工厂](<../src/svn-https-host.mjs>)组合[共享Host](<../src/svn-host.mjs>)、[严格RPC](<../src/svn-rpc.mjs>)、[运行时](<../src/svn-runtime.mjs>)与有界DAV／TLS传输。生产工厂不接受请求实现、CLI、认证缓存或自定义CA注入。
+[固定工厂](<../src/svn-https-host.mjs>)组合[共享Host](<../src/svn-host.mjs>)、[严格RPC](<../src/svn-rpc.mjs>)、[运行时](<../src/svn-runtime.mjs>)与有界DAV／TLS传输。生产工厂不接受自定义请求实现、CLI、认证缓存或自定义 CA。0.9.0 候选允许从宿主配置选用指定仓库与会话的 Basic 凭据；浏览器不传递凭据。
 
 本地身份解析复用发现授权。用户先审阅提议并明确勾选同意，才生成绑定Session、cwd、root、UUID和scope的短期能力。运行时逐步骤复验；撤销、过期、Session变化及插件卸载使能力失效。日志固定本地工作副本修订，不隐式读远端HEAD。功能及认证限制见[SVN结论](<SVN-RUNTIME-SCOPE.md>)。
 
@@ -64,4 +64,4 @@
 
 [构建目标](<../build.mjs>)分别产出客户端、编辑器、Worker和SVN Host；Host bundle保留宿主入口外部依赖。新增运行时文件必须同步打包白名单与[包闭包检查](<../scripts/verify-package.mjs>)。
 
-测试分为纯协议／模型、真实临时Git／SVN仓库、Host授权和隔离Chrome／真实Apache TLS链。测试辅助模块只服务fixture，不进入生产包。隔离安装和浏览器证据不等于当前DSH实机验收；见[实机结论](<LIVE-ACCEPTANCE.md>)。未运行或未完成的发布门禁保持PENDING，不用历史专项通过覆盖当前失败；本次0.8.0收口不安装、升级或重启日常DSH／profile。
+测试分为纯协议／模型、真实临时Git／SVN仓库、Host授权和隔离Chrome／真实Apache TLS链。测试辅助模块只服务fixture，不进入生产包。隔离安装和浏览器证据不等于当前DSH实机验收；见[实机结论](<LIVE-ACCEPTANCE.md>)。未运行或未完成的发布门禁保持PENDING，不用历史专项通过覆盖当前失败。

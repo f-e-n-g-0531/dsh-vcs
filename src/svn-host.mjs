@@ -6,14 +6,14 @@ const REMOTE_METHODS = new Set(['describe', 'approve', 'log', 'detail', 'compare
 
 // Shared host authorization; callers must explicitly supply a transport.
 export function createSvnHost(ctx, api, {
-  transport, transportFormat = 'cli', now = Date.now, timeoutMs = 15000,
+  transport, transportFormat = 'cli', readBasicCredentials, now = Date.now, timeoutMs = 15000,
 } = {}) {
   let resolveIdentity;
   const local = createHandler(ctx, api, 4, {
     now,
     bindSvnIdentityResolver: resolver => { resolveIdentity = resolver; },
   });
-  const runtime = createSvnRuntime({resolveIdentity, transport, transportFormat, now, timeoutMs});
+  const runtime = createSvnRuntime({resolveIdentity, transport, transportFormat, readBasicCredentials, now, timeoutMs});
   const remote = createSvnRpc(runtime, {timeoutMs});
 
   return {

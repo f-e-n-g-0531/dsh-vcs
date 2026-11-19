@@ -30,7 +30,8 @@ assert.ok(evaluatePluginCompatibility({...vcsManifest,version:'0.4.10',peerDepen
 assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.1-rc.5').join(' || ')}},{},'0.2.1-rc.5'));
 assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.2-rc.1').join(' || ')}},{},'0.2.2-rc.1'));
 assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.2-rc.3').join(' || ')}},{},'0.2.2-rc.3'));
-console.log('Actual host peer gate accepts only declared versions, including 0.2.2-rc.3; no exemption.');
+assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.2-rc.5').join(' || ')}},{},'0.2.2-rc.5'));
+console.log('Actual host peer gate accepts only declared versions; no exemption.');
 const {Context}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/cordis')));
 const connectionPlugin=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-client-connection')));
 const rendererDeps=new Map();

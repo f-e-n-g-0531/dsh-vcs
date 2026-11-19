@@ -1,6 +1,6 @@
 # 当前能力与验证入口
 
-此表依据 0.7.3 之后累积的当前冻结源码整理，计划以 **0.8.0** 正式版本收口，不再扩展功能。读取默认只读；以下受限写入口须独立预览和明确确认。代码已接入、专项验证、同标签发布门禁与日常 GUI 实机验收是不同状态。**0.8.0 已正式发布；完整3352/3352及同标签四矩阵、浏览器和五宿主合同通过，公开npm／GitHub工件一致。** 最终状态见[发布回执](<releases/0.8.0-RECEIPT.md>)；历史失败记录仍保留。 证据见[默认全量记录](<DEFAULT-REGRESSION-ROUND100.md>)，发布清单见[0.8.0](<releases/0.8.0.md>)。
+本表按当前源码整理，区分用户可见入口、保留的底层实现和验证入口。正式发布和实机验收另见[变更记录](<../CHANGELOG.md>)与[实机记录](<LIVE-ACCEPTANCE.md>)；0.8.0 的历史证据保留在[发布回执](<releases/0.8.0-RECEIPT.md>)和[默认全量记录](<DEFAULT-REGRESSION-ROUND100.md>)。
 
 | 能力 | 实现 | 验证入口 | 主要边界 |
 | --- | --- | --- | --- |
@@ -11,9 +11,11 @@
 | 内容搜索及命中行定位 | [搜索页](<../src/GrepPanel.jsx>) | [固定快照跳转](<../scripts/search-navigation-browser.jsx>) | Git 固定提交，保留查询；不搜索任意磁盘或远端 |
 | 大仓库文件与目录 | [定点读取及缓存](<../src/historical-access.mjs>)、[目录页](<../src/HistoricalTree.jsx>) | [历史读取](<../test/historical-access.test.mjs>)、[目录交互](<../scripts/history-tree-pages-browser.jsx>) | 单目录最多 10 万项／16MiB 输出；每页最多 100；旧整树 API 上限不变 |
 | 大文件与结构化能力 | [预览能力](<../src/preview-capabilities.mjs>)、[前端适配](<../src/preview-actions.mjs>) | [能力测试](<../test/preview-capabilities.test.mjs>)、[完整比较](<../test/large-compare.test.mjs>) | 普通每侧 2MiB，显式完整比较每侧 8MiB，历史分段 16MiB；不承诺无限文件 |
-| SVN HTTPS 历史 | [生产组合](<../src/svn-https-host.mjs>)、[运行时](<../src/svn-runtime.mjs>) | [TLS 授权链](<../test/svn-dav-chain-tls.test.mjs>) | 显式同意、系统信任、无额外认证；逐步骤授权；不复用磁盘凭据 |
+| SVN HTTPS 历史 | [生产组合](<../src/svn-https-host.mjs>)、[运行时](<../src/svn-runtime.mjs>) | [TLS 授权链](<../test/svn-dav-chain-tls.test.mjs>) | 显式同意、系统信任、逐步授权；0.9.0 候选支持宿主配置的 HTTPS Basic，不复用 SVN 登录缓存 |
 | 工作区分支切换／插件内更新 | 当前开发源码已移除 UI 与公开 RPC | [移除断言](<../test/updates.test.mjs>) | 历史引用导航仍只读；外部 Git 客户端及 DSH 插件管理器管理相应操作 |
 | 编辑器资源与性能 | [编辑器](<../src/editor.js>)、[采样工具](<../scripts/performance-baseline.mjs>) | [资源循环](<../scripts/performance-browser.jsx>)、[统计测试](<../test/performance-baseline.test.mjs>) | 环境／规模／内容一致才能比较；基线不是通用性能承诺 |
+| 图片并排／overlay／swipe | [叠加范围](<IMAGE-OVERLAY-SCOPE.md>)、[图片组件](<../src/ImageComparison.jsx>) | [浏览器回归](<../scripts/image-ui-browser.jsx>) | 原始像素左上对齐、共同缩放，不拉伸等宽；Fit／实际大小／25–200%；PNG／JPEG／静态 WebP 限制不变，不写像素 |
+| HEAD Reflog | [读取模型](<../src/reflog.mjs>) | [读取测试](<../test/reflog.test.mjs>) | 最近 200 项只读快照、固定 OID 详情；不提供恢复、reset 或 checkout |
 | 候选包与发布证据 | [预检](<../scripts/release-preflight.mjs>)、[发布工作流](<../.github/workflows/release.yml>) | [证据负例](<../test/release-evidence.test.mjs>)、[CLI 验证](<../test/release-preflight-cli.test.mjs>) | 同标签／SHA／run attempt；四包一致；渠道显式；缺证据阻断 |
 
 ### 保留的底层操作实现
@@ -30,8 +32,6 @@
 | 当前 HEAD 创建分支 | [创建范围](<BRANCH-CREATE-USER-SCOPE.md>) | 固定当前 HEAD、安全短名；不覆盖、不自动 checkout，不接受任意起点 |
 | 当前 HEAD 创建 annotated／lightweight tag | [附注标签](<TAG-CREATE-USER-SCOPE.md>)、[轻量标签](<LIGHTWEIGHT-TAG-USER-SCOPE.md>) | 独立表单与令牌；annotated 显式 tagger／消息，lightweight 直接指向 commit；不覆盖、不签名、不 push／checkout |
 | 分支删除只读评估 | [评估界面](<BRANCH-DELETE-ASSESSMENT-UI.md>) | 查看 tip 与已合并证明；无删除确认入口或授权，不执行删除；未合并／不完整历史／超限拒绝 |
-| 图片并排／overlay／swipe | [叠加范围](<IMAGE-OVERLAY-SCOPE.md>)、[图片组件](<../src/ImageComparison.jsx>) | 原始像素左上对齐、共同缩放，不拉伸等宽；Fit／实际大小／25–200%；PNG／JPEG／静态 WebP 限制不变，不写像素 |
-| HEAD Reflog | [读取模型](<../src/reflog.mjs>) | 最近 200 项只读快照、固定 OID 详情；不提供恢复、reset 或 checkout |
 
 写操作保留严格仓库／配置／路径校验：特殊 Index、attributes／filters／hooks、签名、packed refs、linked／shared worktree 等按各入口范围保守拒绝，不宣称通用 Git 兼容。计划与预览只读，确认后可追加对象；取消／失败可能残留不可达对象或写入已生效，不自动重试、删除对象或 GC 回滚。共享 pending／unknown 门禁不是外部 Git 进程的全局锁；结果未知先显式刷新并核对 HEAD、refs、Index 和工作文件。
 
