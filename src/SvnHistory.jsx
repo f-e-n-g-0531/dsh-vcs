@@ -36,19 +36,21 @@ function Scoped({sessionId,repositoryId,token,snapshot,rpc,t,onRediscover}){
 }
 function Detail({sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscover}){
  const [data,setData]=useState(null),[selection,setSelection]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0),[query,setQuery]=useState(''),[focused,setFocused]=useState(false);
+ const [detailTab,setDetailTab]=useState('changes');
  useEffect(()=>{const c=new AbortController();setData(null);setSelection(null);setError('');rpc('vcs/svn-detail',{sessionId,repositoryId,token,snapshot,revision},c.signal).then(v=>{if(!c.signal.aborted)setData(v);}).catch(e=>{if(!c.signal.aborted){setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}});return()=>c.abort();},[retry]);
  const files=(data?.changes||[]).filter(change=>change.path.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
  return <section className={'vcs-commit-details'+(focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}>
   {error?<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role="status">{t('loading')}</p>:<div className="vcs-commit-sidebar">
-   <header className="vcs-commit-summary"><h3>{data.message?.split(/\r?\n/)[0]||'r'+revision}</h3><code className="vcs-commit-oid">r{revision}</code><p>{data.author} · {data.date}</p><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{data.message}</pre><p>{previousSvnRevision(revision)===null?t('commitRoot'):'r'+previousSvnRevision(revision)} → r{revision}</p></header>
-   <aside className="vcs-commit-picker"><label>{t('commitFileSearch')} <input aria-label={t('commitFileSearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelection(null);}}/></label><span>{files.length} / {data.changes.length}</span>
+   <nav className="vcs-commit-detail-tabs" aria-label={t('commitDetails')}>{['commit','changes'].map(tab=><button key={tab} type="button" aria-pressed={detailTab===tab} onClick={()=>setDetailTab(tab)}>{t(tab==='commit'?'commitInfoTab':'commitChangesTab')}</button>)}</nav>
+   <header className="vcs-commit-summary" hidden={detailTab!=='commit'}><h3>{data.message?.split(/\r?\n/)[0]||'r'+revision}</h3><code className="vcs-commit-oid">r{revision}</code><p>{data.author} · {data.date}</p><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{data.message}</pre><p>{previousSvnRevision(revision)===null?t('commitRoot'):'r'+previousSvnRevision(revision)} → r{revision}</p></header>
+   <aside className="vcs-commit-picker" hidden={detailTab!=='changes'}><label>{t('commitFileSearch')} <input aria-label={t('commitFileSearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelection(null);}}/></label><span>{files.length} / {data.changes.length}</span>
     <ul className="vcs-commit-files">{files.map(change=><li key={change.id}><button disabled={change.kind!=='file'} aria-pressed={selection?.id===change.id&&selection.mode==='compare'} onClick={()=>setSelection({id:change.id,mode:'compare'})}><span className="vcs-file-status">{change.action} · </span><span className="vcs-file-path" title={change.path}>{change.path}{change.copyFromPath&&<small>← {change.copyFromPath} @r{change.copyFromRevision}</small>}</span></button>
      {change.kind==='file'&&<div className="vcs-svn-file-actions"><button onClick={()=>setSelection({id:change.id,mode:'trace'})}>{t('fileHistory')}</button>{change.copyFromPath&&change.copyFromRevision&&!change.copySourceOutsideScope&&<button onClick={()=>setSelection({id:change.id,mode:'copytrace'})}>{t('svnCopyHistory')} · {change.copyFromPath} @r{change.copyFromRevision}</button>}{change.copySourceOutsideScope&&<span>{t('svnCopyOutside')}</span>}</div>}
     </li>)}</ul>
     {!!data.changes.length&&!files.length&&<p role="status">{t('emptySearch')}</p>}{!data.changes.length&&<p>{t('commitNoChanges')}</p>}
    </aside>
   </div>}
-  <div className="vcs-commit-review"><div className="vcs-commit-comparison" aria-label={t('comparisonContext')}>
+  <div className="vcs-commit-review" hidden={detailTab!=='changes'}><div className="vcs-commit-comparison" aria-label={t('comparisonContext')}>
    {selection&&<button className="vcs-comparison-focus" aria-pressed={focused} onClick={()=>setFocused(v=>!v)}>{t(focused?'comparisonRestore':'comparisonFocus')}</button>}
    {selection?<Selected key={JSON.stringify(selection)} {...{sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscover}} {...selection}/>:<p role="status">{t('pick')}</p>}
   </div></div>

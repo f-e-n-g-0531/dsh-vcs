@@ -5,7 +5,28 @@ export async function checkSvnHistoryAlignment(){
  const rpc=async(e,p,signal)=>{calls.push({e,p,signal});if(p.snapshot!=='300')throw Error('Snapshot drift');if(e==='vcs/svn-log'){const start=Number(p.cursor);return {entries:Array.from({length:50},(_,i)=>({revision:String(start-i),author:'AUTHOR',date:'2026-10-15',message:'subject '+(start-i)+'\nbody'})),nextRevision:start>100?String(start-50):null};}if(e==='vcs/svn-detail')return {author:'AUTHOR',date:'2026-10-15',message:'DETAIL '+p.revision,changes:[{id:'file',kind:'file',action:'M',path:'/file.txt'},{id:'dir',kind:'dir',action:'A',path:'/directory'}]};if(e==='vcs/svn-compare')return new Promise(resolve=>late={resolve,signal});throw Error('Unexpected '+e);};
  const button=key=>[...host.querySelectorAll('button')].find(b=>b.textContent===key);
  try{flushSync(()=>root.render(<SvnHistory sessionId='s' repositoryId='r' token='token' snapshot='300' rpc={rpc} t={k=>k} onRediscover={()=>{}}/>));await wait(()=>host.querySelectorAll('.vcs-commit-row').length===50);if(!host.querySelector('.vcs-commit-meta').textContent.includes('AUTHOR'))throw Error('Missing author/date metadata');
- button('r300 · subject 300').click();await wait(()=>host.querySelector('.vcs-commit-files button'));const file=host.querySelector('.vcs-commit-files button');file.click();await wait(()=>late);if(calls.at(-1).p.revision!=='300'||calls.at(-1).p.id!=='file')throw Error('Not selected revision member');
+  button('r300 · subject 300').click();await wait(()=>host.querySelector('.vcs-commit-files button'));
+  const pane=name=>host.querySelector('.vcs-commit-'+name),visible=node=>!!node?.getClientRects().length;
+  const selectTab=async tab=>{button(tab).click();await wait(()=>button(tab).getAttribute('aria-pressed')==='true');};
+  const checkChanges=stacked=>{
+   const picker=pane('picker').getBoundingClientRect(),review=pane('review').getBoundingClientRect(),tabs=pane('detail-tabs').getBoundingClientRect();
+   if(visible(pane('summary'))||!visible(pane('picker'))||!visible(pane('review'))||tabs.bottom>Math.min(picker.top,review.top)+1||picker.width<100||review.height<80||(stacked?picker.bottom>review.top+1:picker.right>review.left+1))throw Error('SVN changes panes overlap or are clipped');
+  };
+  const beforeTabs=calls.length,file=pane('files').querySelector('button');
+  for(const [width,height,stacked] of [[1122,613,false],[640,540,true]]){
+   Object.assign(host.style,{width:width+'px',height:height+'px'});
+   if(!button('commitInfoTab')||button('commitChangesTab')?.getAttribute('aria-pressed')!=='true')throw Error('SVN default changes tab missing');
+   checkChanges(stacked);
+   await selectTab('commitInfoTab');
+   const summary=pane('summary').getBoundingClientRect(),detail=pane('details').getBoundingClientRect();
+   if(visible(pane('picker'))||visible(pane('review'))||summary.height<80||Math.abs(summary.width-detail.width)>1||!pane('summary').textContent.includes('DETAIL 300'))throw Error('SVN summary does not occupy its own pane');
+   await selectTab('commitChangesTab');checkChanges(stacked);
+  }
+  if(calls.length!==beforeTabs)throw Error('SVN detail tab refetched history');
+  file.click();await wait(()=>late);if(calls.at(-1).p.revision!=='300'||calls.at(-1).p.id!=='file')throw Error('Not selected revision member');
+  await selectTab('commitInfoTab');await selectTab('commitChangesTab');
+  await wait(()=>file.getAttribute('aria-pressed')==='true');
+  if(calls.length!==beforeTabs+1||late.signal.aborted)throw Error('SVN tab lost the current file comparison');
  if(!host.querySelectorAll('.vcs-commit-files>li>button')[1].disabled)throw Error('Directory selectable as text');
  button('comparisonFocus').click();await wait(()=>host.querySelector('.vcs-commit-focused'));button('comparisonRestore').click();await wait(()=>!host.querySelector('.vcs-commit-focused'));
  button('historyMore').click();await wait(()=>host.querySelectorAll('.vcs-commit-row').length===100);if(late.signal.aborted||!host.textContent.includes('DETAIL 300'))throw Error('Append lost selected detail');
