@@ -63,6 +63,7 @@ export function createSvnRuntime({
   timeoutMs = DEFAULT_TRANSPORT_TIMEOUT_MS,
   transportFormat = 'cli',
   readBasicCredentials,
+  readCachedCredential,
 } = {}) {
   if (!['cli', 'dav'].includes(transportFormat)) throw Error('Invalid SVN transport format');
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > DEFAULT_TRANSPORT_TIMEOUT_MS) {
@@ -163,7 +164,7 @@ export function createSvnRuntime({
         timeoutMs,
         signal: controller.signal,
         assertAuthorized,
-        ...(authentication.has(options.token) ? {authentication: authentication.get(options.token).value} : {}),
+        ...(authentication.has(options.token) ? authentication.get(options.token).value.readCachedCredential ? {readCachedCredential} : {authentication:authentication.get(options.token).value} : {}),
       });
       controller.signal.throwIfAborted();
       return normalizeTransportOutput(value, plan, options.maxBytes);
@@ -181,7 +182,8 @@ export function createSvnRuntime({
   };
 
   const runtime = {
-    async describe(address, {signal} = {}) {
+    requiresOwner(token) { return !!authentication.get(token)?.value.readCachedCredential; },
+    async describe(address, {signal, isOwner} = {}) {
       const identity = await resolve(address, signal);
       const snapshot = localSnapshot(identity);
       const offer = offers.grant(identity, {explicit: true});
@@ -194,18 +196,22 @@ export function createSvnRuntime({
         origin: new URL(identity.root).origin,
         expiresAt: now() + CONSENT_TTL_MS,
         remoteEnabled,
+        ...(isOwner && remoteEnabled && readCachedCredential && transportFormat === 'dav' ? {cachedLoginEnabled:true} : {}),
         ...(readBasicCredentials?.(identity, false) ? {basicAuthEnabled: true} : {}),
       };
     },
 
-    async approve(address, {offer, explicit = false, signal, useBasic = false} = {}) {
+    async approve(address, {offer, explicit = false, signal, useBasic = false, useCachedLogin = false, isOwner} = {}) {
       if (explicit !== true) throw Error('Explicit SVN network consent required');
       const identity = await resolve(address, signal);
       offers.assert(offer, identity);
       assertRemoteEnabled();
       const snapshot = localSnapshot(identity);
       let value;
-      if (useBasic === true) {
+      if (useCachedLogin === true) {
+        if (!isOwner || !readCachedCredential || transportFormat !== 'dav' || useBasic) throw Error('SVN cached login is not available');
+        value = {readCachedCredential};
+      } else if (useBasic === true) {
         const basic = transportFormat === 'dav' && readBasicCredentials?.(identity, true);
         if (!basic
           || typeof basic.username !== 'string' || !basic.username || Buffer.byteLength(basic.username) > 256

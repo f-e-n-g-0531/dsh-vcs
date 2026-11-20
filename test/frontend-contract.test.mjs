@@ -24,7 +24,7 @@ test('new scope owners keep request cancellation and old endpoint fallback expli
 
 // Execute the actual JSX modules in memory. Hooks/effect generations and keyed
 // unmounts are modeled here; no DOM/browser or generated module files are used.
-function frontendHarness(entry, initialProps) {
+function frontendHarness(entry, initialProps, {navigator}={}) {
  const modules=new Map(),instances=new Map(),ids=new WeakMap();let nextId=0,current,cursor=0,dirty=true,tree,props=initialProps,effects=[];
  const equal=(a,b)=>a&&b&&a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
  const React={Fragment:Symbol('fragment'),createElement:(type,p,...children)=>({type,props:{...p,children}}),
@@ -36,7 +36,7 @@ function frontendHarness(entry, initialProps) {
   Component:class {constructor(p){this.props=p;}},
  };
  const document={baseURI:'https://fixture.test/',visibilityState:'visible',head:{appendChild(){}},createElement:()=>({remove(){}})};
- const context={AbortController,URL,Set,Map,console,window:{addEventListener(){},removeEventListener(){}},document,setTimeout,clearTimeout};
+ const context={AbortController,URL,Set,Map,console,navigator,window:{addEventListener(){},removeEventListener(){}},document,setTimeout,clearTimeout};
  function load(path){
   path=resolve(path);if(modules.has(path))return modules.get(path).exports;
   if(path.endsWith('editor-loader.mjs'))return {loadEditor:async()=>{throw Error('memory-only editor unavailable');}};
@@ -91,6 +91,35 @@ test('production createPage wires SVN consent log and revoke identities across r
  }finally{h.dispose();}
 });
 
+test('SVN 401 explains local client fallback without retrying or requesting credentials',async()=>{
+ const calls=[],copied=[];
+ const workingCopy='C:/fixture/svn-working-copy';
+ const h=frontendHarness('src/SvnRemote.jsx',{sessionId:'s',repositoryId:'r',workingCopy,t:k=>k,onRediscover(){},rpc:async(e,p)=>{
+  calls.push({e,p});
+  if(e==='vcs/svn-describe')return {offer:'a'.repeat(64),remoteEnabled:true};
+  if(e==='vcs/svn-approve')return {token:'b'.repeat(64),snapshot:'9',expiresAt:Date.now()+299000};
+  if(e==='vcs/svn-log')throw Object.assign(new Error('401'),{code:'vcs/svn-auth-required'});
+  if(e==='vcs/svn-revoke')return {revoked:true};
+  throw Error('Unexpected RPC '+e);
+ }},{navigator:{clipboard:{async writeText(value){copied.push(value);}}}});
+ try {
+  await h.flush();assert.equal(calls.length,0);assert.ok(!nodeText(h.tree).includes('svnAuthNativeHint'));
+  assert.equal(button(h,'svnCopyWorkingCopy'),undefined);
+  button(h,'svnConsentReview').props.onClick();await h.flush();
+  findNode(h,n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});await h.flush();
+  button(h,'svnConsentApprove').props.onClick();await h.flush();
+  assert.ok(nodeText(h.tree).includes('svnAuthNativeHint'));assert.ok(nodeText(h.tree).includes('svnAuthRequired'));
+  assert.ok(!nodeText(h.tree).includes('svnAuthBasicHint'));assert.equal(button(h,'svnConsentBasic'),undefined);
+  assert.ok(nodeText(h.tree).includes(workingCopy));assert.deepEqual(copied,[]);
+  const beforeCopy=calls.length;await button(h,'svnCopyWorkingCopy').props.onClick();await h.flush();
+  assert.equal(calls.length,beforeCopy);assert.deepEqual(copied,[workingCopy]);
+  assert.ok(nodeText(h.tree).includes('svnWorkingCopyCopied'));
+  assert.equal(calls.filter(c=>c.e==='vcs/svn-log').length,1);
+  assert.equal(calls.filter(c=>c.e==='vcs/svn-approve').length,1);
+  assert.deepEqual(Object.keys(calls.find(c=>c.e==='vcs/svn-approve').p).sort(),['explicit','offer','repositoryId','sessionId']);
+ }finally{h.dispose();}
+});
+
 test('production review views preserve keyed scope boundaries and hide the workspace',async()=>{
  const A='a'.repeat(40),calls=[];let finishCompare;
  const rpc=(e,p,signal)=>{
@@ -126,6 +155,13 @@ test('production review views preserve keyed scope boundaries and hide the works
   await navigate('reflog');checkPanel('ReflogPanel',true);assert.equal(button(h,'history only'),undefined);
   await navigate('stash');checkPanel('StashPanel',false);
   await navigate('grep');checkPanel('SearchPanel',false);
+  assert.equal(findNode(h,n=>n.props?.className==='vcs-revision-panel'),undefined);
+  assert.ok(button(h,'revisionTitle'));
+  button(h,'revisionTitle').props.onClick();await h.flush();
+  assert.ok(findNode(h,n=>n.props?.className==='vcs-revision-panel'));
+  assert.equal(findNode(h,n=>n.props?.className==='vcs-body').props.hidden,true);
+  assert.equal(button(h,'history only'),undefined);
+  assert.equal(calls.filter(c=>c.e==='vcs/references').length,0);
  }finally{h.dispose();}
 });
 

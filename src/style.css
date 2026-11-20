@@ -392,10 +392,14 @@
 .vcs-root .vcs-snapshot-ref {flex:0 0 130px;max-width:28%;color:var(--vcs-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vcs-root .vcs-snapshot-subject {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vcs-root .vcs-snapshot-date {flex:0 0 auto;font-size:10px;color:var(--vcs-muted);font-variant-numeric:tabular-nums}
-.vcs-root .vcs-revision-panel {padding:10px 0;border-top:1px solid var(--vcs-border);margin-top:10px}
+.vcs-root .vcs-revision-panel {display:block;flex:1 1 auto;min-height:0;min-width:0;overflow:auto;padding:14px 16px;scrollbar-gutter:stable;background:var(--vcs-panel);border-top:0;margin:0}
+.vcs-root .vcs-revision-panel select {display:block;width:100%;min-width:0;max-width:100%;margin-block:4px 8px}
+.vcs-root .vcs-revision-panel ul {list-style:none;padding:0;display:grid;gap:4px}
+.vcs-root .vcs-revision-panel li button {max-width:100%;text-align:start;overflow-wrap:anywhere}
 .vcs-root .vcs-revision-panel h3 {font-size:12px;margin:0 0 6px}
 .vcs-root .vcs-revision-panel>p {font-size:11px;color:var(--vcs-muted);margin:6px 0}
-.vcs-root .vcs-revision-panel>label {margin:8px 0}
+.vcs-root .vcs-revision-panel>label {display:block;margin:8px 0}
+.vcs-root .vcs-revision-panel .vcs-history-comparison {margin-top:14px;min-width:0}
 .vcs-root .vcs-search-modes {padding:7px 12px;gap:4px;background:var(--vcs-surface)}
 .vcs-root .vcs-grep-panel {padding:16px;min-width:0}
 .vcs-root .vcs-grep-panel h3 {margin:0 0 5px;font-size:15px}
@@ -467,6 +471,9 @@
 .vcs-root .vcs-consent-actions button {max-width:100%;overflow-wrap:anywhere}
 .vcs-root .vcs-consent-actions .vcs-consent-basic:not(:disabled) {border-color:var(--vcs-accent);background:var(--vcs-tint)}
 .vcs-root .vcs-svn-remote>p[role=status] {padding:6px 10px;background:var(--vcs-panel);border-radius:6px;overflow-wrap:anywhere}
+.vcs-root .vcs-svn-native-hint {margin:4px 16px;padding:8px 12px;border:1px solid var(--vcs-border);border-radius:6px;overflow-wrap:anywhere;flex-shrink:0}
+.vcs-root .vcs-svn-native-hint p {margin:0 0 6px}
+.vcs-root .vcs-svn-native-hint button + p {margin:6px 0 0}
 @container(max-width:460px) {
   .vcs-root .vcs-top {padding-block:8px}
   .vcs-root .vcs-files {width:36%;min-width:105px}

@@ -3,12 +3,32 @@ import React, {useEffect, useState} from 'react';
 import SvnConsent from './SvnConsent.jsx';
 import SvnHistory from './SvnHistory.jsx';
 
+function NativeLogHint({workingCopy, t}) {
+  const [copyStatus, setCopyStatus] = useState('');
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(workingCopy);
+      setCopyStatus('svnWorkingCopyCopied');
+    } catch {
+      setCopyStatus('svnWorkingCopyCopyFailed');
+    }
+  };
+  return <div className="vcs-svn-native-hint">
+    <p>{t('svnAuthNativeHint')}</p>
+    {workingCopy && <>
+      <p><span>{t('svnWorkingCopyPath')}: </span><code>{workingCopy}</code></p>
+      <button type="button" onClick={copy}>{t('svnCopyWorkingCopy')}</button>
+      {copyStatus && <p role="status">{t(copyStatus)}</p>}
+    </>}
+  </div>;
+}
+
 // Network reads start only after explicit scoped approval; teardown revokes the grant.
 export default function SvnRemote(props) {
   return <Scoped key={JSON.stringify([props.sessionId, props.repositoryId])} {...props}/>;
 }
 
-function Scoped({sessionId, repositoryId, rpc, t, onRediscover}) {
+function Scoped({sessionId, repositoryId, workingCopy, rpc, t, onRediscover}) {
   const [grant, setGrant] = useState(null);
   const [revoking, setRevoking] = useState(false);
   const [error, setError] = useState('');
@@ -95,6 +115,7 @@ function Scoped({sessionId, repositoryId, rpc, t, onRediscover}) {
 
   return <section className="vcs-svn-remote">
     {!grant && error && <p role="status">{error}</p>}
+    {!grant && authRequired && <NativeLogHint key={workingCopy} workingCopy={workingCopy} t={t}/>}
     {!grant ? <SvnConsent {...{sessionId, repositoryId, rpc, t, onRediscover, authRequired}} onApproved={onApproved}/> : <>
       <p>{t('svnGrantScope')}</p>
       <button disabled={revoking} onClick={() => setAttempt(value => value + 1)}>{t('svnRevoke')}</button>

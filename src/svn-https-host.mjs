@@ -1,3 +1,4 @@
+import {readWindowsSvnCache} from './svn-windows-cache.mjs';
 import {createSvnHost} from './svn-host.mjs';
 import {createBoundedHttps} from './bounded-https.mjs';
 import {createSvnDavLogTransport} from './svn-dav-log-transport.mjs';
@@ -13,11 +14,12 @@ export function readHostBasicCredentials({root, uuid, sessionId}, includeSecret,
   } : true;
 }
 
-// Production composition: no CLI, persistent auth cache, custom CA or request injection.
+// Network transport stays in-process DAV; Windows may use a local credential provider.
 export function createSvnHttpsHost(ctx, api) {
   return createSvnHost(ctx, api, {
     transportFormat: 'dav',
     readBasicCredentials: readHostBasicCredentials,
+    readCachedCredential: process.platform === 'win32' ? readWindowsSvnCache : undefined,
     transport: createSvnDavLogTransport({request: createBoundedHttps()}),
   });
 }

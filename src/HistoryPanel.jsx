@@ -2,7 +2,7 @@ import React,{useState,useEffect,useMemo} from 'react';
 import {indexHistoryReferences} from './history-refs.mjs';
 import CommitDetails from './CommitDetails.jsx';
 import HistoryGraph from './HistoryGraph.jsx';
-import RevisionPanel from './RevisionPanel.jsx';
+import {useRevisionReferences} from './RevisionPanel.jsx';
 import {filterLoadedCommits} from './history-filter.mjs';
 import {mergeHistoryWindow} from './history-window.mjs';
 import {reviewLocation,patchReviewLocation,pushReviewLocation} from './review-location.mjs';
@@ -13,6 +13,7 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover,showSearc
  const [selection,setSelection]=useState({...reviewLocation(),revision:0}),[query,setQuery]=useState('');
  const [navStack,setNavStack]=useState([]);
  const [references,setReferences]=useState(null),[historyTip,setHistoryTip]=useState(''),[historyRef,setHistoryRef]=useState('');
+ const refsControl=useRevisionReferences({sessionId,repositoryId,rpc,onRediscover,onReferencesLoaded:setReferences});
  const navigateReference=value=>{const ref=(references||[]).find(row=>JSON.stringify([row.name,row.commit])===value);const tip=ref?.commit||'';setHistoryRef(value);setHistoryTip(tip);setSearch(old=>old?{...old,snapshot:tip||null}:null);setOffset(0);setQuery('');setSelected(null);setPage({commits:[],snapshot:null,nextOffset:null});};
  const [draft,setDraft]=useState({message:'',author:'',path:'',since:'',until:''}),[search,setSearch]=useState(null);
  const submitSearch=value=>{setSearch({values:value,snapshot:page.snapshot});setOffset(0);setQuery('');setSelected(null);setPage(old=>({...old,commits:[],nextOffset:null}));};
@@ -36,6 +37,8 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover,showSearc
  const commits=filterLoadedCommits(page.commits,query);
  return <section className="vcs-history vcs-history-browser" aria-label={t('history')} aria-busy={busy}>
  <div className="vcs-history-list"><p>{t('historyListOnly')}</p>{references!==null&&<p>{t('historyRefsScope')}</p>}
+ <button disabled={refsControl.busy} onClick={refsControl.reload}>{t('revisionLoadRefs')}</button>
+ {refsControl.busy&&<p role="status">{t('loading')}</p>}{refsControl.error&&<p role="alert">{refsControl.error}</p>}
  <label>{t('historyBranch')} <select aria-label={t('historyBranch')} value={historyRef} disabled={busy} onChange={e=>navigateReference(e.target.value)}><option value="">HEAD</option>{historyRef&&!(references||[]).some(ref=>JSON.stringify([ref.name,ref.commit])===historyRef)&&<option value={historyRef}>{JSON.parse(historyRef)[0]} · {historyTip.slice(0,10)} · {t('historyPinned')}</option>}{(references||[]).map(ref=>{const value=JSON.stringify([ref.name,ref.commit]);return <option key={value} value={value}>{ref.name} · {ref.commit.slice(0,10)}</option>;})}</select></label>{showSearch&&<details className="vcs-help"><summary>{t('historySearchHelp')}</summary><p>{t('historyBranchScope')}{historyTip&&<> · <code>{historyTip}</code></>}</p></details>}
  {showSearch&&<form className="vcs-history-search" aria-label={t('historyServerSearch')} onSubmit={e=>{e.preventDefault();submitSearch({...draft});}}><fieldset disabled={busy}><legend>{t('historyServerSearch')}</legend><details className="vcs-help"><summary>{t('historySearchHelp')}</summary><p>{t('historyServerScope')}</p></details>{['message','author','path','since','until'].map(field=><label key={field}>{t('historyServer_'+field)} <input maxLength={field==='since'||field==='until'?40:1024} placeholder={field==='since'||field==='until'?'YYYY-MM-DD[THH:MM[:SS][±HH:MM]]':undefined} aria-label={t('historyServer_'+field)} value={draft[field]} onChange={e=>setDraft(old=>({...old,[field]:e.target.value}))}/></label>)}<button type="submit">{t('historyServerApply')}</button><button type="button" onClick={()=>{setDraft({message:'',author:'',path:'',since:'',until:''});submitSearch({});}}>{t('historyServerClear')}</button></fieldset></form>}
  {search&&<p role="status">{t('historyServerActive')}: {JSON.stringify(search.values)} · <code>{search.snapshot||page.snapshot}</code></p>}
@@ -50,7 +53,6 @@ function ScopedHistoryPanel({sessionId,repositoryId,rpc,t,onRediscover,showSearc
  {!!offset&&<button disabled={busy} onClick={goBack}>{t('historyBack')}</button>}
  {!error&&page.nextOffset!==null&&<button disabled={busy} onClick={()=>setOffset(page.nextOffset)}>{t('historyMore')}</button>}
  {!!page.commits.length&&<HistoryGraph commits={page.commits} selected={selected} onSelect={setSelected} t={t}/>}
- <RevisionPanel onReferencesLoaded={setReferences} commits={page.commits} {...{sessionId,repositoryId,rpc,t,onRediscover}}/>
  </div><div className="vcs-history-details">{navStack.length>0&&<p className="vcs-history-back"><button onClick={navigationBack} aria-label={t('historyNavigationBack')}>{t('historyNavigationBack')} · {navStack[navStack.length-1].id.slice(0,10)}</button></p>}{selected&&<CommitDetails key={JSON.stringify([selected,selection.revision])} compactSummary initialPath={selection.path} initialLocation={selection} onLocationChange={updateLocation} sessionId={sessionId} repositoryId={repositoryId} commit={selected} onSelectCommit={navigateCommit} rpc={rpc} t={t} onRediscover={onRediscover}/>}
  </div></section>;
 }

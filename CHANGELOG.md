@@ -1,5 +1,11 @@
 # 变更记录
 
+## 0.9.1 — SVN 登录缓存与独立版本比较
+
+- 支持在 Windows 宿主显式使用 TortoiseSVN 的 HTTPS Basic 登录缓存。
+- 将 A/B 版本比较移到独立页签，并改善比较区域布局。
+- 兼容 SVN WebDAV 属性名列表中重复的空属性。
+
 ## 0.9.0 — DSH rc.5 兼容与 SVN HTTPS Basic 认证
 
 - 新增 DSH Web 0.2.2-rc.5 精确兼容声明。

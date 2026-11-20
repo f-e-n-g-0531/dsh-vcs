@@ -29,7 +29,7 @@ test('host-scoped Basic authenticates DAV discovery, baseline and REPORT only af
     req.end = () => queueMicrotask(() => {
       const res = new EventEmitter();
       res.statusCode = sent === header && !invalid ? 200 : 401;
-      res.headers = {};
+      res.headers = sent ? {} : {'www-authenticate':'Basic realm="Repo"'};
       res.complete = true;
       res.destroy = () => {};
       callback(res);
@@ -44,6 +44,7 @@ test('host-scoped Basic authenticates DAV discovery, baseline and REPORT only af
   }});
   const runtime = createSvnRuntime({now:()=>now, resolveIdentity:async()=>identity,
     readBasicCredentials:(value, secret)=>readHostBasicCredentials(value, secret, env),
+    readCachedCredential:async realm=>{assert.equal(realm,'<https://example.test:443> Repo');return {username:'fixture',password:'only:fixture'};},
     transportFormat:'dav', transport:createSvnDavLogTransport({request})});
   t.after(()=>runtime.dispose());
   const rpc = createSvnRpc(runtime);
@@ -70,9 +71,22 @@ test('host-scoped Basic authenticates DAV discovery, baseline and REPORT only af
   assert.deepEqual(history.value.entries.map(item=>item.revision),['2','1','0']);
   assert.deepEqual(calls.slice(1).map(c=>[c.method,c.sent]),[['PROPFIND',header],['PROPFIND',header],['REPORT',header]]);
   assert.ok(calls.every(c=>c.url.startsWith(root+'/')));
+  const ownerCall=(method,options)=>rpc('vcs/svn-'+method,{...address,...options},undefined,true);
+  assert.equal((await describe()).cachedLoginEnabled,undefined);
+  const cacheOffer=(await ownerCall('describe')).value;
+  assert.equal(cacheOffer.cachedLoginEnabled,true);
+  assert.equal((await approve(cacheOffer,{useCachedLogin:true})).ok,false);
+  const cached=(await ownerCall('approve',{offer:cacheOffer.offer,explicit:true,useCachedLogin:true})).value;
+  const beforeCached=calls.length;
+  assert.equal((await log(cached)).ok,false);
+  assert.equal(calls.length,beforeCached);
+  assert.equal((await ownerCall('log',{token:cached.token,snapshot:cached.snapshot})).ok,true);
+  assert.deepEqual(calls.slice(beforeCached).map(c=>c.sent),[undefined,header,undefined,header,undefined,header]);
+  // Selecting a new mode replaces the previous grant for this working copy.
+  const current=(await approve(await describe(),{useBasic:true})).value;
   invalid = true;
-  assert.equal((await log(authenticated)).error.code,'vcs/svn-auth-required');
-  assert.equal((await log(authenticated)).error.code,'vcs/svn-consent-required');
+  assert.equal((await log(current)).error.code,'vcs/svn-auth-required');
+  assert.equal((await log(current)).error.code,'vcs/svn-consent-required');
   const expiring = (await approve(await describe(),{useBasic:true})).value;
   now = 300000;
   const before = calls.length;

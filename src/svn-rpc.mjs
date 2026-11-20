@@ -5,7 +5,7 @@ const failure=(code,message)=>({ok:false,error:{code,message,details:{}}});
 const FIELDS = {
   revoke: ['token'],
   describe: [],
-  approve: ['offer', 'explicit', 'useBasic'],
+  approve: ['offer', 'explicit', 'useBasic', 'useCachedLogin'],
   log: ['token', 'snapshot', 'cursor', 'limit'],
   detail: ['token', 'snapshot', 'revision'],
   compare: ['token', 'snapshot', 'revision', 'id'],
@@ -26,6 +26,7 @@ function validatePayload(method, payload) {
     }
   }
   if (method === 'approve') {
+    if (payload.useCachedLogin !== undefined && (payload.useCachedLogin !== true || payload.useBasic !== undefined)) throw Error('Invalid SVN authentication selection');
     if (payload.useBasic !== undefined && payload.useBasic !== true) throw Error('Invalid SVN authentication selection');
     if (payload.explicit !== true || typeof payload.offer !== 'string' || !/^[a-f0-9]{64}$/.test(payload.offer)) {
       throw Error('Explicit scoped offer required');
@@ -56,7 +57,7 @@ export function createSvnRpc(runtime, {timeoutMs = 15000} = {}) {
     throw Error('Invalid SVN RPC deadline');
   }
   let active = 0;
-  return async (endpoint, payload, signal) => {
+  return async (endpoint, payload, signal, isOwner = false) => {
     const method = endpoint.startsWith('vcs/svn-') ? endpoint.slice(8) : '';
     if (!Object.hasOwn(FIELDS, method)) {
       return failure('vcs/not-found','Unknown SVN endpoint');
@@ -77,9 +78,10 @@ export function createSvnRpc(runtime, {timeoutMs = 15000} = {}) {
     try {
       signal?.throwIfAborted();
       validatePayload(method, payload);
+      if (!isOwner && runtime.requiresOwner?.(payload.token)) throw Error('SVN cached login requires an owner');
       const {sessionId, repositoryId, ...options} = payload;
       const value = await runtime[method]({sessionId, repositoryId}, {
-        ...options, signal: controller.signal,
+        ...options, signal: controller.signal, isOwner,
       });
       controller.signal.throwIfAborted();
       return {ok: true, value};
