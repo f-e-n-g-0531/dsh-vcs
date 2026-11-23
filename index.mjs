@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import {readFileSync} from 'node:fs';
-import {registerFrontendAssets} from './frontend-assets.mjs';
+import {assetRejection,registerFrontendAssets} from './frontend-assets.mjs';
 const runningFrontend=JSON.parse(readFileSync(new URL('./dist/frontend.json',import.meta.url),'utf8'));
 import * as adapter from './vcs.mjs';
 import {createIndexUnstageCoordinator} from './index-change-host.mjs';
@@ -756,10 +756,10 @@ export function registerAssets(ctx, load = filename => readFile(new URL('./dist/
 /** Dedicated static routes avoid dependence on the shared /api dispatcher. */
 export function registerDirectAssets(ctx, load = filename => readFile(new URL('./dist/' + filename, import.meta.url))) {
   for (const filename of ASSETS) ctx.effect(() => ctx.webServer.register({
-    kind: 'exact', path: '/vcs-assets/' + filename,
-    async handler(req, res) {
-      const admission = ctx.connection.admit(req);
-      if ('rejection' in admission) { res.writeHead(admission.rejection); res.end(admission.rejection === 401 ? 'unauthorized' : 'forbidden'); return; }
+    kind: 'exact', path: '/vcs-assets/' + filename, auth: 'required',
+    async handler(req, res, peer) {
+      const rejection = assetRejection(ctx,req,peer);
+      if (rejection !== undefined) { res.writeHead(rejection); res.end(rejection === 401 ? 'unauthorized' : 'forbidden'); return; }
       if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, {Allow:'GET, HEAD'}); res.end(); return; }
       try {
         const bytes = await load(filename);
@@ -771,11 +771,17 @@ export function registerDirectAssets(ctx, load = filename => readFile(new URL('.
 }
 
 export function apply(ctx) {
-  // Pass the plugin owner explicitly: the nested rpc getter can retain the
-  // connection service context, which does not inject webServer.
   const host=createSvnHttpsHost(ctx,adapter);
   ctx.effect(()=>()=>{ host.dispose(); adapter.clearHistoricalCache?.(); });
-  ctx.connection.register(ctx, RPC_CHANNEL, host.handle);
+  const connection=ctx.connection;
+  if(!('browserPeer' in connection)){
+    // Older hosts expose explicit owner registration.
+    connection.register(ctx,RPC_CHANNEL,host.handle);
+  }else{
+    // The new carrier admits a Peer before dispatch. VCS is local-owner only.
+    connection.rpc.handle(RPC_CHANNEL,(endpoint,payload,signal,peer)=>
+      peer?.principal?.kind==='owner'?host.handle(endpoint,payload,signal):failure('vcs/forbidden','VCS requires the local owner.'));
+  }
   registerAssets(ctx);
   registerDirectAssets(ctx);
   registerFrontendAssets(ctx,{running:runningFrontend});

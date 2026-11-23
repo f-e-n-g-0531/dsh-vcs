@@ -24,13 +24,9 @@ const requireHost=createRequire(path.resolve(manifest));
 const {evaluatePluginCompatibility}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-app-boot')));
 const vcsManifest=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8'));
 for(const version of supportedHosts)assert.equal(evaluatePluginCompatibility(vcsManifest,{},version),undefined);
-for(const version of ['0.1.7-rc.1','0.2.0-rc.1','0.2.0-rc.3','0.2.0','0.2.1-rc.1','0.2.1-rc.3','0.2.1-rc.4','0.2.1-rc.6','0.2.1','0.2.2-rc.0','0.2.2-rc.2','0.2.2-rc.4','0.2.2','0.3.0'])assert.ok(evaluatePluginCompatibility(vcsManifest,{},version));
-assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!==hostManifest.version).join(' || ')}},{},hostManifest.version));
+for(const version of ['0.1.7-rc.1','0.2.0-rc.1','0.2.0-rc.3','0.2.0','0.2.1-rc.1','0.2.1-rc.3','0.2.1-rc.4','0.2.1-rc.6','0.2.1','0.2.2-rc.0','0.2.2-rc.2','0.2.2-rc.4','0.2.2','0.2.3-alpha.1','0.2.3-alpha.3','0.2.3','0.3.0'])assert.ok(evaluatePluginCompatibility(vcsManifest,{},version));
 assert.ok(evaluatePluginCompatibility({...vcsManifest,version:'0.4.10',peerDependencies:{'@deepseek-ai/dsh':'0.1.7-rc.2 || 0.2.0-rc.2'}},{},'0.2.1-rc.2'));
-assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.1-rc.5').join(' || ')}},{},'0.2.1-rc.5'));
-assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.2-rc.1').join(' || ')}},{},'0.2.2-rc.1'));
-assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.2-rc.3').join(' || ')}},{},'0.2.2-rc.3'));
-assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!=='0.2.2-rc.5').join(' || ')}},{},'0.2.2-rc.5'));
+for(const version of supportedHosts)assert.ok(evaluatePluginCompatibility({...vcsManifest,peerDependencies:{'@deepseek-ai/dsh':supportedHosts.filter(v=>v!==version).join(' || ')}},{},version));
 console.log('Actual host peer gate accepts only declared versions; no exemption.');
 const {Context}=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/cordis')));
 const connectionPlugin=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-client-connection')));
@@ -49,21 +45,41 @@ const {SlotRegistry}=renderer;
 const ctx=new Context(),routes=new Map();
 let cookie='';
 try{
- ctx.provide('webServer',{register(route){assert.equal(routes.has(route.path),false);routes.set(route.path,route);return ()=>routes.delete(route.path);}});
+ const splitAuth=hostManifest.version==='0.2.3-alpha.2';
+ const webServer={host:'127.0.0.1',protocol:'http:',register(route){assert.equal(routes.has(route.path),false);routes.set(route.path,route);return ()=>routes.delete(route.path);}};
+ ctx.provide('webServer',webServer);
  ctx.provide('sessions',new Map());ctx.provide('sessionPersistence',{stat:async()=>undefined});
  const credentials=new Map();ctx.provide('credentials',{async modifyRecord(key,update){const decision=await update(credentials.get(key));if(decision?.kind==='grant')credentials.set(key,decision);else if(decision?.kind==='revoke')credentials.delete(key);return credentials.get(key);}});
- await connectionPlugin.apply(ctx,{});
+ if(splitAuth){
+  await ctx.plugin(connectionPlugin);
+  const tokenPlugin=await import(pathToFileURL(requireHost.resolve('@deepseek-ai/dsh-host-authentication-token')));
+  await ctx.plugin(tokenPlugin);
+ }else await connectionPlugin.apply(ctx,{});
+ const serve=async(route,req,res)=>{
+  if(!splitAuth)return route.handler(req,res);
+  const auth=route.auth??'required';
+  const admission=ctx.bail(webServer,'webserver/authorize',{headers:req.headers,method:req.method,url:new URL(req.url??'/','http://127.0.0.1:3080'),transport:'http'},auth);
+  assert.ok(admission,'Expected real WebServer authorization hook');
+  if(admission.kind==='deny'){res.writeHead(admission.status);res.end();return;}
+  return route.handler(req,res,admission.peer);
+ };
  const oldHost=['0.1.7-rc.2','0.2.0-rc.2'].includes(hostManifest.version),hostRoutes=oldHost?['/api']:['/api','/connect'];
  assert.deepEqual([...routes.keys()].sort(),hostRoutes,'Exact host carrier contract');
  const fiber=await ctx.plugin(plugin);
  for(const [name,route] of routes)assert.equal(route.kind,['/vcs-rpc','/api'].includes(name)?'prefix':'exact');
  assert.deepEqual([...routes.keys()].sort(),[...hostRoutes,'/vcs-assets/editor.css','/vcs-assets/editor.js','/vcs-assets/editor.worker.js','/vcs-assets/frontend.json','/vcs-assets/interface.js','/vcs-rpc']);
  for(const [name,route] of routes){if(name==='/connect')continue;
-  let status,ended=false;await route.handler({method:'GET',headers:{host:'127.0.0.1:3080'}},{writeHead(n){status=n;},end(){ended=true;}});
+  let status,ended=false;await serve(route,{method:'GET',headers:{host:'127.0.0.1:3080'}},{writeHead(n){status=n;},end(){ended=true;}});
   assert.equal(status,401);assert.equal(ended,true);
  }
- const url=new URL(ctx.connection.authenticatedUrl('http://127.0.0.1:3080/'));let authStatus,authHeaders;
- assert.equal(ctx.connection.authorizeIndex({method:'GET',url:url.pathname+url.search,headers:{host:url.host}},{writeHead(status,headers){authStatus=status;authHeaders=headers;},end(){}}),false);assert.equal(authStatus,303);
+ const base='http://127.0.0.1:3080/';
+ const entries=[];if(splitAuth)ctx.emit(webServer,'webserver/entry-url',base,entries);
+ const url=new URL(splitAuth?entries[0].url:ctx.connection.authenticatedUrl(base));let authStatus,authHeaders;
+ const indexReq={method:'GET',url:url.pathname+url.search,headers:{host:url.host}};
+ const indexRes={writeHead(status,headers){authStatus=status;authHeaders=headers;},end(){}};
+ if(splitAuth)await ctx.waterfall(webServer,'webserver/request',indexReq,indexRes,async()=>{throw Error('Token exchange must handle the launch URL');});
+ else assert.equal(ctx.connection.authorizeIndex(indexReq,indexRes),false);
+ assert.equal(authStatus,303);
  cookie=String(authHeaders['set-cookie']).split(';')[0];assert.ok(cookie.includes('='),'Real cookie exchange must set session cookie');
  const request={headers:{host:'127.0.0.1:3080',cookie}};
  assert.equal(ctx.connection.admit({headers:{host:'127.0.0.1:3080',cookie:cookie+'tampered'}}).rejection,401);const admission=ctx.connection.admit(request);assert.ok('peer' in admission);const peer=admission.peer;
@@ -82,7 +98,7 @@ try{
   try{assert.equal((await fetcher.fetch(new Request('http://127.0.0.1:3080/api/vcs-assets/editor.css'),guest)).status,403);}finally{await guest.dispose();}
  }
  const direct=async(name,url,method='GET')=>{
-  let status,body;await routes.get('/vcs-assets/'+name).handler({method,url,headers:request.headers},{writeHead(code){status=code;},end(value){body=value;}});
+  let status,body;await serve(routes.get('/vcs-assets/'+name),{method,url,headers:request.headers},{writeHead(code){status=code;},end(value){body=value;}});
   return {status,body};
  };
  const frontend=await direct('frontend.json','/vcs-assets/frontend.json');assert.equal(frontend.status,200);
@@ -99,7 +115,7 @@ try{
   const chunks=[];let status;
   const res=new Writable({write(chunk,encoding,done){chunks.push(Buffer.from(chunk));done();}});
   res.writeHead=code=>{status=code;};
-  await routes.get(carrier).handler(req,res);
+  await serve(routes.get(carrier),req,res);
   return {status,text:Buffer.concat(chunks).toString('utf8')};
  };
  for(const [auth,host,status] of [['','127.0.0.1:3080',401],[cookie+'tampered','127.0.0.1:3080',401],[cookie,'evil.invalid',403],[cookie,'127.0.0.1:3080',200]])assert.equal((await routeRequest('vcs-assets/editor.css','','application/json',host,'/api',auth)).status,status,'Real /api cookie carrier');
@@ -110,6 +126,17 @@ try{
   const response=await routeRequest(method,JSON.stringify({type:'client-request',rpcId:'compat-test',method,payload}));
   assert.equal(response.status,200,response.text);const body=JSON.parse(response.text);assert.equal(body.type,'server-response');assert.equal(body.rpcId,'compat-test');return body.result;
  };
+ if(splitAuth){
+  const guest=ctx.connection.createPeer({principal:{kind:'guest'}});
+  try{
+   let status;await routes.get('/vcs-assets/editor.css').handler({method:'GET',headers:request.headers},{writeHead(n){status=n;},end(){}},guest);assert.equal(status,403);
+   const body=JSON.stringify({type:'client-request',rpcId:'guest',method:'vcs/repositories',payload:{sessionId:'fixture'}});
+   const req=Readable.from([Buffer.from(body)]);Object.assign(req,{url:'/vcs-rpc/vcs/repositories',method:'POST',headers:{host:url.host,'content-type':'application/json'}});
+   const chunks=[];const res=new Writable({write(chunk,_encoding,done){chunks.push(chunk);done();}});res.writeHead=n=>{status=n;};
+   await routes.get('/vcs-rpc').handler(req,res,guest);
+   assert.equal(status,200);assert.equal(JSON.parse(Buffer.concat(chunks)).result.error.code,'vcs/forbidden');
+  }finally{await guest.dispose();}
+ }
  assert.equal((await invoke('vcs/unknown',{})).error.code,'vcs/not-found');
  assert.equal((await invoke('vcs/repositories',{sessionId:'missing'})).error.code,'vcs/session-unavailable');
  assert.equal((await invoke('vcs/repositories',{sessionId:'missing',cwd:'/untrusted'})).error.code,'vcs/invalid-request');
@@ -136,7 +163,7 @@ try{
   vm.runInNewContext(await readFile(new URL('../dist/client.js',import.meta.url),'utf8'),{window:{__ModuleLoader__:target},URL,AbortController,console});
   assert.equal(target.pendingQueue.length,1);assert.equal(target.pendingQueue[0].id,vcsManifest.name);
   assert.equal(clientCtx.slots.entries('main').length,0,'Bundle registration must not activate the plugin');
-  const modules=new moduleApi.ClientModuleSystem({manifest:{modules:[]},staticModules:{react:React},registrationTarget:target,bootstrapModule:{id:'compat-fixture',exports:{}},loadBundle:async()=>{throw Error('Unexpected network bundle request');}});
+  const modules=new moduleApi.ClientModuleSystem({manifest:{modules:[]},staticModules:splitAuth?[{id:'react',factory:()=>React}]:{react:React},registrationTarget:target,bootstrapModule:{id:'compat-fixture',exports:{}},loadBundle:async()=>{throw Error('Unexpected network bundle request');}});
   assert.equal(modules.loadCache.has(vcsManifest.name),false,'Registration must remain lazy');
   const client=await modules.import(vcsManifest.name);
   assert.equal(await modules.import(vcsManifest.name+'/client'),client,'Client alias must reuse materialized exports');

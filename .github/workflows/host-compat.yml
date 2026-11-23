@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: ['0.1.7-rc.2', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.5', '0.2.2-rc.1', '0.2.2-rc.3', '0.2.2-rc.5']
+        host: ['0.1.7-rc.2', '0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.5', '0.2.2-rc.1', '0.2.2-rc.3', '0.2.2-rc.5', '0.2.3-alpha.2']
     env:
       RELEASE_TAG: ${{ github.ref_name }}
       RELEASE_SHA: ${{ github.sha }}
@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '24.9.0'
+          node-version: '24.22.3'
       - name: Require exact version tag and controlled fixture inputs
         env:
           FIXTURE_RUN: ${{ inputs.fixture_run }}
