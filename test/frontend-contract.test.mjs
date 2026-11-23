@@ -177,6 +177,24 @@ test('production status category counts do not depend on file selection or filte
  }finally{h.dispose();}
 });
 
+test('large workspace lists retain all rows and repeat selection does not restart comparison',async()=>{
+ const changes=Array.from({length:145},(_,i)=>({id:'file-'+i,path:'folder/file-'+String(i).padStart(3,'0'),status:'modified'}));
+ let comparisons=0;
+ const rpc=async(e,p)=>e==='vcs/repositories'?{cwd:'/w',repositories:[{id:'r',type:'git',relativePath:'.'}]}:e==='vcs/status'?{changes}:e==='vcs/compare'?(++comparisons,{path:p.id,left:{text:'before'},right:{text:'after'}}):null;
+ const h=frontendHarness('src/client.jsx',{ctx:workspaceContext(rpc),useSessions:select=>select({byId:{s:{id:'s',cwd:'/w',retainedBy:{mainView:1}}}})});
+ const rows=()=>renderedNodes(h.tree).filter(node=>node.type==='button'&&node.props['data-vcs-change']);
+ const chunks=()=>renderedNodes(h.tree).filter(node=>node.props?.className==='vcs-file-chunk');
+ try{
+  await h.flush();assert.equal(rows().length,145);assert.equal(chunks().length,3);
+  rows().at(-1).props.onClick();await h.flush();assert.equal(comparisons,1);
+  rows().at(-1).props.onClick();await h.flush();assert.equal(comparisons,1);
+  assert.equal(rows().at(-1).props['aria-current'],'true');
+  button(h,'collapseAll').props.onClick();await h.flush();assert.equal(rows().length,0);
+  button(h,'expandAll').props.onClick();await h.flush();assert.equal(rows().length,145);
+  input(h,'search').props.onChange({target:{value:'file-144'}});await h.flush();assert.equal(rows().length,1);
+ }finally{h.dispose();}
+});
+
 test('same-OID branch tag and HEAD transitions reload first page without snapshot drift',async()=>{
  const X='a'.repeat(40),refs=['refs/heads/A','refs/tags/B'],calls=[];
  const rpc=async(e,p,signal)=>{calls.push({e,p,signal});if(e==='vcs/references')return {references:refs.map(name=>({name,commit:X}))};if(e==='vcs/history')return {snapshot:X,commits:[{id:(p.offset?'b':'a').repeat(40),subject:'row '+p.offset,parents:[]}],nextOffset:p.offset?null:50};throw Error('Unexpected history endpoint '+e);};

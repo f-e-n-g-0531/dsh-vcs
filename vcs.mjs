@@ -24,6 +24,7 @@ import {createHistoricalAccess,validateHistoricalPath} from './src/historical-ac
 import {withComparisonPreview} from './src/preview-capabilities.mjs';
 import {searchContentPage} from './src/content-search.mjs';
 import {withOperationBudget} from './src/operation-budget.mjs';
+import {settledReads} from './src/settled-reads.mjs';
 import {parseReflog, REFLOG_FORMAT, REFLOG_MAX_OUTPUT} from './src/reflog.mjs';
 
 const historicalAccess = createHistoricalAccess({run:git});
@@ -240,9 +241,10 @@ async function resolveHeadCommit(run) {
   }
 }
 export async function getSvnIdentity(repo,{signal}={}){
- repo=await checkedRepo(repo,signal);if(repo.type!=='svn')throw Error('SVN working copy required');
+ signal?.throwIfAborted();
+ if(repo?.type!=='svn'||typeof repo.root!=='string')throw Error('SVN working copy required');
  const result=parseSvnIdentity((await svn(repo.root,['info','--xml','--', '.'],MAX_TEXT,{signal})).toString('utf8'));
- if(await fs.realpath(result.wcRoot)!==repo.root)throw Error('SVN working copy root changed');signal?.throwIfAborted();return result;
+ if(path.resolve(await fs.realpath(result.wcRoot))!==path.resolve(repo.root))throw Error('SVN working copy root changed');signal?.throwIfAborted();return result;
 }
 export async function listHistory(repo, {snapshot,offset=0,limit=50,search,signal} = {}) {
   const query=historySearchArgs(search);
@@ -577,7 +579,8 @@ async function annotateSubmodules(repo, entries, options) {
   const pointers = new Map();
   const deadline=Date.now()+(options?.timeoutMs??TIMEOUT);
   const check=()=>{options?.signal?.throwIfAborted();if(Date.now()>=deadline)throw Object.assign(Error('Index metadata timed out'),{code:'TIMEOUT'});};
-  const files=entries.filter(entry=>entry.status!=='conflicted').map(entry=>entry.path);
+  // Porcelain ?? rows have no stage-0 entry. Never send them through batched index lookups.
+  const files=entries.filter(entry=>entry.status!=='conflicted'&&entry.indexStatus!=='?').map(entry=>entry.path);
   for(let from=0;from<files.length;){
     check();const batch=[];let bytes=0;
     while(from<files.length&&batch.length<METADATA_BATCH_SIZE){const file=files[from],size=Buffer.byteLength(file,'utf8')+1;if(size>METADATA_BATCH_BYTES)throw Error('Selected path exceeds metadata budget');if(bytes+size>METADATA_BATCH_BYTES)break;batch.push(file);bytes+=size;from++;}
@@ -623,7 +626,7 @@ async function annotateSubmodules(repo, entries, options) {
   }
 }
 const statuses = { M: 'modified', A: 'added', D: 'deleted', R: 'renamed', C: 'copied', U: 'conflicted', T: 'typechanged', '?': 'untracked' };
-async function changes(repo, mode, options) {
+async function changes(repo, mode, options, selectedPath) {
   let entries;
   if (repo.type === 'git') {
     const fields = (await git(repo.root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none'],undefined,options)).toString('utf8').split('\0');
@@ -639,7 +642,8 @@ async function changes(repo, mode, options) {
     }
     await annotateSubmodules(repo, entries, options);
   } else {
-    const document = parseXML(await svn(repo.root, ['status', '--xml', '--ignore-externals', '--', '.'], undefined, options));
+    const targets = selectedPath === undefined ? ['--', '.'] : ['--depth', 'empty', '--', selectedPath + '@'];
+    const document = parseXML(await svn(repo.root, ['status', '--xml', '--ignore-externals', ...targets], undefined, options));
     entries = [];
     for (const target of document.status?.target || []) for (const item of target.entry || []) {
       const state = item['wc-status'];
@@ -649,7 +653,7 @@ async function changes(repo, mode, options) {
       entries.push({ path: file, status: state['tree-conflicted'] === 'true' || state.props === 'conflicted' ? 'conflicted' : state.item === 'normal' ? 'modified' : state.item, propertyStatus: state.props, treeConflict: state['tree-conflicted'] === 'true' });
     }
   }
-  return entries.map(entry => ({ ...entry, id: identity(entry, mode) }));
+  return entries.filter(entry => selectedPath === undefined || entry.path === selectedPath).map(entry => ({ ...entry, id: identity(entry, mode) }));
 }
 /** Changes have opaque IDs, status words, and repo-relative paths. */
 export async function listChanges(repo, mode = 'all', {signal} = {}) { repo = await checkedRepo(repo,signal); modeFor(repo, mode); const result=await changes(repo, mode,{signal});signal?.throwIfAborted();return result; }
@@ -730,8 +734,10 @@ export async function getCommitComparison(repo,{commit,parentIndex=0,id,signal,l
   const details=await commitDetails(repo,{commit,parentIndex,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Historical change is not part of selected commit and parent');
-  const left=details.parent&&entry.status!=='added'?await historicalBlob(repo.root,details.parent,entry.oldPath||entry.path,signal,large):{text:''};
-  const right=entry.status!=='deleted'?await historicalBlob(repo.root,commit,entry.path,signal,large):{text:''};
+  const [left,right]=await settledReads([
+    ()=>details.parent&&entry.status!=='added'?historicalBlob(repo.root,details.parent,entry.oldPath||entry.path,signal,large):{text:''},
+    ()=>entry.status!=='deleted'?historicalBlob(repo.root,commit,entry.path,signal,large):{text:''},
+  ]);
   return withComparisonPreview({...entry,large,left:{...left,label:details.parent||'Empty tree'},right:{...right,label:commit},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')},{allowLarge:true});
 }
 export async function getRevisionComparison(repo,{base,target,id,signal,large=false}={}){
@@ -740,8 +746,10 @@ export async function getRevisionComparison(repo,{base,target,id,signal,large=fa
   const details=await getRevisionChanges(repo,{base,target,signal});
   const entry=details.changes.find(row=>row.id===id);
   if(!entry)throw new Error('Change is not part of selected revision pair');
-  const left=entry.status!=='added'?await historicalBlob(repo.root,base,entry.oldPath||entry.path,signal,large):{text:''};
-  const right=entry.status!=='deleted'?await historicalBlob(repo.root,target,entry.path,signal,large):{text:''};
+  const [left,right]=await settledReads([
+    ()=>entry.status!=='added'?historicalBlob(repo.root,base,entry.oldPath||entry.path,signal,large):{text:''},
+    ()=>entry.status!=='deleted'?historicalBlob(repo.root,target,entry.path,signal,large):{text:''},
+  ]);
   return withComparisonPreview({...entry,base,target,large,left:{...left,label:base},right:{...right,label:target},binary:!!(left.binary||right.binary),notice:[left.notice,right.notice].filter(Boolean).join(' ')},{allowLarge:true});
 }
 async function properties(root, file, base, signal) {
@@ -820,13 +828,16 @@ async function workingIdentity(root, file) {
 }
 
 /** Bind mutable HEAD/Index to immutable objects, then reject any changed selection. */
-export async function getComparison(repo, {mode = 'all',id,large = false,signal} = {}) {
+export async function getComparison(repo, {mode = 'all',id,large = false,signal,svnModifiedPath} = {}) {
   if(typeof large !== 'boolean') throw Error('Invalid large comparison mode');
   if(large) return getWorkspaceLargeComparison(repo,{mode,id,signal});
   signal?.throwIfAborted();
-  repo = await checkedRepo(repo,signal);modeFor(repo,mode);
-  const status = () => changes(repo,mode,{signal});
-  const entry = (await status()).find(item => item.id === id);
+  repo = await checkedRepo(repo,signal,undefined,false);modeFor(repo,mode);
+  // A server-owned path from status is only a hint. Re-check current SVN membership and ID.
+  const selectedPath = repo.type === 'svn' ? svnModifiedPath : undefined;
+  if(selectedPath !== undefined) await confined(repo.root,selectedPath);
+  const status = () => changes(repo,mode,{signal},selectedPath);
+  const entry = (await status()).find(item => item.id === id && (selectedPath === undefined || item.status === 'modified'));
   if(!entry) throw selectionChanged('Change no longer exists; refresh repository status.');
   await confined(repo.root,entry.path);
   if(entry.oldPath) await confined(repo.root,entry.oldPath);
@@ -836,37 +847,51 @@ export async function getComparison(repo, {mode = 'all',id,large = false,signal}
   if(repo.type === 'git') {
     const run = args => git(repo.root,args,MAX_TEXT,{signal});
     const head = () => resolveHeadCommit(run);
-    const revision = await head();
     const indexArgs = ['ls-files','--stage','-z','--',entry.path];
-    const index = await run(indexArgs);
+    const readSnapshot = () => settledReads([head,()=>run(indexArgs)],signal);
+    const [revision,index] = await readSnapshot();
     verify = async () => {
-      if(revision !== await head() || !index.equals(await run(indexArgs))) throw selectionChanged();
+      const [currentHead,currentIndex] = await readSnapshot();
+      if(revision !== currentHead || !index.equals(currentIndex)) throw selectionChanged();
     };
     leftLabel = mode === 'unstaged' ? 'Index' : 'HEAD';
     rightLabel = mode === 'staged' ? 'Index' : 'Working tree';
     if(entry.status === 'conflicted') {
       notice = 'Unmerged conflict: showing HEAD versus working tree (index has conflict stages).';
       leftLabel = 'HEAD';rightLabel = 'Working tree';
-      if(revision) left = await gitBlob(repo.root,revision,entry.oldPath || entry.path,{signal});
-      right = await working(repo.root,entry.path,false,signal);
+      [left,right] = await settledReads([
+        ()=>revision ? gitBlob(repo.root,revision,entry.oldPath || entry.path,{signal}) : left,
+        ()=>working(repo.root,entry.path,false,signal),
+      ],signal);
     } else {
       const untracked = entry.indexStatus === '?';
       const addedToHead = entry.indexStatus === 'A' || entry.indexStatus === 'C';
-      if(!untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : revision && !addedToHead)) {
-        left = await gitBlob(repo.root,mode === 'unstaged' ? '' : revision,mode === 'unstaged' ? entry.path : entry.oldPath || entry.path,{signal},index);
-      }
-      if(mode === 'staged') {if(entry.indexStatus !== 'D') right = await gitBlob(repo.root,'',entry.path,{signal},index);}
-      else right = await working(repo.root,entry.path,false,signal);
+      const readLeft = !untracked && (mode === 'unstaged' ? entry.indexStatus !== 'D' : revision && !addedToHead);
+      [left,right] = await settledReads([
+        ()=>readLeft ? gitBlob(repo.root,mode === 'unstaged' ? '' : revision,mode === 'unstaged' ? entry.path : entry.oldPath || entry.path,{signal},index) : left,
+        ()=>mode !== 'staged' ? working(repo.root,entry.path,false,signal) : entry.indexStatus !== 'D' ? gitBlob(repo.root,'',entry.path,{signal},index) : right,
+      ],signal);
     }
   } else {
     leftLabel = 'BASE';rightLabel = 'Working copy';
     const added = ['added','unversioned','replaced'].includes(entry.status);
     const info = () => svn(repo.root,['info','--xml','--',entry.path + '@'],undefined,{signal});
     const before = entry.status === 'unversioned' ? null : await info();
+    const beforeEntry = before && parseXML(before).info.entry[0];
+    if(selectedPath !== undefined) {
+      const selectedRoot = beforeEntry?.['wc-info']?.['wcroot-abspath'];
+      if(!selectedRoot || path.resolve(await fs.realpath(selectedRoot)) !== path.resolve(repo.root)) throw selectionChanged();
+    }
+    const readProperties = async () => {
+      const base = () => added ? {} : properties(repo.root,entry.path,true,signal);
+      const work = () => ['deleted','missing'].includes(entry.status) ? {} : properties(repo.root,entry.path,false,signal);
+      const [left,right] = selectedPath === undefined ? [await base(),await work()] : await settledReads([base,work]);
+      return {left,right};
+    };
     verify = async () => {
       if(before && svnInfoSnapshot(before) !== svnInfoSnapshot(await info())) throw selectionChanged('SVN BASE selection changed; refresh repository status');
       if(props) {
-        const after = {left:added ? {} : await properties(repo.root,entry.path,true,signal),right:['deleted','missing'].includes(entry.status) ? {} : await properties(repo.root,entry.path,false,signal)};
+        const after = await readProperties();
         if(stableSnapshot(after) !== stableSnapshot(props)) throw selectionChanged('SVN properties changed; refresh repository status');
       }
     };
@@ -874,12 +899,12 @@ export async function getComparison(repo, {mode = 'all',id,large = false,signal}
     let directory = false;
     try {directory = (await fs.lstat(await confined(repo.root,entry.path))).isDirectory();} catch(error) {if(error.code !== 'ENOENT') throw error;}
     if(!added && !directory) {
-      directory = parseXML(before).info.entry[0].kind === 'dir';
+      directory = beforeEntry.kind === 'dir';
       if(!directory) left = await content(() => svn(repo.root,['cat','--revision','BASE','--',entry.path + '@'],MAX_TEXT,{signal}));
     }
     if(directory) {notice = 'Directory change; property differences are shown separately.';right = {text:'',previewReason:'unsupported-type',largeEligible:false};}
     else right = await working(repo.root,entry.path,true,signal);
-    if(entry.status !== 'unversioned') props = {left:added ? {} : await properties(repo.root,entry.path,true,signal),right:['deleted','missing'].includes(entry.status) ? {} : await properties(repo.root,entry.path,false,signal)};
+    if(entry.status !== 'unversioned') props = await readProperties();
     if(entry.status === 'conflicted') notice = 'Conflicted working copy: showing BASE versus working content.';
   }
   await verify();

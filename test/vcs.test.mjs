@@ -475,6 +475,10 @@ test('SVN XML, BASE/working, added, deleted, unversioned, directories and proper
   const repo = await detectRepository(path.join(wc,'dir')); assert.equal(repo.type,'svn');
   await write(wc,'a & 中文.txt','working\n'); cmd(wc,'svn',['propset','custom:test','working & value','a & 中文.txt']); cmd(wc,'svn',['delete','delete.txt']); await write(wc,'added@file.txt','added\n'); cmd(wc,'svn',['add','added@file.txt@']); await write(wc,'untracked.txt','untracked\n'); cmd(wc,'svn',['propset','custom:dir','yes','dir']);
   const c = await compare(repo,'a & 中文.txt'); assert.equal(c.left.text,'base\n'); assert.equal(c.right.text,'working\n'); assert.equal(c.properties.left['custom:test'],'base value'); assert.equal(c.properties.right['custom:test'],'working & value');
+  const focused = await getComparison(repo,{id:c.id,svnModifiedPath:'a & 中文.txt'});
+  assert.deepEqual(focused,c);
+  await assert.rejects(getComparison(repo,{id:c.id,svnModifiedPath:'delete.txt'}),/no longer exists/);
+  await assert.rejects(getComparison(repo,{id:c.id,svnModifiedPath:'../outside'}),/escapes repository/);
   const added = await compare(repo,'added@file.txt'); assert.equal(added.left.text,''); assert.equal(added.right.text,'added\n');
   const deleted = await compare(repo,'delete.txt'); assert.equal(deleted.left.text,'gone\n'); assert.equal(deleted.right.text,'');
   assert.equal((await compare(repo,'untracked.txt')).right.text,'untracked\n'); assert.match((await compare(repo,'dir')).notice,/Directory/);

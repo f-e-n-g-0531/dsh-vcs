@@ -1,4 +1,4 @@
-import React, {useState,useEffect,useRef,useSyncExternalStore} from 'react';
+import React, {useState,useEffect,useMemo,useRef,useSyncExternalStore} from 'react';
 import css from './style.css';
 import {createClientRpc} from './client-rpc.mjs';
 import {createStatusLimiter} from './status-limiter.mjs';
@@ -32,6 +32,7 @@ import {changeKey,repositoryLabel,requestMode,groupChanges,changePosition,adjace
 const statusCodes={modified:'M',added:'A',deleted:'D',missing:'D',renamed:'R',copied:'C',conflicted:'U',untracked:'?',unversioned:'?',replaced:'M',obstructed:'U',normal:'P'};
 const asset = name => new URL('vcs-assets/'+name,document.baseURI).href;
 function Icon(){return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M12 4v16M6 10h3M7.5 8.5v3M15 14h3"/></svg>}
+const EMPTY_REPOSITORIES=Object.freeze([]);
 const changeCode=entry=>statusCodes[entry?.status]||entry?.status?.slice(0,1).toUpperCase()||'M';
 export const inject=['slots','layout','locale','connection','uiSession'];
 export {dictionaries};
@@ -61,7 +62,7 @@ function useRepositoryDiscovery({session,rpc,invalidate,setStatuses}){
   const [scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState('');
   const [scanning,setScanning]=useState(false),[error,setError]=useState('');
   const scanController=useRef(null),previousDiscovery=useRef(null),rediscovering=useRef(false);
-  const repositories=discovery?.repositories||[];
+  const repositories=discovery?.repositories||EMPTY_REPOSITORIES;
   useEffect(()=>{if(repositories.some(repo=>repo.id===repositoryId))saveProject(session?.cwd,repositoryId);},[session?.cwd,repositoryId,discovery]);
   useEffect(()=>{
     const controller=new AbortController();scanController.current=controller;setError('');setScanning(!!sessionId);
@@ -70,8 +71,8 @@ function useRepositoryDiscovery({session,rpc,invalidate,setStatuses}){
     }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setScanning(false);});
     return()=>controller.abort();
   },[sessionId,scan,scanPath]);
-  const rescan=()=>rediscover();
-  const rediscover=()=>{if(rediscovering.current)return;rediscovering.current=true;invalidate();scanController.current?.abort();previousDiscovery.current=null;setDiscovery(null);setStatuses({});setScanPath('');setScan(x=>x+1);};
+  const rediscover=useMemo(()=>()=>{if(rediscovering.current)return;rediscovering.current=true;invalidate();scanController.current?.abort();previousDiscovery.current=null;setDiscovery(null);setStatuses({});setScanPath('');setScan(x=>x+1);},[invalidate]);
+  const rescan=rediscover;
   return {discovery,repositories,repositoryId,setRepositoryId,scan,subdirectory,setSubdirectory,scanning,error,rescan,rediscover};
 }
 
@@ -113,7 +114,7 @@ function useComparisonLoader({sessionId,rpc,discovery,repositories,statuses,mode
   },[selected,selectedStatus,sessionId,mode,reviewActive,large,compareRetry]);
   const reset=()=>{compareController.current?.abort();setComparison(null);setSelected(null);setDetailError('');setTab('content');setStats({added:0,deleted:0,count:0});};
   const clearSelection=()=>{compareController.current?.abort();setComparison(null);setSelected(null);setDetailError('');};
-  const selectFile=(repositoryId,id)=>{compareController.current?.abort();setComparison(null);setTab('content');setSelected({repositoryId,id});};
+  const selectFile=useMemo(()=>(repositoryId,id)=>{if(selected?.repositoryId===repositoryId&&selected.id===id)return;compareController.current?.abort();setComparison(null);setTab('content');setSelected({repositoryId,id});},[selected]);
   const toggleLarge=()=>{compareController.current?.abort();setComparison(null);setLargeSelection(large?null:{key:selectionKey,status:selectedStatus});};
   const retryCompare=()=>setCompareRetry(x=>x+1);
   return {selected,comparison,loading,tab,setTab,large,selectionKey,selectedRepository,selectedStatus,compareError,reset,clearSelection,selectFile,toggleLarge,retryCompare};
@@ -199,30 +200,45 @@ function FileRow({entry,compact=false,depth=0,repositoryId,selected,t,onSelect})
   return <button className="vcs-file" data-vcs-item data-vcs-change={changeKey(repositoryId,entry.id)} aria-current={selected?.repositoryId===repositoryId&&selected?.id===entry.id?'true':undefined} style={{paddingInlineStart:8+depth*14}} title={(entry.oldPath?entry.oldPath+' → ':'')+entry.path+' · '+t(changeCode(entry))} onClick={()=>onSelect(repositoryId,entry.id)}><span className="vcs-status" data-status={changeCode(entry)}>{changeCode(entry)}</span><SubmoduleBadge submodule={entry.submodule} t={t}/><span className="vcs-filename">{compact?entry.path.slice(slash+1):entry.path}{entry.oldPath&&<small className="vcs-filepath">← {entry.oldPath}</small>}</span></button>;
 }
 
+// Keep every row in DOM order for keyboard/reveal, but defer offscreen layout in chunks.
+const FILE_ROW_CHUNK=64;
+function FileRows({entries,...rowProps}){
+  const row=entry=><FileRow key={changeKey(rowProps.repositoryId,entry.id)} entry={entry} {...rowProps}/>;
+  if(entries.length<=FILE_ROW_CHUNK)return entries.map(row);
+  const blocks=[];
+  for(let start=0;start<entries.length;start+=FILE_ROW_CHUNK){
+    const batch=entries.slice(start,start+FILE_ROW_CHUNK);
+    const estimatedHeight=batch.reduce((sum,entry)=>sum+(entry.oldPath?50:34),0);
+    blocks.push(<div className="vcs-file-chunk" key={batch[0].id} style={{containIntrinsicBlockSize:`auto ${estimatedHeight}px`}}>{batch.map(row)}</div>);
+  }
+  return blocks;
+}
+
 // Recursive tree rows: directories toggle expansion, files select a comparison.
 function TreeRows({node,repository,selected,t,collapsedDirectories,onToggleDirectory,onSelect,depth=0}){
-  return <>{node.directories.map(directory=>{const key=repository.id+'\0'+directory.id,closed=!!collapsedDirectories[key];return <React.Fragment key={key}><button className="vcs-dir vcs-dir-toggle" data-vcs-item data-vcs-directory={closed?'closed':'open'} aria-expanded={!closed} style={{paddingInlineStart:8+depth*14}} onClick={()=>onToggleDirectory(key,closed)}><span aria-hidden="true">{closed?'›':'⌄'}</span>{directory.name}<small>{directory.count}</small></button>{!closed&&<TreeRows node={directory} repository={repository} selected={selected} t={t} collapsedDirectories={collapsedDirectories} onToggleDirectory={onToggleDirectory} onSelect={onSelect} depth={depth+1}/>}</React.Fragment>;})}{node.files.map(entry=><FileRow key={changeKey(repository.id,entry.id)} entry={entry} compact={node.id!==''} depth={depth} repositoryId={repository.id} selected={selected} t={t} onSelect={onSelect}/>)}</>;
+  return <>{node.directories.map(directory=>{const key=repository.id+'\0'+directory.id,closed=!!collapsedDirectories[key];return <React.Fragment key={key}><button className="vcs-dir vcs-dir-toggle" data-vcs-item data-vcs-directory={closed?'closed':'open'} aria-expanded={!closed} style={{paddingInlineStart:8+depth*14}} onClick={()=>onToggleDirectory(key,closed)}><span aria-hidden="true">{closed?'›':'⌄'}</span>{directory.name}<small>{directory.count}</small></button>{!closed&&<TreeRows node={directory} repository={repository} selected={selected} t={t} collapsedDirectories={collapsedDirectories} onToggleDirectory={onToggleDirectory} onSelect={onSelect} depth={depth+1}/>}</React.Fragment>;})}<FileRows entries={node.files} compact={node.id!==''} depth={depth} repositoryId={repository.id} selected={selected} t={t} onSelect={onSelect}/></>;
 }
 
 // Focusable file list with keyboard arrow navigation.
-function FileList({t,sessionId,scanning,error,groups,statuses,query,tree,collapsedDirectories,selected,mode,fileListNode,onSelect,onToggleDirectory,onRescan}){
+function FileList({t,localeRevision,sessionId,scanning,error,groups,statuses,query,tree,collapsedDirectories,selected,mode,fileListNode,onSelect,onToggleDirectory,onRescan}){
   const onFileListKeyDown=e=>handleFileListKeyDown(e,fileListNode.current);
-  return <nav className="vcs-filelist" aria-label={t('title')} ref={fileListNode} onKeyDown={onFileListKeyDown}>
-    {groups.map(group=>{const repo=group.repository;return <section className="vcs-repository" key={repo.id} aria-label={repositoryLabel(repo,t('workspaceRoot'))}><div className="vcs-repository-heading" title={repo.root}><strong>{repositoryLabel(repo,t('workspaceRoot'))}</strong><small>{repo.type==='svn'?t('svnBase'):t(requestMode(repo,mode))}</small></div>
-      {group.error?<div className="vcs-message vcs-error" role="status">{group.error}<button onClick={onRescan}>{t('rescan')}</button></div>:!statuses[repo.id]?<div className="vcs-message">{t('loading')}</div>:tree?<TreeRows node={buildChangeTree(group.changes)} repository={repo} selected={selected} t={t} collapsedDirectories={collapsedDirectories} onToggleDirectory={onToggleDirectory} onSelect={onSelect}/>:group.changes.map(entry=><FileRow key={changeKey(repo.id,entry.id)} entry={entry} repositoryId={repo.id} selected={selected} t={t} onSelect={onSelect}/>)}
+  const sections=useMemo(()=>groups.map(group=>{const repo=group.repository;return <section className="vcs-repository" key={repo.id} aria-label={repositoryLabel(repo,t('workspaceRoot'))}><div className="vcs-repository-heading" title={repo.root}><strong>{repositoryLabel(repo,t('workspaceRoot'))}</strong><small>{repo.type==='svn'?t('svnBase'):t(requestMode(repo,mode))}</small></div>
+      {group.error?<div className="vcs-message vcs-error" role="status">{group.error}<button onClick={onRescan}>{t('rescan')}</button></div>:!statuses[repo.id]?<div className="vcs-message">{t('loading')}</div>:tree?<TreeRows node={group.changeTree} repository={repo} selected={selected} t={t} collapsedDirectories={collapsedDirectories} onToggleDirectory={onToggleDirectory} onSelect={onSelect}/>:<FileRows entries={group.changes} repositoryId={repo.id} selected={selected} t={t} onSelect={onSelect}/>}
       {!group.error&&statuses[repo.id]&&!group.changes.length&&<div className="vcs-message">{query?t('emptySearch'):t('clean')}</div>}
-    </section>;})}{!groups.length&&<div className="vcs-message">{scanning?t('loading'):error||(!sessionId?t('noSession'):t('noRepo'))}{error&&<button onClick={onRescan}>{t('rescan')}</button>}</div>}
+    </section>;}),[groups,statuses,query,tree,collapsedDirectories,selected,mode,t,onSelect,onToggleDirectory,onRescan,localeRevision]);
+  return <nav className="vcs-filelist" aria-label={t('title')} ref={fileListNode} onKeyDown={onFileListKeyDown}>
+    {sections}{!groups.length&&<div className="vcs-message">{scanning?t('loading'):error||(!sessionId?t('noSession'):t('noRepo'))}{error&&<button onClick={onRescan}>{t('rescan')}</button>}</div>}
   </nav>;
 }
 
 // File list sidebar: search, filters, tree actions and the list itself.
-function FileBrowser({t,sessionId,scanning,error,groups,statuses,query,statusFilter,statusCounts,changes,tree,collapsedDirectories,selected,mode,searchNode,fileListNode,chosen,onQuery,onStatusFilter,onClearFilters,onToggleTree,onExpandAll,onCollapseAll,onRevealSelected,onSelect,onToggleDirectory,onRescan}){
+function FileBrowser({t,localeRevision,sessionId,scanning,error,groups,statuses,query,statusFilter,statusCounts,changes,tree,collapsedDirectories,selected,mode,searchNode,fileListNode,chosen,onQuery,onStatusFilter,onClearFilters,onToggleTree,onExpandAll,onCollapseAll,onRevealSelected,onSelect,onToggleDirectory,onRescan}){
   return <aside className="vcs-files">
     <div className="vcs-filter"><input ref={searchNode} aria-label={t('search')} placeholder={t('search')} title={t('searchShortcut')} value={query} onChange={e=>onQuery(e.target.value)}/>{(query||statusFilter!=='all')&&<button className="vcs-clear-filter" onClick={onClearFilters}>{t('clearFilters')}</button>}</div>
     <StatusFilterBar t={t} statusFilter={statusFilter} statusCounts={statusCounts} onStatusFilter={onStatusFilter}/>
     <div className="vcs-count"><span>{changes.length} {t('files')}</span><span className="vcs-auto">{t('autoRefresh')}</span><button aria-pressed={tree} onClick={onToggleTree}>{t(tree?'tree':'list')}</button></div>
     {tree&&<div className="vcs-tree-actions"><button onClick={onExpandAll}>{t('expandAll')}</button><button onClick={onCollapseAll}>{t('collapseAll')}</button><button onClick={onRevealSelected} disabled={!chosen}>{t('revealSelected')}</button></div>}
-    <FileList t={t} sessionId={sessionId} scanning={scanning} error={error} groups={groups} statuses={statuses} query={query} tree={tree} collapsedDirectories={collapsedDirectories} selected={selected} mode={mode} fileListNode={fileListNode} onSelect={onSelect} onToggleDirectory={onToggleDirectory} onRescan={onRescan}/>
+    <FileList t={t} localeRevision={localeRevision} sessionId={sessionId} scanning={scanning} error={error} groups={groups} statuses={statuses} query={query} tree={tree} collapsedDirectories={collapsedDirectories} selected={selected} mode={mode} fileListNode={fileListNode} onSelect={onSelect} onToggleDirectory={onToggleDirectory} onRescan={onRescan}/>
   </aside>;
 }
 
@@ -298,7 +314,7 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     render(){return this.state.error?<section className="vcs-root"><style>{css}</style><div className="vcs-message vcs-error">{t('error')}<button onClick={()=>this.setState({error:null})}>{t('retry')}</button><button onClick={()=>ctx.layout.selectPanel(null)}>{t('back')}</button></div></section>:this.props.children;}
   }
   function Panel({session}) {
-    useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot(),()=>ctx.locale.getSnapshot());
+    const localeRevision=useSyncExternalStore(fn=>ctx.locale.subscribe(fn),()=>ctx.locale.getSnapshot(),()=>ctx.locale.getSnapshot());
     const sessionId=session?.id;
     const panelNode=useRef(null),editorNode=useRef(null),viewer=useRef(null),fileListNode=useRef(null),searchNode=useRef(null),revealChange=useRef(null),invalidateRef=useRef(null);
     const [reviewView,setReviewView]=useReviewView(initialView,onViewChange);
@@ -322,9 +338,9 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const {mode,setMode,statuses,setStatuses,detailError,setDetailError,stats,setStats}=useWorkspaceSharedState();
     // Loaders are created before the shared reset exists; this late-bound handler keeps the
     // single invalidation path (and its state-reset order) without reordering hooks.
-    const invalidateLatest=()=>invalidateRef.current?.();
+    const invalidateLatest=useMemo(()=>()=>invalidateRef.current?.(),[]);
     const {discovery,repositories,repositoryId,setRepositoryId,scan,subdirectory,setSubdirectory,scanning,error,rescan,rediscover}=useRepositoryDiscovery({session,rpc,invalidate:invalidateLatest,setStatuses});
-    const visibleRepositories=repositories.filter(repo=>repo.id===repositoryId);
+    const visibleRepositories=useMemo(()=>repositories.filter(repo=>repo.id===repositoryId),[repositories,repositoryId]);
     const gitSelected=visibleRepositories.some(repo=>repo.type==='git');
     const svnSelected=visibleRepositories.some(repo=>repo.type==='svn');
     const historyActive=(gitSelected||svnSelected)&&reviewView==='history';
@@ -340,11 +356,13 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const openReviewView=view=>{clearSelection();setReviewView(view);};
     const {setEditorRetry,editorReady,editorError,computation,sideBySide,setSide,ignoreWhitespace,setWhitespace,wrap,setWrap}=useEditorLifecycle({editorNode,viewer,setStats,comparison,sessionId,discovery,selected,mode,reviewActive});
     const {query,setQuery,statusFilter,setStatusFilter,tree,setTree,collapsedDirectories,setCollapsedDirectories,clearFilters}=useFileListState();
-    const groups=groupChanges(visibleRepositories,statuses,query,statusFilter);
-    const changes=groups.flatMap(group=>group.changes);
-    const statusCounts=countChangeStatuses(statuses[repositoryId]?.changes);
-    const chosen=selectedStatus?.changes?.find(c=>c.id===selected?.id);
-    const setTreeExpanded=expanded=>setCollapsedDirectories(old=>{const next={...old};for(const group of groups)for(const id of treeDirectoryIds(buildChangeTree(group.changes)))next[group.repository.id+'\0'+id]=!expanded;return next;});
+    const groups=useMemo(()=>groupChanges(visibleRepositories,statuses,query,statusFilter),[visibleRepositories,statuses,query,statusFilter]);
+    const displayedGroups=useMemo(()=>tree?groups.map(group=>({...group,changeTree:buildChangeTree(group.changes)})):groups,[groups,tree]);
+    const changes=useMemo(()=>groups.flatMap(group=>group.changes),[groups]);
+    const statusCounts=useMemo(()=>countChangeStatuses(statuses[repositoryId]?.changes),[statuses,repositoryId]);
+    const chosen=useMemo(()=>selectedStatus?.changes?.find(c=>c.id===selected?.id),[selectedStatus,selected?.id]);
+    const toggleDirectory=useMemo(()=>(key,closed)=>setCollapsedDirectories(old=>({...old,[key]:!closed})),[]);
+    const setTreeExpanded=expanded=>setCollapsedDirectories(old=>{const next={...old};for(const group of displayedGroups)for(const id of treeDirectoryIds(group.changeTree))next[group.repository.id+'\0'+id]=!expanded;return next;});
     const busy=scanning||visibleRepositories.some(repo=>!statuses[repo.id]);
     const {selectAdjacent,revealSelected}=usePanelShortcuts({panelNode,searchNode,fileListNode,revealChange,query,setQuery,changes,selected,reviewActive,repositoryId,selectFile,tree,statusFilter,collapsedDirectories,groups,setTree,clearFilters,chosen,setCollapsedDirectories});
     return <section ref={panelNode} className="vcs-root" aria-label={t('title')}><style>{css}</style>
@@ -365,7 +383,7 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
       </div>
       {visibleRepositories.filter(repo=>repo.type==='svn'&&!reviewActive).map(repo=><React.Fragment key={JSON.stringify([sessionId,repo.id,scan,refresh])}><SvnIdentity repositoryId={repo.id} {...{sessionId,rpc,t}} onRediscover={rediscover}/></React.Fragment>)}
       <ReviewPanels sessionId={sessionId} repositoryId={repositoryId} svnWorkingCopy={svnSelected?visibleRepositories[0]?.root:undefined} historyRefresh={historyRefresh} scan={scan} rpc={rpc} t={t} rediscover={rediscover} historyActive={historyActive} stashActive={stashActive} reflogActive={reflogActive} grepActive={grepActive} revisionActive={revisionActive} svnSelected={svnSelected} gitSelected={gitSelected}/>
-      <div className="vcs-body" hidden={reviewActive} aria-label={t('workspaceView')}><FileBrowser t={t} sessionId={sessionId} scanning={scanning} error={error} groups={groups} statuses={statuses} query={query} statusFilter={statusFilter} statusCounts={statusCounts} changes={changes} tree={tree} collapsedDirectories={collapsedDirectories} selected={selected} mode={mode} searchNode={searchNode} fileListNode={fileListNode} chosen={chosen} onQuery={setQuery} onStatusFilter={setStatusFilter} onClearFilters={clearFilters} onToggleTree={()=>setTree(!tree)} onExpandAll={()=>setTreeExpanded(true)} onCollapseAll={()=>setTreeExpanded(false)} onRevealSelected={revealSelected} onSelect={selectFile} onToggleDirectory={(key,closed)=>setCollapsedDirectories(old=>({...old,[key]:!closed}))} onRescan={rescan}/><DetailPane t={t} comparison={comparison} selected={selected} selectedRepository={selectedRepository} selectedStatus={selectedStatus} sessionId={sessionId} mode={mode} discoveryCwd={discovery?.cwd} refresh={refresh} rpc={rpc} rediscover={rediscover} large={large} selectionKey={selectionKey} loading={loading} detailError={detailError} compareError={compareError} error={error} busy={busy} chosen={chosen} repositoryCount={repositories.length} editorNode={editorNode} editorReady={editorReady} editorError={editorError} computation={computation} tab={tab} setTab={setTab} stats={stats} onRetryEditor={()=>setEditorRetry(x=>x+1)} onRetryCompare={retryCompare} onRescan={rescan} onToggleLarge={toggleLarge} sideBySide={sideBySide} setSide={setSide} ignoreWhitespace={ignoreWhitespace} setWhitespace={setWhitespace} wrap={wrap} setWrap={setWrap} viewer={viewer} changes={changes} onSelectAdjacent={selectAdjacent} onCopyError={setDetailError}/></div>
+      <div className="vcs-body" hidden={reviewActive} aria-label={t('workspaceView')}><FileBrowser t={t} localeRevision={localeRevision} sessionId={sessionId} scanning={scanning} error={error} groups={displayedGroups} statuses={statuses} query={query} statusFilter={statusFilter} statusCounts={statusCounts} changes={changes} tree={tree} collapsedDirectories={collapsedDirectories} selected={selected} mode={mode} searchNode={searchNode} fileListNode={fileListNode} chosen={chosen} onQuery={setQuery} onStatusFilter={setStatusFilter} onClearFilters={clearFilters} onToggleTree={()=>setTree(!tree)} onExpandAll={()=>setTreeExpanded(true)} onCollapseAll={()=>setTreeExpanded(false)} onRevealSelected={revealSelected} onSelect={selectFile} onToggleDirectory={toggleDirectory} onRescan={rescan}/><DetailPane t={t} comparison={comparison} selected={selected} selectedRepository={selectedRepository} selectedStatus={selectedStatus} sessionId={sessionId} mode={mode} discoveryCwd={discovery?.cwd} refresh={refresh} rpc={rpc} rediscover={rediscover} large={large} selectionKey={selectionKey} loading={loading} detailError={detailError} compareError={compareError} error={error} busy={busy} chosen={chosen} repositoryCount={repositories.length} editorNode={editorNode} editorReady={editorReady} editorError={editorError} computation={computation} tab={tab} setTab={setTab} stats={stats} onRetryEditor={()=>setEditorRetry(x=>x+1)} onRetryCompare={retryCompare} onRescan={rescan} onToggleLarge={toggleLarge} sideBySide={sideBySide} setSide={setSide} ignoreWhitespace={ignoreWhitespace} setWhitespace={setWhitespace} wrap={wrap} setWrap={setWrap} viewer={viewer} changes={changes} onSelectAdjacent={selectAdjacent} onCopyError={setDetailError}/></div>
     </section>;
   }
   return Page;

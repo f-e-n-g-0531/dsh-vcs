@@ -11,5 +11,5 @@ test('client has only dropdown navigation and never falls back to all repositori
  const source=await readFile(new URL('../src/client.jsx',import.meta.url),'utf8');
  assert.ok(!source.includes('RepositoryNavigation'));
  assert.ok(!source.includes("t('allRepositories')"));
- assert.ok(source.includes('const visibleRepositories=repositories.filter(repo=>repo.id===repositoryId);'));
+ assert.match(source,/const visibleRepositories=(?:useMemo\(\(\)=>)?repositories\.filter\(repo=>repo\.id===repositoryId\)/);
 });

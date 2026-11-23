@@ -45,6 +45,23 @@ test('compare delegates once directly to adapter with authorized repository', as
  await discover(call);
  assert.equal((await call('vcs/compare',{...request,mode:'staged',id:'file'})).value.left.text,'before');assert.equal(calls,1);
 });
+test('SVN comparison hints stay bound to the Session, grant, and selected ID', async () => {
+  const observed=[];
+  const call=createHandler(ctx,{...api,discoverRepositories:async()=>discovered([svn]),
+    listChanges:async()=>[{id:'modified',path:'nested/file@name.txt',status:'modified'},{id:'deleted',path:'gone.txt',status:'deleted'}],
+    getComparison:async (_repo,options)=>{observed.push(options.svnModifiedPath);return {};}});
+  const address={...request,repositoryId:svn.id};
+  const compare=(id='modified',extra={})=>call('vcs/compare',{...address,id,...extra});
+  await discover(call); await discover(call,{sessionId:'other'});
+  assert.equal((await compare()).ok,true);
+  assert.equal((await call('vcs/status',address)).ok,true);
+  assert.equal((await compare()).ok,true);
+  assert.equal((await compare('deleted')).ok,true);
+  assert.equal((await compare('modified',{sessionId:'other'})).ok,true);
+  assert.equal((await compare('modified',{svnModifiedPath:'../outside'})).error.code,'vcs/invalid-request');
+  await discover(call); assert.equal((await compare()).ok,true);
+  assert.deepEqual(observed,[undefined,'nested/file@name.txt',undefined,undefined,undefined]);
+});
 test('empty discovery succeeds without implicitly enabling status', async () => {
  const call=createHandler(ctx,{...api,discoverRepositories:async()=>discovered([])});
  assert.deepEqual((await discover(call)).value,{cwd:'/workspace',...discovered([])});

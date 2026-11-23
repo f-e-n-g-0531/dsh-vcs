@@ -377,7 +377,7 @@ function latestCommitPayload(payload) {
 const optionalField = (key, value) => value === undefined ? {} : {[key]: value};
 
 /** Dispatch only after grants and capacity have been checked by createHandler. */
-async function readRepository(api, endpoint, repository, payload, {cwd, mode, signal}) {
+async function readRepository(api, endpoint, repository, payload, {cwd, mode, signal, svnModifiedPath}) {
   switch (endpoint) {
     case 'vcs/tree-page':
       return api.getHistoricalTreePage({...repository}, {commit: payload.commit, path: payload.path ?? '', offset: payload.offset ?? 0, limit: payload.limit ?? 100, ...optionalField('query', payload.query), signal});
@@ -445,7 +445,7 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
     case 'vcs/conflict-stages':
       return api.getConflictStages({...repository}, {mode, id: payload.id, signal});
     case 'vcs/compare':
-      return api.getComparison({...repository}, {mode, id: payload.id, ...optionalField('signal', signal), ...optionalField('large', payload.large)});
+      return api.getComparison({...repository}, {mode, id: payload.id, ...optionalField('signal', signal), ...optionalField('large', payload.large), ...optionalField('svnModifiedPath', svnModifiedPath)});
   }
 }
 
@@ -453,6 +453,10 @@ async function readRepository(api, endpoint, repository, payload, {cwd, mode, si
 export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.now, ttlMs = 5 * 60_000, maxSessions = 32, maxRepositories = 512, operationTimeoutMs = 15000, bindSvnIdentityResolver } = {}) {
   let active = 0, activeImages = 0, activeSegments = 0;
   const sessions = new Map();
+  // Only the most recent SVN status list per Session supplies optional path hints.
+  const svnSelections = new WeakMap();
+  const MAX_SVN_HINTS = 10000;
+  let svnStatusSequence = 0;
   const commit=createCommitCoordinator({api,now});
   const amend=createAmendCoordinator({api,now});
   const branchCreate=createBranchCreateCoordinator({api,now});
@@ -477,6 +481,7 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
   const lineUnstage=createLineUnstageCoordinator({api,now});
 
   const clearGrantCache = entry => {
+    svnSelections.delete(entry);
     branchCreate.invalidate(entry);
     tagCreate.invalidate(entry);
     lightweightTag.invalidate(entry);
@@ -589,8 +594,23 @@ export function createHandler(ctx, api = adapter, maxActive = 4, { now = Date.no
 
   /** Read through the adapter, then require both the cwd grant and the selected repository to be current. */
   async function readGrantedRepository(endpoint, repository, payload, cwd, mode, entry, signal) {
-    const value = await readRepository(api, endpoint, repository, payload, {cwd, mode, signal});
+    const svnStatus = repository.type === 'svn' && endpoint === 'vcs/status';
+    const sequence = svnStatus ? ++svnStatusSequence : 0;
+    const previous = svnSelections.get(entry);
+    if (svnStatus) svnSelections.set(entry, {sequence, repository});
+    const svnModifiedPath = endpoint === 'vcs/compare' && previous?.repository === repository
+      ? previous.paths?.get(payload.id) : undefined;
+    const value = await readRepository(api, endpoint, repository, payload, {cwd, mode, signal, svnModifiedPath});
     await assertCurrentGrant(payload.sessionId, cwd, entry, payload.repositoryId, repository, signal);
+    const snapshot = svnSelections.get(entry);
+    if (svnStatus && snapshot?.sequence === sequence) {
+      const hints = new Map();
+      for (const row of value.changes) {
+        if (hints.size === MAX_SVN_HINTS) break;
+        if (row.status === 'modified' && typeof row.path === 'string' && row.path.length <= 4096 && row.path !== '.') hints.set(row.id, row.path);
+      }
+      snapshot.paths = hints;
+    }
     return value;
   }
 

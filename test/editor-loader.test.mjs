@@ -7,5 +7,5 @@ test('resource failures are actionable and never imported',async()=>{
 });
 test('same-origin fetch and exact module URL preserve worker base',async()=>{
  const url='https://test/editor.js?v=3';const expected={createDiff(){}};
- assert.equal(await loadEditor(url,{fetcher:async(u,o)=>{assert.equal(u,url);assert.equal(o.credentials,'same-origin');return new Response('export {}',{headers:{'content-type':'text/javascript'}});},importer:async u=>{assert.equal(u,url);return expected;}}),expected);
+ assert.equal(await loadEditor(url,{fetcher:async(u,o)=>{assert.equal(u,url);assert.equal(o.credentials,'same-origin');assert.equal(o.method,'HEAD');return {ok:true,headers:new Headers({'content-type':'text/javascript'}),arrayBuffer:()=>assert.fail('HEAD must not read a body')};},importer:async u=>{assert.equal(u,url);return expected;}}),expected);
 });

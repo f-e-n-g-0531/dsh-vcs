@@ -26,6 +26,8 @@ Windows 用 Get-FileHash 检查 SHA-256；Linux 用 sha256sum。安装包自带�
 2. 使用上述命令安装指定的新版本。
 3. 重启后检查 VCS 入口、文件比较、历史和 Session 切换；确认工作区与聊天仍正常。
 
+如果升级界面显示候选为 `0.9.3`，但报错点名旧版 `0.9.2` 与当前宿主不兼容，先确认当前 profile 并备份配置，再卸载旧版、重新安装确切的 `@feng0531/dsh-vcs@0.9.3`。不要用版本豁免启用旧包。
+
 如果以前安装的是旧包 `@local/dsh-vcs`，先备份配置，再移除旧包，不同时保留新旧实例：
 
 	dsh plugin --profile web remove @local/dsh-vcs
