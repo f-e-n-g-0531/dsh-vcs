@@ -6,7 +6,7 @@
 
 每次改动完成并验证通过后，按授权渠道完成正式发布，不停留在本地修改或只推标签。默认 `both` 联合 npm／GitHub；明确仅 GitHub 的版本使用 `github-only`，不接触 npm token、registry 或 latest。渠道例外写入该版本说明，不能据 GitHub 版本号推断 npm 可用版本。版本使用 `vX.Y.Z`：X 为大版本，Y 为小版本／新增功能，Z 为 BUG 修复；递增前一位时后面的位归零。失败门禁必须先修复，不能为了发布跳过验证。发布不自动安装或重启宿主。
 
-每个新版本必须有独立的中文发布说明，放在 `docs/releases/版本号.md`。按“本版变化、安装、限制、验证”组织，不把自动提交列表、开发轮次或内部恢复记录当作用户说明。没有新增功能时明确写出，不夸大改动。
+每个新版本必须有独立的中文发布说明，放在 `docs/releases/版本号.md`。按“本版变化、安装、限制、验证”组织，不把自动提交列表、开发轮次或内部恢复记录当作用户说明。没有新增功能时明确写出，不夸大改动。正文会直接用于 GitHub Release；仓库文档链接须用完整 GitHub URL，不使用相对路径。发布后打开 Release 页面确认链接可用。
 
 更新包版本和锁文件，在变更记录中填写同一版本。核查许可证、第三方声明及公开文件，排除凭据和私人数据。
 
@@ -68,7 +68,7 @@ node scripts/release-host-fixture.mjs pack <含node_modules和package-lock.json�
 
 在 Actions 从 main 运行 **Publish GitHub and npm**，输入已验证的标签。
 
-工作流检出该标签，验证同标签证据，直接使用已验证的候选 tgz，不重新生成另一份包。`both` 先上传 npm，再验证公开 npm 元数据与实际下载字节，最后公开 GitHub Release；`github-only` 跳过全部 npm 步骤，仅上传已验证候选及 SHA-256 校验文件。
+工作流检出该标签，验证同标签证据，直接使用已验证的候选 tgz，不重新生成另一份包。`both` 先上传 npm，再验证公开 npm 元数据与实际下载字节，最后公开 GitHub Release；`github-only` 跳过全部 npm 步骤。两种渠道均在 GitHub 上传候选 tgz、`SHA256SUMS.txt` 和 `release-evidence.json`。
 
 仅 `both` 渠道需配置 `NPM_AUTOMATION_TOKEN`，具有该包发布权限并符合 npm 2FA 策略；`github-only` 无需该凭据。凭据只用于上传步骤；不要写进源码、发布说明或聊天。
 

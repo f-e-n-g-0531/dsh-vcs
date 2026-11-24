@@ -7,6 +7,7 @@
 需要 Node.js 22+、Git、SVN、svnadmin 和 OpenSSL。先运行 `npm run test:preflight` 确认实际工具版本；OpenSSL 可通过 `OPENSSL_BIN` 指定现有可执行文件，不会自动安装工具。在项目根目录执行：
 
 ```sh
+npm run test:preflight
 npm ci --include=dev
 npm run check
 npm run verify:package
@@ -39,7 +40,7 @@ npm run test:install
 
 ## 不应改变的行为
 
-1. 默认只读，不增加正文编辑、远端fetch／pull／push、stash／merge／rebase／冲突解决、force或SVN写操作。已有分支切换仍要求干净工作区；整文件stage／unstage拒绝选中MM，块／行仅按精确计划稳定ID合成受限同mode普通UTF-8候选，冻结选择，不接收客户端偏移／正文。所有Index入口复验固定HEAD／完整Index／工作字节并使用index.lock，不改工作文件，不覆盖其他暂存。commit使用完整Index和显式身份／消息；amend独立确认历史替换，保留原author与有序parents。新分支与unsigned annotated／lightweight tag仅从当前HEAD创建，不覆盖、不自动切换。分支删除仅评估，不授予删除能力。保留各入口严格配置与仓库子集、限时单次token、操作种类隔离及授权复验。对象只追加，未知结果不自动重试、回滚、删对象／ref或GC；显式刷新核对真实状态。所有写入口共享仓库pending／unknown与writer门禁，但不能约束外部Git，不保证跨Index／ref全局原子性。
+1. 当前页面只读，不新增正文编辑或写操作入口；历史引用不切换工作区，Stash 只查看已有内容。维护底层 Git 写操作时，遵循[架构的确认事务边界](<docs/ARCHITECTURE.md#可复用确认事务基础>)和[各操作约束](<docs/CURRENT-CAPABILITIES.md#保留的底层操作实现>)，尤其不扩大授权、不自动重试或回滚未知结果。
 2. 浏览器只能请求Session下已发现的仓库，不能指定任意磁盘路径；目录变化后重新验证权限。
 3. 保留无shell命令、输出与时间限制、链接路径检查及选中文件复核。
 4. SVN远程访问必须明确同意；不自动连接、续权或扩大范围。

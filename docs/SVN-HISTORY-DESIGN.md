@@ -1,6 +1,6 @@
 # SVN 历史协议与语义
 
-本文说明当前源码的 SVN 历史协议。已发布能力与候选新增认证的区别见[SVN 远程历史](<SVN-RUNTIME-SCOPE.md>)。
+本文说明当前源码的 SVN 历史协议。用户操作、认证配置与排查见 [SVN 远程历史指南](<SVN-RUNTIME-SCOPE.md>)。
 
 ## 修订与路径
 
@@ -13,7 +13,7 @@
 
 发现和BASE／工作副本比较保持离线。describe提出范围，approve要求用户明确勾选；能力绑定Session、cwd、repositoryId、root、UUID和scope，约5分钟有效，撤销和替换失效。每个IO步骤前后重新校验，不能通过重试或聚焦自动续权。
 
-生产仅固定有界HTTPS／DAV，系统CA和名称校验开启，不跟随重定向、不接受压缩、任意URL、CLI或测试request注入。Basic 头仅在为指定 Session 和仓库显式授权后由宿主添加，只发往校验过的仓库根及其下属路径。浏览器不能提交凭据或认证头；生产不支持自定义CA。file仓库和显式测试CA仅用于隔离fixture，不进入生产工厂。
+生产使用固定的有界 HTTPS／DAV 传输，启用系统 CA 和名称校验，不跟随重定向，不接受压缩、任意 URL、SVN CLI 网络请求或测试 request 注入。宿主配置的 Basic 凭据绑定 Session ID、仓库根和 UUID；Windows 上显式选择 TortoiseSVN 登录状态时，仅在受信任地址返回明确的 Basic 挑战后读取匹配的本机缓存。浏览器不能提交凭据或认证头；生产不支持自定义 CA。file 仓库和测试 CA 仅用于隔离测试。
 
 ## 生命周期
 

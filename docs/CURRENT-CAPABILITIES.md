@@ -1,6 +1,6 @@
 # 当前能力与验证入口
 
-本表按当前源码整理，区分用户可见入口、保留的底层实现和验证入口。正式发布和实机验收另见[变更记录](<../CHANGELOG.md>)与[实机记录](<LIVE-ACCEPTANCE.md>)；0.8.0 的历史证据保留在[发布回执](<releases/0.8.0-RECEIPT.md>)和[默认全量记录](<DEFAULT-REGRESSION-ROUND100.md>)。
+本表区分页面可用功能与保留的底层实现，并提供代码和测试入口。版本变化看[变更记录](<../CHANGELOG.md>)，实际页面验证看[实机记录](<LIVE-ACCEPTANCE.md>)。
 
 | 能力 | 实现 | 验证入口 | 主要边界 |
 | --- | --- | --- | --- |
@@ -8,19 +8,18 @@
 | 请求取消与整操作预算 | [预算](<../src/operation-budget.mjs>)、[命令](<../local-command.mjs>) | [预算测试](<../test/operation-budget.test.mjs>)、[命令测试](<../test/local-command.test.mjs>) | 默认 15 秒共享截止时间；等待进程清理，不承诺即时结束 |
 | 历史、提交图、引用与 A/B | [历史页](<../src/HistoryPanel.jsx>) | [历史窗口](<../test/history-window.test.mjs>)、[浏览器聚合](<../scripts/monaco-fixture.mjs>) | 固定提交快照，有界窗口；远程跟踪引用只是本地缓存，不 fetch |
 | 文件历史、Blame 与返回 | [导航位置](<../src/review-location.mjs>)、[文件分页](<../src/history-pages.mjs>) | [返回闭环](<../scripts/review-context-browser.jsx>)、[原有返回](<../scripts/history-back-navigation-browser.jsx>) | 有界导航，不自动追踪复制／合并／歧义来源 |
-| 内容搜索及命中行定位 | [搜索页](<../src/GrepPanel.jsx>) | [固定快照跳转](<../scripts/search-navigation-browser.jsx>) | Git 固定提交，保留查询；不搜索任意磁盘或远端 |
+| 内容搜索及命中行定位 | [搜索页](<../src/GrepPanel.jsx>)、[分页](<../src/content-search.mjs>) | [固定快照跳转](<../scripts/search-navigation-browser.jsx>) | 固定查询开始时的 HEAD；每页最多 100 条／1 MiB 结果，扫描最多 64 个文件／16 MiB；超过 16 MiB 的文件跳过并提示，不含二进制或未提交改动；空页可能还有下一页 |
 | 大仓库文件与目录 | [定点读取及缓存](<../src/historical-access.mjs>)、[目录页](<../src/HistoricalTree.jsx>) | [历史读取](<../test/historical-access.test.mjs>)、[目录交互](<../scripts/history-tree-pages-browser.jsx>) | 单目录最多 10 万项／16MiB 输出；每页最多 100；旧整树 API 上限不变 |
 | 大文件与结构化能力 | [预览能力](<../src/preview-capabilities.mjs>)、[前端适配](<../src/preview-actions.mjs>) | [能力测试](<../test/preview-capabilities.test.mjs>)、[完整比较](<../test/large-compare.test.mjs>) | 普通每侧 2MiB，显式完整比较每侧 8MiB，历史分段 16MiB；不承诺无限文件 |
-| SVN HTTPS 历史 | [生产组合](<../src/svn-https-host.mjs>)、[运行时](<../src/svn-runtime.mjs>) | [TLS 授权链](<../test/svn-dav-chain-tls.test.mjs>) | 显式同意、系统信任、逐步授权；0.9.0 候选支持宿主配置的 HTTPS Basic，不复用 SVN 登录缓存 |
+| SVN HTTPS 历史 | [生产组合](<../src/svn-https-host.mjs>)、[运行时](<../src/svn-runtime.mjs>) | [TLS 授权链](<../test/svn-dav-chain-tls.test.mjs>) | 需明示同意、系统信任、逐步授权；支持匿名 HTTPS、宿主配置的 Basic，以及 Windows 上符合条件的 TortoiseSVN 登录状态，见[使用指南](<SVN-RUNTIME-SCOPE.md>) |
 | 工作区分支切换／插件内更新 | 当前开发源码已移除 UI 与公开 RPC | [移除断言](<../test/updates.test.mjs>) | 历史引用导航仍只读；外部 Git 客户端及 DSH 插件管理器管理相应操作 |
 | 编辑器资源与性能 | [编辑器](<../src/editor.js>)、[采样工具](<../scripts/performance-baseline.mjs>) | [资源循环](<../scripts/performance-browser.jsx>)、[统计测试](<../test/performance-baseline.test.mjs>) | 环境／规模／内容一致才能比较；基线不是通用性能承诺 |
 | 图片并排／overlay／swipe | [叠加范围](<IMAGE-OVERLAY-SCOPE.md>)、[图片组件](<../src/ImageComparison.jsx>) | [浏览器回归](<../scripts/image-ui-browser.jsx>) | 原始像素左上对齐、共同缩放，不拉伸等宽；Fit／实际大小／25–200%；PNG／JPEG／静态 WebP 限制不变，不写像素 |
-| HEAD Reflog | [读取模型](<../src/reflog.mjs>) | [读取测试](<../test/reflog.test.mjs>) | 最近 200 项只读快照、固定 OID 详情；不提供恢复、reset 或 checkout |
-| 候选包与发布证据 | [预检](<../scripts/release-preflight.mjs>)、[发布工作流](<../.github/workflows/release.yml>) | [证据负例](<../test/release-evidence.test.mjs>)、[CLI 验证](<../test/release-preflight-cli.test.mjs>) | 同标签／SHA／run attempt；四包一致；渠道显式；缺证据阻断 |
+| HEAD Reflog 与 Stash | [Reflog 模型](<../src/reflog.mjs>)、[Stash 面板](<../src/StashPanel.jsx>) | [Reflog 测试](<../test/reflog.test.mjs>) | 最近 200 项 HEAD 移动记录与固定提交详情；可查看已有 Stash 和差异，不创建、恢复、应用、弹出或删除 |
 
 ### 保留的底层操作实现
 
-0.8.6 候选已撤下分支／标签／删除评估面板，并移除模式选择；下表写操作底层实现与协议保留，但不再通过当前页面进入。不应将独立组件回归解读为生产 UI 仍提供入口。
+当前页面不提供下表所列操作的入口，但保留底层实现与协议。独立组件通过测试不代表正式页面开放相应操作。
 
 | 能力 | 实现与验证入口 | 主要边界 |
 | --- | --- | --- |
@@ -35,6 +34,6 @@
 
 写操作保留严格仓库／配置／路径校验：特殊 Index、attributes／filters／hooks、签名、packed refs、linked／shared worktree 等按各入口范围保守拒绝，不宣称通用 Git 兼容。计划与预览只读，确认后可追加对象；取消／失败可能残留不可达对象或写入已生效，不自动重试、删除对象或 GC 回滚。共享 pending／unknown 门禁不是外部 Git 进程的全局锁；结果未知先显式刷新并核对 HEAD、refs、Index 和工作文件。
 
-**完整 Fork 对齐未完成**：远端 fetch／pull／push、stash、merge／rebase、冲突解决等仍缺失，实际分支删除未开放。实现与阶段性验证见[增量记录](<FORK-PARITY-VERIFICATION.md>)，差距见[对齐清单](<FORK-PARITY.md>)；历史通过数字不代表当前默认全量或本版发布通过。本次不安装、升级或重启日常 DSH GUI／profile。
+不提供远端 fetch／pull／push、合并、变基、冲突解决或实际分支删除。历史设计差距与阶段性证据见[对齐清单](<FORK-PARITY.md>)和[增量记录](<FORK-PARITY-VERIFICATION.md>)。
 
 旧计划和旧版验收保留在原文件，用于追溯历史，不应据其中“未实现”直接建立重复研发项。当前宿主支持声明和实机限制见[兼容性](<COMPATIBILITY.md>)及[实机记录](<LIVE-ACCEPTANCE.md>)。

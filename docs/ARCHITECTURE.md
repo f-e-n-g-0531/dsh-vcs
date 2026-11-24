@@ -38,14 +38,14 @@
 
 ## SVN HTTPS组合
 
-[固定工厂](<../src/svn-https-host.mjs>)组合[共享Host](<../src/svn-host.mjs>)、[严格RPC](<../src/svn-rpc.mjs>)、[运行时](<../src/svn-runtime.mjs>)与有界DAV／TLS传输。生产工厂不接受自定义请求实现、CLI、认证缓存或自定义 CA。0.9.0 候选允许从宿主配置选用指定仓库与会话的 Basic 凭据；浏览器不传递凭据。
+[固定工厂](<../src/svn-https-host.mjs>)组合[共享宿主](<../src/svn-host.mjs>)、[严格 RPC](<../src/svn-rpc.mjs>)、[运行时](<../src/svn-runtime.mjs>)与有界 DAV／TLS 传输。生产网络传输不接受自定义请求实现、SVN CLI 或自定义 CA。浏览器不传递凭据；宿主支持既定范围内的 Basic 配置，以及 Windows 上显式选择的本地 TortoiseSVN 凭据提供器。
 
 本地身份解析复用发现授权。用户先审阅提议并明确勾选同意，才生成绑定Session、cwd、root、UUID和scope的短期能力。运行时逐步骤复验；撤销、过期、Session变化及插件卸载使能力失效。日志固定本地工作副本修订，不隐式读远端HEAD。功能及认证限制见[SVN结论](<SVN-RUNTIME-SCOPE.md>)。
 
 ## 前端组合
 
 - [客户端入口](<../src/client.jsx>)负责DSH页面注册、工作区选择与交互状态；[RPC适配器](<../src/client-rpc.mjs>)仅转换认证响应，保留错误码和取消信号。[状态调度器](<../src/status-limiter.mjs>)跨请求代次限制两项并发，取消在途请求直到结束才释放槽；[列表键盘处理](<../src/file-list-keyboard.mjs>)只管理焦点和目录开合，不自动选择文件。
-- 工作区／历史／Stash／内容搜索使用单一 `reviewView` 状态互斥切换，工作区比较、编辑器与快捷键共用 `reviewActive` 门禁；进入只读辅助视图统一取消工作区比较并清空旧选择，避免新增视图时漏更新依赖。
+- 工作区、历史、版本比较、Reflog、Stash 和内容搜索通过 `reviewView` 互斥切换；`reviewActive` 控制工作区比较、编辑器与快捷键。进入历史或辅助视图会取消工作区比较并清空旧选择。
 - [内容搜索](<../src/GrepPanel.jsx>)按 Session／repositoryId 重新挂载请求所有者，切换时取消旧查询。搜索结果绑定固定 snapshot，打开文件不跟随移动的 HEAD，返回保留查询结果与阅读设置。[搜索分页](<../src/content-search.mjs>)使用绑定仓库／快照／查询的签名游标；逐页重新授权，最多保存100个前页请求坐标，不保存全部命中。服务进程重启后旧游标失效，需重新查询。
 - 历史面板组合提交详情、目录、文件历史、Blame 和比较视图；[历史窗口模型](<../src/history-window.mjs>)和[文件历史分页](<../src/history-pages.mjs>)有界显示最多 200 条。[导航位置](<../src/review-location.mjs>)只保存有界的提交／父提交／文件／行和视图选项，不保存正文或授权。
 - [历史审阅视图](<../src/HistoryViewer.jsx>)负责展示；[生命周期Hook](<../src/useHistoryEditor.mjs>)管理编辑器与样式资源；[编辑器任务](<../src/history-editor.mjs>)处理异步加载和释放。
@@ -55,7 +55,7 @@
 
 - 发现默认检查Session目录及一级子目录；定向扫描仍限于Session内。发现的包含仓库可能大于Session目录。
 - 授权最多32个Session、约5分钟；每次请求重新解析cwd，拒绝旧扫描覆盖新状态。过期需手动重新发现。
-- 历史读取绑定不可变OID和选中ID；Git禁止replace refs、lazy fetch、提示及外部diff／textconv。只读浏览不checkout、不自动获取对象；实际分支切换仅走上述独立确认链。
+- 历史读取绑定固定对象标识（OID）和选中 ID；Git 禁用 replace refs、lazy fetch、提示及外部 diff／textconv。历史引用导航不切换工作区、不自动获取对象；当前没有公开的工作区分支切换入口。
 - [操作预算](<../src/operation-budget.mjs>)通过异步上下文为本地 RPC 提供统一截止时间；[本地命令](<../local-command.mjs>)共享剩余预算，取消或超时清理进程树，直到 close 与清理结束才释放请求容量。不是即时终止承诺。
 - 文本每侧2MiB；历史UTF8分段最大16MiB、每片64KiB。历史图最多200节点／1000关系／32泳道，不等于完整无限图。
 - 刷新仅手动或可见window聚焦，无周期刷新。资源路由是固定认证白名单，URL不能成为任意磁盘路径。

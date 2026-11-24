@@ -2,12 +2,11 @@
 
 在 DeepSeek Harness（DSH）Web 中查看 Git / SVN 文件变更和提交历史，**默认只读预览**。
 
-你可以查看差异、浏览历史、追溯文件。0.8.7 已移除工作区分支切换及插件内更新入口，工作区固定显示全部变更；暂时撤下创建分支、创建标签和分支删除评估面板。依赖已暂存／未暂存模式的提交与暂存写操作也不再通过当前页面进入，底层实现保留。历史引用选择只改变阅读起点，不提供 fetch／pull／push、stash、merge 或冲突解决。
+你可以查看工作区差异、浏览提交历史、追溯文件来源。插件不切换工作区分支，不执行暂存、提交或远端同步。
 
-**0.8.9 已正式发布至 npm 与 GitHub。** 优化提交历史分栏和窄屏阅读，改善 Reflog／Stash 与内容搜索。[发布回执](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.9-RECEIPT.md>) · [本版说明](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/releases/0.8.9.md>)。
+正式版本以 [GitHub Releases](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) 和 npm 为准。
 
-- npm 包：`@feng0531/dsh-vcs`
-- [下载正式版本](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) · [查看更新](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md)
+- npm 包：`@feng0531/dsh-vcs` · [下载正式版](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) · [更新记录](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CHANGELOG.md)
 - 当前源码自 0.8.5 起采用 [MIT License](<LICENSE>)，允许商业使用、修改和分发，须保留版权及许可声明；第三方材料仍适用各自许可证。已发布旧版本的许可条款以对应发行包为准。
 
 ## 能做什么
@@ -16,56 +15,38 @@
 | --- | --- |
 | 查看工作区变更 | Git 全部变更；SVN 本地基线与工作副本、属性差异 |
 | 阅读代码差异 | 默认 Monaco 只读 Diff，支持并排／行内、换行、忽略行尾空白、上一处／下一处差异 |
-| 浏览 Git 历史 | 搜索提交说明、作者、路径与提交时间范围（since/until，含边界，按 committer date）；查看本地分支、提交图、提交详情与目录 |
-| 比较历史版本 | 比较提交与选定父提交，或选择两个本地提交进行 A/B 比较 |
-| 追溯代码来源 | 文件历史、唯一来源重命名追踪（含改名同时修改）、Blame（逐行查看最后修改者和提交） |
-| 搜索与定位 | 在固定提交中分页搜索内容，点击结果定位命中行；高级、基础与分段阅读支持目标行，返回保留结果与阅读设置 |
-| 查看其他内容 | 支持部分静态图片并排／叠加／滑动比较与双侧同步缩放；较大历史 UTF-8 文件可分段阅读 |
-| 查看 HEAD 移动记录 | Reflog 只读查看最近200项，点击固定提交查看详情；不提供恢复、reset或checkout |
+| 浏览 Git 历史 | 查看提交图、详情与目录；从「内容搜索 → 提交历史」按说明、作者、路径和提交者日期筛选 |
+| 比较历史版本 | 比较提交与选定的父提交，或在「版本比较」页签选择两个本地提交 |
+| 追溯代码来源 | 查看文件历史、跟随唯一的重命名来源；按行查看最后改动对应的提交（Blame） |
+| 搜索文件正文 | 从「内容搜索 → 文件正文」搜索查询开始时的 HEAD，不含未提交改动；点击结果跳到命中行 |
+| 查看图片和大文件 | 静态图片可并排、叠加或滑动比较；较大的历史 UTF-8 文件可分段阅读 |
+| 查看历史辅助记录 | 只读查看最近 200 条 HEAD 移动记录（Reflog），以及已有的 Git 暂存快照（Stash）及其差异；不恢复或应用 |
 | 浏览 SVN 历史 | 明确同意连接后，查看 HTTPS 仓库日志、修订差异和文件历史 |
-| 历史引用选择 | 仅改变阅读起点，不切换工作区分支 |
 
 提供中英文界面。编辑器加载失败时会显示基础文本比较；它不是完整的 Monaco 替代品。
 
 ## 安装
 
-以下兼容性按当前源码列出；已发布版本以各自的包清单为准。DSH `0.2.3-alpha.2` 需要 DSH VCS `0.9.3`；`0.9.2` 不支持。
+先核对 [DSH 与 Node.js 兼容列表](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/COMPATIBILITY.md)，并确认宿主能通过 PATH 找到 Git 或 SVN（只使用 Git 时不需要 SVN）。
 
-需要：
+使用 npm 安装正式版：
 
-- Node.js **22 或更新版本**；DSH `0.2.2-rc.3` 和 `0.2.2-rc.5` 本身要求 **24.9.0+**，DSH `0.2.3-alpha.2` 要求 **24.22.3+（24.x）或 26.13.1+**。打包的 DSH 桌面应用自带运行时。
-- DSH Web：声明兼容 **0.1.7-rc.2、0.2.0-rc.2、0.2.1-rc.2、0.2.1-rc.5、0.2.2-rc.1、0.2.2-rc.3、0.2.2-rc.5 或 0.2.3-alpha.2**。
-- 系统 PATH 中有 Git 或 SVN；只使用 Git 时无需安装 SVN。
+```sh
+dsh plugin --profile web add "@feng0531/dsh-vcs@latest"
+```
 
-profile是DSH的配置和插件环境，不是Session。下面的web是示例，请先确认运行中的DSH使用哪个profile；若不同，替换命令中的web。宿主插件命令通过pnpm执行，需确保该工具可用。
+`web` 是示例 profile（DSH 的配置和插件环境，不是 Session）。请换成运行中的 DSH 所用的 profile；命令依赖 `pnpm`。安装会修改该 profile，升级前请备份配置。
 
-在终端执行：
-
-	dsh plugin --profile web add "@feng0531/dsh-vcs@<已确认发布到 npm 的版本>"
-
-GitHub 与 npm 的可用版本可能不同；例如 0.4.11 仅发布 GitHub。安装前核对目标渠道，候选源码版本不等于已发布版本。
-
-安装后由你自行重启 DSH，再刷新原来的 Web 页面。安装会改变所选 profile；升级前请备份配置。**本项目的发布不会自动升级或重启你的 DSH。**
-
-也可以从 [GitHub Release](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) 下载 tgz 和校验文件，核对 SHA-256 后安装：
-
-	dsh plugin --profile web add "<tgz 的绝对路径>"
-
-升级、旧包迁移和回滚见[安装指南](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/INSTALL.md)。
-
-## 版本管理
-
-当前开发源码不再提供插件内版本检查、安装或重载按钮。请通过 DSH 插件管理器或安装命令管理版本；仓库“刷新”会重新扫描当前会话目录并更新变更状态。
+安装后自行重启 DSH，再刷新原来的 Web 页面。也可从 [GitHub 正式发布页](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) 下载并校验安装包；具体步骤、升级和回滚见[安装指南](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/INSTALL.md)。
 
 ## 开始使用
 
 1. 在 DSH 中选择一个 Session，确认它的工作目录在项目内。
 2. 打开 VCS 页面，发现仓库，再从顶部下拉框选择仓库。
 3. 点击文件查看差异，或进入历史视图浏览提交。
-4. SVN远程历史需先审阅并明确同意。复制成员可主动查看范围内的固定来源历史，不自动跨复制追溯。
-5. 外部工具修改了项目后，手动刷新；可见窗口重新获得焦点时也会刷新。没有定时轮询。
+4. 外部工具修改项目后，点击「刷新」重新发现仓库并更新变更。可见窗口重新获得焦点时也会刷新，没有定时轮询。
 
-默认发现当前目录、一级子目录以及包含当前目录的上级仓库，不递归深入。右上角“刷新”会重新发现仓库并刷新变更；查看更深的独立项目时，请切换到相应工作目录的 Session。
+默认发现当前目录、一级子目录以及包含当前目录的上级仓库，不递归深入。更深的独立项目应使用工作目录指向该项目的 Session。
 
 **注意：Session 位于仓库子目录时，发现后的查看范围可以覆盖整个仓库。**
 
@@ -80,43 +61,27 @@ GitHub 与 npm 的可用版本可能不同；例如 0.4.11 仅发布 GitHub。�
 
 ### 历史引用与工作区分支
 
-历史页分支／引用选择只改变阅读起点，不切换工作区。当前开发源码已移除本地分支切换 UI 及对应公开 RPC；如需切换分支，请在外部 Git 客户端完成后刷新仓库。
+历史页选择分支、标签或远程跟踪引用只改变阅读起点，不切换工作区或连接远端。要切换分支，请在外部 Git 客户端完成后刷新仓库。
 
-### SVN 历史需要单独同意
+### SVN 远程历史需要单独同意
 
-本地 SVN 变更比较不连接服务器。打开远程历史前，需要审阅服务器与路径范围并勾选同意；授权约 5 分钟后过期，须重新手动同意。
+本地 SVN 比较不联网。打开远程历史前，须审阅服务器和路径并明确同意；授权约 5 分钟后过期。历史读取以本地工作副本修订为上界，不自动获取服务器最新修订。支持匿名 HTTPS 和显式授权的 HTTPS Basic；Windows 宿主也可按条件使用 TortoiseSVN 登录状态。配置、复制来源查看与 401 排查见 [SVN 远程历史指南](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/SVN-RUNTIME-SCOPE.md)。
 
-正式版 `0.8.9` 只支持无需额外认证的 HTTPS SVN；`0.9.0` 候选增加 HTTPS Basic。需要 Basic 登录的仓库须[在宿主配置凭据](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/SVN-RUNTIME-SCOPE.md#https-basic-认证>)并在授权界面显式选择；不支持其他认证方式或自定义证书。历史范围固定在本地工作副本的修订，不自动获取服务器最新版本。
+## 使用限制
 
-## 保留的底层功能
-
-暂存、取消暂存、提交、Amend、分支／标签创建和分支删除评估不在当前页面开放。实现和适用边界见[能力清单](<https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/CURRENT-CAPABILITIES.md>)。
-
-## 目前的限制
-
-- **不是完整的 Fork 客户端**：底层写操作仅支持受限 Git 子集，当前页面不开放这些入口。仍缺少远端 fetch／pull／push、stash、merge／rebase 与冲突解决，不提供 force。历史图和列表都有容量限制；历史分支导航可使用本地分支、标签及本地缓存的远程跟踪引用，不连接远端。
-- 普通文本比较每侧最多 **2MiB**。Git提交／A-B／工作区三个模式比较超限时可手动加载完整文本（UTF-8／GBK／带BOM的UTF-16），每侧最多 **8MiB、10万行**，单行最多65536字符；计算超时会明确提示结果不完整。工作区读取期间发生变化会拒绝结果，但不是系统级原子快照；SVN大文件仍不支持。
-- 内容搜索每页最多100条匹配，扫描最多64个文件／16MiB正文，匹配列表最多1MiB；固定提交树上限10万项／16MiB。超过16MiB的文件跳过并提示结果不完整，二进制排除；无匹配的扫描页仍可能有下一页。长命中行仅显示开头片段，打开文件可继续阅读。
-- 历史 UTF-8 正文分段最多 **16MiB**，每片64KiB；按全局行号定位，行片段有明确提示；基础单版本阅读每窗口最多500行。分段阅读不是完整 Diff。正文按固定对象缓存，最多 32MiB／8 项／60 秒，缓存命中仍重新验证请求授权。历史目录按需分页，每页最多 100 项，单目录仍有 10 万项和 16MiB 命令输出上限。
-- 重命名追溯仅沿第一父链，至少50%相似且确认唯一删除源／新增目标；合并、复制、歧义或累计32次确认后停止。
-- 子模块变更只显示 Index 记录的提交指针与本地检出状态（已检出／未初始化／目录缺失／不可读）；不进入子模块、不读取其 HEAD，也不更新或同步。
-- 树浏览和来源行预览可手动查看该历史路径的文件历史，并可选跟随重命名；路径必须存在于所选提交，跟随规则与路径历史一致（第一父链、≥50%相似、唯一确认、32次上限）。
-- 冲突文件可额外手动查看 Git Index 阶段1／2／3，任意两阶段可只读比较。缺失阶段显示为空、不推断原内容；阶段编号不声称合并／变基归属。每阶段仍为 2MiB 预览；不读取工作文件、不解决冲突，子模块只显示提交引用，链接只显示目标文本。
-- 图片支持 PNG、基线/渐进 JPEG 和简单静态 VP8／无损VP8L WebP；动画、扩展 WebP、算术编码/CMYK JPEG 等不支持。
-- 支持 UTF-8、GBK、带 BOM 的 UTF-16；不是通用编码检测器。
-- 本地读取整次请求默认最多 15 秒，子命令共享剩余预算；取消或超时会终止子进程树并等待清理，不保证立即完成。操作系统拒绝终止时仍可能延迟。
+- 普通文本比较每侧最多 **2 MiB**。Git 超限时可手动加载完整文本，每侧最多 **8 MiB、10 万行**；SVN 不支持完整大文件比较。较大的历史 UTF-8 文件可[分段阅读](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/LARGE-FILE-SCOPE.md)，最多 **16 MiB**，不等同于完整差异比较。
+- 图片支持 PNG、基线／渐进 JPEG 和简单静态 WebP，不支持动画。文本支持 UTF-8、GBK 和带 BOM 的 UTF-16，具体支持范围随查看模式而异。
+- Git 冲突可按阶段查看内容，不能合并或解决冲突；子模块只显示提交指针和状态，不打开子模块文件。搜索、历史、重命名追溯等有容量或范围限制，详见[能力清单](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/CURRENT-CAPABILITIES.md)。
 
 ## 常见问题
 
-- **找不到仓库**：检查 Session 工作目录和 Git／SVN 的 PATH；更深项目使用相对子目录发现。
-- **提示重新发现**：目录变了或发现授权过期，手动重新发现即可。
-- **高级编辑器加载失败**：确认安装了完整正式包并重新加载宿主；失败时仍可使用基础比较。
-- **SVN 历史连接失败**：先确认是受信任 HTTPS 服务，且不要求本插件未支持的额外认证。
-
-正式发布要求通过同标签自动测试、Windows／Linux 检查、隔离浏览器和精确宿主合同等门禁。发布证据不代表你正在使用的 DSH 已加载新版。
+- **找不到仓库**：确认 Session 工作目录和宿主 PATH 中的 Git／SVN；对于更深的独立项目，将 Session 工作目录指向项目后再发现。
+- **提示重新发现**：目录改变或授权过期后，点击「刷新」。
+- **高级编辑器加载失败**：确认安装了完整的正式包，重启 DSH 后刷新原页面；仍失败时可使用基础文本比较。
+- **SVN 历史连接失败**：确认服务器使用受信任的 HTTPS；认证失败请按 [SVN 指南](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/SVN-RUNTIME-SCOPE.md#https-basic-认证)检查使用的登录方式。
 
 ## 开发与更多资料
 
-[文档导航](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/README.md) · [贡献指南](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CONTRIBUTING.md) · [安全说明](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/SECURITY.md) · [维护者发布流程](<docs/RELEASING.md>)
+[文档导航](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/README.md) · [贡献指南](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/CONTRIBUTING.md) · [安全说明](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/SECURITY.md) · [维护者发布流程](https://github.com/f-e-n-g-0531/dsh-vcs/blob/main/docs/RELEASING.md)
 
 界面设计参考 [Fork](https://fork.dev/)，不代表与 Fork 官方有关联或获得背书。

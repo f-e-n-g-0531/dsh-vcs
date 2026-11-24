@@ -1,22 +1,26 @@
 # 安装、升级与回滚
 
-需要 Node.js 22+（使用 DSH 0.2.2-rc.3 或 0.2.2-rc.5 时须满足宿主的 Node.js 24.9.0+ 要求；DSH 0.2.3-alpha.2 要求 24.22.3+（24.x）或 26.13.1+，打包的桌面应用自带运行时），DSH Web 0.1.7-rc.2、0.2.0-rc.2、0.2.1-rc.2、0.2.1-rc.5、0.2.2-rc.1、0.2.2-rc.3、0.2.2-rc.5 或 0.2.3-alpha.2，以及 PATH 中可用的 Git／SVN。当前源码自 0.8.5 起采用 [MIT License](<../LICENSE>)；已发布旧版本以对应发行包附带的许可证为准，第三方许可独立适用。
-
-上述列表按当前源码列出。DSH `0.2.3-alpha.2` 需要 DSH VCS `0.9.3`；`0.9.2` 不支持。
+先核对[兼容性](<COMPATIBILITY.md>)：DSH 与 Node.js 要满足对应版本要求，且宿主的 PATH 中须有项目所需的 Git 或 SVN。
 
 ## 先确认安装位置
 
-profile是DSH配置与插件环境，不是Session。下面以web为例：请使用当前运行DSH的实际profile，避免装到另一个环境。宿主插件命令通过pnpm执行，需要能找到pnpm；可先查看dsh plugin --help。
+profile 是 DSH 的配置和插件环境，不是 Session。`web` 是示例，请换成运行中的 DSH 所用的 profile。终端需要能找到 `pnpm`；用 `dsh plugin --help` 确认命令格式。
 
 ## 安装正式包
 
-	dsh plugin --profile web add "@feng0531/dsh-vcs@<已确认发布到 npm 的版本>"
+用 `npm view @feng0531/dsh-vcs version` 查询 npm 最新版，或用 `npm view @feng0531/dsh-vcs versions` 查看可用版本，然后安装：
 
-GitHub 与 npm 的版本可能不同；例如 0.4.11 只发布了 GitHub。不要把候选源码版本当作 registry 已发布版本。也可以从[正式发布页](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest)下载 tgz 与 SHA256SUMS.txt，核对 SHA-256 后执行：
+```sh
+dsh plugin --profile web add "@feng0531/dsh-vcs@<npm 上的确切版本>"
+```
 
-	dsh plugin --profile web add "<tgz 的绝对路径>"
+GitHub 与 npm 的可用版本可能不同。也可从 [GitHub 正式发布页](https://github.com/f-e-n-g-0531/dsh-vcs/releases/latest) 下载 `.tgz` 和 `SHA256SUMS.txt`，核对 SHA-256 后运行：
 
-Windows 用 Get-FileHash 检查 SHA-256；Linux 用 sha256sum。安装包自带启用补丁，不需要额外的 enable-vcs 包。
+```sh
+dsh plugin --profile web add "<tgz 的绝对路径>"
+```
+
+Windows 可用 `Get-FileHash -Algorithm SHA256`，Linux 可在下载目录执行 `sha256sum --check SHA256SUMS.txt`。正式包已包含启用补丁，无需额外安装 enable-vcs。
 
 安装修改所选 profile。**安装后由你自行重启 DSH，再刷新原来的 Web 页面**。命令成功不代表页面已经加载新版。
 
@@ -26,13 +30,13 @@ Windows 用 Get-FileHash 检查 SHA-256；Linux 用 sha256sum。安装包自带�
 2. 使用上述命令安装指定的新版本。
 3. 重启后检查 VCS 入口、文件比较、历史和 Session 切换；确认工作区与聊天仍正常。
 
-如果升级界面显示候选为 `0.9.3`，但报错点名旧版 `0.9.2` 与当前宿主不兼容，先确认当前 profile 并备份配置，再卸载旧版、重新安装确切的 `@feng0531/dsh-vcs@0.9.3`。不要用版本豁免启用旧包。
+如果 DSH `0.2.3-alpha.2` 报旧版插件 `0.9.2` 不兼容，先确认 profile 并备份配置，然后卸载旧版，安装[兼容性列表](<COMPATIBILITY.md>)中的已发布版本，不要用版本豁免启用旧包。
 
 如果以前安装的是旧包 `@local/dsh-vcs`，先备份配置，再移除旧包，不同时保留新旧实例：
 
-	dsh plugin --profile web remove @local/dsh-vcs
-
-使用不同 profile 时，将命令中的 web 替换成实际 profile 名称。可先查看当前 DSH 的 plugin --help。
+```sh
+dsh plugin --profile web remove @local/dsh-vcs
+```
 
 ## 回滚
 

@@ -6,7 +6,7 @@
 
 - [安装、升级与回滚](<INSTALL.md>)：具体命令和安装后检查。
 - [运行环境与兼容性](<COMPATIBILITY.md>)：DSH、Node.js、操作系统与 Windows 下的 SVN 中文路径问题。
-- [实机验证状态](<LIVE-ACCEPTANCE.md>)：哪些是用户实际反馈，哪些仅有自动测试。
+- [功能范围与限制](<CURRENT-CAPABILITIES.md>)：目前可以用什么，哪些底层功能没有页面入口。
 - [SVN 远程历史与认证](<SVN-RUNTIME-SCOPE.md>)：网络授权、HTTPS Basic 与 401 排查。
 - [安全说明](<../SECURITY.md>)：插件会读什么、保护什么、不能保证什么。
 - [更新记录](<../CHANGELOG.md>)：每个版本改了什么。
@@ -15,18 +15,18 @@
 
 - [贡献指南](<../CONTRIBUTING.md>)：准备环境、运行检查、提交要求。
 - [架构说明](<ARCHITECTURE.md>)：模块分工和调用方向。
-- [当前能力与验证入口](<CURRENT-CAPABILITIES.md>)：实现、测试、边界及旧计划的区别。
+- [实机与自动验证记录](<LIVE-ACCEPTANCE.md>)：区分历史用户反馈、自动证据和未确认项。
 - [维护者发布流程](<RELEASING.md>)：测试、标签、发布与失败恢复。
 - [常用术语](<GLOSSARY.md>)：Session、OID、RPC等词的含义。
 - [第三方许可](<../THIRD_PARTY_NOTICES.md>)。
 
-## 我要了解功能边界
+## 功能专题
 
-- [已交付功能](<REVIEW-ROADMAP.md>)与[历史功能计划](<FEATURE-PLAN.md>)。
-- [SVN 历史协议](<SVN-HISTORY-DESIGN.md>)：固定修订、传输与授权生命周期。
-- [两个提交的比较](<REVISION-COMPARE-DESIGN.md>)、[重命名追溯](<RENAME-FOLLOW-SCOPE.md>)、[Blame定位](<BLAME-LOCATION-SCOPE.md>)。
-- [图片范围](<IMAGE-EXTENSION-SCOPE.md>)、[JPEG](<JPEG-SCOPE.md>)、[WebP](<WEBP-SCOPE.md>)及[大文件阅读](<LARGE-FILE-SCOPE.md>)。
+- [两个提交的比较](<REVISION-COMPARE-DESIGN.md>)、[重命名追溯](<RENAME-FOLLOW-SCOPE.md>)、[Blame 定位](<BLAME-LOCATION-SCOPE.md>)。
+- [图片格式](<IMAGE-EXTENSION-SCOPE.md>)及[大文件阅读](<LARGE-FILE-SCOPE.md>)。
+- [SVN 历史协议](<SVN-HISTORY-DESIGN.md>)：固定修订、传输与授权。
 
-## 旧版本材料
+## 历史资料
 
-`CANDIDATE-*.md` 和 `RELEASE-*.md` 分别保留当时的候选检查与发布记录。各版本说明见 [releases](<releases>)。这些材料用于追溯，不代表当前功能或实机验收状态。
+- [版本说明与发布回执](<releases>)；`CANDIDATE-*.md` 和 `RELEASE-*.md` 保留早期候选检查及发布记录。
+- [早期只读功能交付（截至 0.3.65）](<REVIEW-ROADMAP.md>)和[历史功能计划](<FEATURE-PLAN.md>)。旧方案、阶段验收和候选界面说明用于追溯，不能据此判断当前入口或实机验收状态。

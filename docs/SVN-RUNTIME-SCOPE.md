@@ -23,13 +23,13 @@ SVN本地变更比较不需要连接服务器。远程历史从0.3.65开始提�
 ## 服务器要求
 
 - HTTPS，证书受系统信任且名称匹配。
-- 正式版 `0.8.9` 仅支持匿名访问；`0.9.0` 候选增加显式启用的 HTTPS Basic。不支持 SSO、NTLM、Digest 或客户端证书。
+- 支持匿名访问和显式授权的 HTTPS Basic：从 0.9.0 起可使用宿主配置的凭据，从 0.9.1 起 Windows 宿主可按下文条件使用 TortoiseSVN 登录状态。不支持 SSO、NTLM、Digest 或客户端证书。
 - 不支持自定义CA、HTTP、svn或svn+ssh协议。
 - 不跟随重定向，不允许输入任意网络URL。
 
 本插件不获取远端最新版本，不比较任意两条SVN修订，也不执行更新、提交等写操作。
 
-## 使用本机 SVN 客户端查看日志
+## 在 Windows 上使用 TortoiseSVN 登录状态
 
 Windows 宿主的 DSH 拥有者可明确选择「使用 TortoiseSVN 登录状态」。需要已安装 TortoiseSVN 及与其动态库位数一致、可从宿主 PATH 找到的 Python 3（3.8 或更新）。插件只在可信 HTTPS 端点返回明确的 Basic 挑战后，让原生 Wincrypt 提供器按认证域查询缓存；不弹窗、不保存认证，不向浏览器传递凭据。缓存缺失、失效或环境不兼容时会提示失败；也可复制工作副本路径，在 TortoiseSVN 中打开日志。
 
@@ -42,18 +42,12 @@ Windows 宿主的 DSH 拥有者可明确选择「使用 TortoiseSVN 登录状态
 - `DSH_VCS_SVN_BASIC_SESSION`：允许使用凭据的 DSH Session ID。
 - `DSH_VCS_SVN_BASIC_USERNAME` 与 `DSH_VCS_SVN_BASIC_PASSWORD`：该仓库的只读账号凭据。
 
-配置匹配时，勾选同意并点击「使用宿主配置的 Basic 凭据并读取历史」。若按钮未出现，先核对版本、仓库根、UUID、会话 ID，以及宿主是否取得用户名和密码。浏览器不接收或发送密码，插件也不读取 TortoiseSVN 登录缓存。
+配置匹配时，勾选同意并点击「使用宿主配置的 Basic 凭据并读取历史」。若按钮未出现，先核对版本、仓库根、UUID、会话 ID，以及宿主是否取得用户名和密码。浏览器不接收或发送密码；此方式不读取 TortoiseSVN 登录缓存。
 
 网络授权只允许插件发请求，不等于 SVN 已认证。匿名方式和手工配置的 Basic 方式收到 401 时结束授权。显式选用 TortoiseSVN 登录时，仅在明确的 Basic 挑战后尝试同地址认证；没有匹配缓存或认证被拒时结束授权，不回退到其他登录方式。
 
-## 开发者需要保留的约束
+## 容量与验证
 
-授权绑定Session、工作目录、仓库根、UUID与路径范围。每一步读操作前后重新验证，目录变化立即阻止后续请求。远程请求最多2项并发，整次RPC在15秒触发取消，生产传输关闭并清理后才释放并发位置；这不是到点强制立即返回的保证。
+日志界面每页 50 条。远程请求最多并行 2 项；单次请求到 15 秒触发取消，等待连接关闭与清理后才结束。授权与协议的实现约束见 [SVN 历史协议](<SVN-HISTORY-DESIGN.md>)。
 
-日志每页最多100条，界面每页50条。数据成员使用服务端标识重新验证，不接受浏览器提供的任意服务器路径。协议细节见[SVN协议说明](<SVN-HISTORY-DESIGN.md>)。
-
-## 验证状态
-
-0.3.65的[CI](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37919692670)与[Chrome回归](https://github.com/f-e-n-g-0531/dsh-vcs/actions/runs/37919725030)通过，并已[正式发布](https://github.com/f-e-n-g-0531/dsh-vcs/releases/tag/v0.3.65)。测试在隔离Apache HTTPS服务器上验证同意、日志、差异、追溯、撤销和取消。
-
-这些不是你当前DSH或任何外部SVN服务器的实机通过证明。使用外部服务器前，仍需在界面审阅并明确同意。发布不会自动升级或重启DSH。
+隔离 HTTPS 环境验证不代表任意 SVN 服务器都可连接，也不代表你的 DSH 已加载新版；见[实机记录](<LIVE-ACCEPTANCE.md>)。
