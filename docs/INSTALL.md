@@ -1,6 +1,6 @@
 # 安装、升级与回滚
 
-先核对[兼容性](<COMPATIBILITY.md>)：DSH 与 Node.js 要满足对应版本要求，且宿主的 PATH 中须有项目所需的 Git 或 SVN。
+先核对[兼容性](<COMPATIBILITY.md>)：DSH 与 Node.js 要满足对应版本要求，且宿主的 PATH 中须有项目所需的 Git 或 SVN。 本项目采用 [MIT License](<../LICENSE>)；旧版许可请以对应发行包为准。
 
 ## 先确认安装位置
 
