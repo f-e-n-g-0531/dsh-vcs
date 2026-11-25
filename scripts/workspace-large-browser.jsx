@@ -19,7 +19,13 @@ export async function checkWorkspaceLarge(){
   flushSync(()=>root.render(<Page key={lang} useSessions={select=>select({byId:{s:{id:'s',cwd:'/fixture',retainedBy:{mainView:1}}}})}/>));
   const button=k=>[...host.querySelectorAll('button')].find(n=>n.textContent===t(k));
   await wait(()=>host.querySelector('.vcs-file'));host.querySelector('.vcs-file').click();await wait(()=>host.textContent.includes('Temporary compare failure'));const retry=[...host.querySelectorAll('.vcs-editorbox button')].find(b=>b.textContent===t('retry'));if(!retry)throw Error('Missing ordinary compare retry');retry.click();await wait(()=>button('largeLoad'));if(discoveries!==1||statusReads!==1||calls.length!==2||JSON.stringify(calls[0].p)!==JSON.stringify(calls[1].p)||host.querySelector('.vcs-file')?.getAttribute('aria-current')!=='true')throw Error('Retry lost selection or rediscovered');if(calls.some(c=>c.p.large))throw Error('Large automatically loaded');
-  button('largeLoad').click();await wait(()=>host.textContent.includes(t('diffComplete')));if(!host.querySelector('.monaco-diff-editor')||!calls.at(-1).p.large)throw Error('Advanced full workspace Diff absent');
+   const focus=host.querySelector('.vcs-comparison-focus'),editor=host.querySelector('.vcs-editor'),files=host.querySelector('.vcs-files'),before=editor.clientWidth;
+   if(!focus||focus.textContent!==t('comparisonFocus'))throw Error('Missing workspace focus action');
+   focus.focus();focus.click();await wait(()=>focus.getAttribute('aria-pressed')==='true'&&getComputedStyle(files).display==='none');
+   if(document.activeElement!==focus||editor.clientWidth<=before||calls.length!==2)throw Error('Focus did not expand the same comparison without reloading');
+   button('largeLoad').click();await wait(()=>host.textContent.includes(t('diffComplete')));if(!host.querySelector('.monaco-diff-editor')||!calls.at(-1).p.large||focus.textContent!==t('comparisonRestore'))throw Error('Focused full workspace Diff absent');
+   focus.click();await wait(()=>getComputedStyle(files).display!=='none');
+   if(host.querySelector('.vcs-editor')!==editor||host.querySelector('.vcs-file')?.getAttribute('aria-current')!=='true'||calls.length!==3)throw Error('Restoring the list reset comparison state');
   button('largeClose').click();await wait(()=>button('largeLoad'));mode='pending';button('largeLoad').click();await wait(()=>pending);const old=calls.at(-1);
   if(host.querySelector('select[aria-label="'+t('gitMode')+'"]'))throw Error('Removed mode selector rendered');button('refresh').click();await wait(()=>old.signal.aborted);pending();await wait(()=>!button('largeClose'));if(host.textContent.includes(t('diffComplete')))throw Error('Late workspace result revived');
  }}finally{root.unmount();host.remove();}

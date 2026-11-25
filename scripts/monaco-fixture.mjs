@@ -15,7 +15,26 @@ window.addEventListener('error',e=>errors.push(e.message));
 const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Diff computation timeout');};
 try{
  const initial=globalThis.MonacoEnvironment;
- const one=await import('../dist/editor.js?retry=0'),two=await import('../dist/editor.js?retry=1');
+ const one=await import('../dist/editor.js?retry=0');
+ phase='editor-repaint';
+ const host=document.querySelector('#a'),body=document.body,token='--dsw-alias-bg-base';
+ const originalStyle=body.getAttribute('style');let themeWrites=0;
+ const editor=one.createDiff(host);
+ const themeObserver=new MutationObserver(records=>themeWrites+=records.length);
+ for(const node of document.querySelectorAll('style.monaco-colors'))themeObserver.observe(node,{childList:true});
+ const frames=async(count=3)=>{for(let i=0;i<count;i++)await new Promise(r=>requestAnimationFrame(r));};
+ const lines=Array.from({length:140},(_,i)=>'line '+i+' '+ 'long '.repeat(80));
+ const after=[...lines];after.splice(5,1,'new item','second new item');after[105]='last edit';
+ const data={path:'long.ps1',left:{text:lines.join(String.fromCharCode(10))},right:{text:after.join(String.fromCharCode(10))}};
+ try{
+  editor.setContent(data,'repaint');await wait(()=>editor.snapshot().computation==='complete');
+  const right=host.querySelector('.monaco-editor.modified-in-monaco-diff-editor');if(!right)throw Error('Modified editor not found');
+  for(let i=0;i<8;i++){body.classList.toggle('unrelated-fixture');await frames(1);}
+  if(themeWrites!==0)throw Error('Unrelated body changes rewrote Monaco theme '+themeWrites+' times');
+  body.style.setProperty(token,'#123456');await frames();
+  if(themeWrites!==1||getComputedStyle(right).getPropertyValue('--vscode-editor-background').trim()!=='#123456')throw Error('Actual palette change did not update exactly once: '+themeWrites);
+ }finally{themeObserver.disconnect();if(originalStyle===null)body.removeAttribute('style');else body.setAttribute('style',originalStyle);editor.dispose();}
+ const two=await import('../dist/editor.js?retry=1');
  const cases=[];
  for(const mode of ['same','retry'])for(const first of [0,1]){
  sa=null;sb=null;phase=mode+'-'+first+'-initial-diffs';
@@ -54,6 +73,7 @@ try{
  phase='branch-history';await (await import('./history-viewer-browser.js')).checkBranchHistory();
  phase='history-server-search';await (await import('./history-viewer-browser.js')).checkHistorySearch();
  phase='review-views';await (await import('./history-viewer-browser.js')).checkReviewViews();
+ phase='workspace-stability';await (await import('./history-viewer-browser.js')).checkWorkspaceStability();
  phase='history-refs';await (await import('./history-viewer-browser.js')).checkHistoryRefs();
  phase='graph';await (await import('./history-viewer-browser.js')).checkGraph();
  phase='image';await (await import('./history-viewer-browser.js')).checkImage();
@@ -89,6 +109,6 @@ try{
  phase='recovery';await (await import('./recovery-browser.js')).checkRecovery();
  phase='performance';const performanceReport=await (await import('./performance-browser.js')).checkPerformance({createDiff:one.createDiff,getEditorResources:one.getEditorResources});
  if(errors.length)throw Error(errors.join('; '));
- report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,performance:performanceReport,steps:['two-modules','two-diffs','survivor-update','dispose','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation','svn-history-date','commit-signature','commit-committer','reflog','stash-list','grep','history-layout','search-navigation','review-context','history-tree-pages','branch-switch','index-unstage','index-stage','partial-stage','partial-unstage','line-selection','commit','amend','branch-create','branch-delete-preview','tag-create','lightweight-tag','recovery','performance']});
+ report.textContent=JSON.stringify({pass:true,browser:navigator.userAgent,cases,performance:performanceReport,steps:['two-modules','two-diffs','survivor-update','dispose','editor-repaint','svn-copy','workspace-large','large-compare','react-controls','revision-controls','file-history','blame','tree','graph','image','image-ui','conflict-stages','path-history','submodule-badge','file-history-date','history-back-navigation','svn-history-date','commit-signature','commit-committer','reflog','stash-list','grep','history-layout','workspace-stability','search-navigation','review-context','history-tree-pages','branch-switch','index-unstage','index-stage','partial-stage','partial-unstage','line-selection','commit','amend','branch-create','branch-delete-preview','tag-create','lightweight-tag','recovery','performance']});
 }catch(e){report.textContent=JSON.stringify({pass:false,error:String(e),phase,sa,sb,errors});}
 </script>`);

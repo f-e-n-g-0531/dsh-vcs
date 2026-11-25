@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import HistoryComparison from './HistoryComparison.jsx';
+import ComparisonFocus from './ComparisonFocus.jsx';
 import {filterCommitFiles} from './history-filter.mjs';
 export function useRevisionReferences({sessionId,repositoryId,rpc,onRediscover,onReferencesLoaded}){
  const [refs,setRefs]=useState([]),[loaded,setLoaded]=useState(false),[load,setLoad]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -13,18 +14,19 @@ export function useRevisionReferences({sessionId,repositoryId,rpc,onRediscover,o
 
 function RevisionFiles({sessionId,repositoryId,base,target,rpc,t,onRediscover}){
  const [data,setData]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0),[selected,setSelected]=useState(null),[query,setQuery]=useState('');
+ const [focused,setFocused]=useState(false);
  useEffect(()=>{
-  const controller=new AbortController();setData(null);setError('');setSelected(null);
+  const controller=new AbortController();setData(null);setError('');setSelected(null);setFocused(false);
   rpc('vcs/revision-changes',{sessionId,repositoryId,base,target},controller.signal).then(value=>{if(!controller.signal.aborted)setData(value);}).catch(e=>{if(controller.signal.aborted)return;setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();});
   return()=>controller.abort();
  },[sessionId,repositoryId,base,target,retry]);
  if(error)return <p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>;
  if(!data)return <p role="status">{t('loading')}</p>;
  const files=filterCommitFiles(data.changes,query);
- return <div><label>{t('commitFileSearch')} <input aria-label={t('commitFileSearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);}}/></label><span> {files.length} / {data.changes.length}</span>
+ return <div className="vcs-revision-files" data-comparison-focused={!!selected&&focused}><div className="vcs-revision-picker"><label>{t('commitFileSearch')} <input aria-label={t('commitFileSearch')} value={query} onChange={e=>{setQuery(e.target.value);setSelected(null);setFocused(false);}}/></label><span> {files.length} / {data.changes.length}</span>
  {!!data.changes.length&&!files.length&&<p role="status">{t('emptySearch')}</p>}
- {!data.changes.length&&<p>{t('revisionEmpty')}</p>}<ul>{files.map(file=><li key={file.id}><button aria-pressed={selected===file.id} onClick={()=>setSelected(file.id)}>{file.status} · {file.oldPath?file.oldPath+' → ':''}{file.path}</button></li>)}</ul>
- {selected&&<HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} base={base} target={target} id={selected} rpc={rpc} t={t} onRediscover={onRediscover}/>}</div>;
+ {!data.changes.length&&<p>{t('revisionEmpty')}</p>}<ul>{files.map(file=><li key={file.id}><button aria-pressed={selected===file.id} onClick={()=>setSelected(file.id)}>{file.status} · {file.oldPath?file.oldPath+' → ':''}{file.path}</button></li>)}</ul></div>
+ {selected&&<div className="vcs-commit-comparison"><ComparisonFocus t={t} focused={focused} onToggle={setFocused}/><HistoryComparison key={selected} sessionId={sessionId} repositoryId={repositoryId} base={base} target={target} id={selected} rpc={rpc} t={t} onRediscover={onRediscover}/></div>}</div>;
 }
 export default function RevisionPanel(props){
  return <ScopedRevisionPanel key={JSON.stringify([props.sessionId,props.repositoryId])} {...props}/>;
@@ -45,13 +47,13 @@ function ScopedRevisionPanel({commits=[],loadRecent=false,sessionId,repositoryId
   return()=>controller.abort();
  },[loadRecent,sessionId,repositoryId,retry]);
  const available=loadRecent?recent:commits;
- return <section className="vcs-revision-panel" aria-label={t('revisionTitle')}><h3>{t('revisionTitle')}</h3><p>{t('revisionScope')}</p>
+ return <section className="vcs-revision-panel" aria-label={t('revisionTitle')}><div className="vcs-revision-controls"><h3>{t('revisionTitle')}</h3><p>{t('revisionScope')}</p>
  <button disabled={busy} onClick={reload}>{t('revisionLoadRefs')}</button><p>{t('revisionRefsScope')}</p>
  {loaded&&!busy&&!error&&<p role="status">{refs.length?`${t('revisionRefsCount')}: ${refs.length}`:t('revisionRefsEmpty')}</p>}
  {busy&&<p role="status">{t('loading')}</p>}{error&&<p role="alert">{error}</p>}{recentError&&<p role="alert">{recentError} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>}
  {[[base,setBase,'revisionBase'],[target,setTarget,'revisionTarget']].map(([value,setValue,label])=><label key={label}>{t(label)} <select aria-label={t(label)} value={value} onChange={e=>setValue(e.target.value)}><option value="">—</option>{!!available.length&&<optgroup label={t('revisionLoadedCommits')}>{available.map(c=><option key={c.id} value={c.id}>{c.id.slice(0,10)} · {c.subject}</option>)}</optgroup>}{!!refs.length&&<optgroup label={t('revisionLocalRefs')}>{refs.map(ref=><option key={ref.name} value={ref.commit}>{ref.name} · {ref.commit.slice(0,10)}</option>)}</optgroup>}{value&&!available.some(c=>c.id===value)&&!refs.some(r=>r.commit===value)&&<option value={value}>{value}</option>}</select></label>)}
  <button disabled={!base||!target} onClick={()=>{setBase(target);setTarget(base);}}>{t('revisionSwap')}</button>
- <p style={{overflowWrap:'anywhere'}}><code>{base||'—'}</code> → <code>{target||'—'}</code></p>
+ <p style={{overflowWrap:'anywhere'}}><code>{base||'—'}</code> → <code>{target||'—'}</code></p></div>
  {base&&target&&<RevisionFiles key={JSON.stringify([sessionId,repositoryId,base,target])} {...{sessionId,repositoryId,base,target,rpc,t,onRediscover}}/>}
  </section>;
 }

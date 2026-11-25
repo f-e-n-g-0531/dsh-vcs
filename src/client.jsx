@@ -3,6 +3,7 @@ import css from './style.css';
 import {createClientRpc} from './client-rpc.mjs';
 import {createStatusLimiter} from './status-limiter.mjs';
 import TextComparison from './TextComparison.jsx';
+import ComparisonFocus from './ComparisonFocus.jsx';
 import ImageComparison from './ImageComparison.jsx';
 import ConflictStages from './ConflictStages.jsx';
 import SubmoduleBadge from './SubmoduleBadge.jsx';
@@ -61,38 +62,47 @@ function useRepositoryDiscovery({session,rpc,invalidate,setStatuses}){
   const [discovery,setDiscovery]=useState(null),[repositoryId,setRepositoryId]=useState(()=>readProject(session?.cwd));
   const [scan,setScan]=useState(0),[subdirectory,setSubdirectory]=useState(''),[scanPath,setScanPath]=useState('');
   const [scanning,setScanning]=useState(false),[error,setError]=useState('');
-  const scanController=useRef(null),previousDiscovery=useRef(null),rediscovering=useRef(false);
+  const scanController=useRef(null),previousDiscovery=useRef(null),rediscovering=useRef(false),automaticRecoveryUsed=useRef(false);
   const repositories=discovery?.repositories||EMPTY_REPOSITORIES;
   useEffect(()=>{if(repositories.some(repo=>repo.id===repositoryId))saveProject(session?.cwd,repositoryId);},[session?.cwd,repositoryId,discovery]);
   useEffect(()=>{
     const controller=new AbortController();scanController.current=controller;setError('');setScanning(!!sessionId);
     if(sessionId)rpc('vcs/repositories',{sessionId,...(scanPath?{subdirectory:scanPath}:{})},controller.signal).then(value=>{
       if(!controller.signal.aborted){const next=mergeDiscovery(previousDiscovery.current,value,scanPath);rediscovering.current=false;setRepositoryId(previous=>selectProject(next.repositories,previous));setDiscovery(next);}
-    }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setScanning(false);});
+    }).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted){rediscovering.current=false;setScanning(false);}});
     return()=>controller.abort();
   },[sessionId,scan,scanPath]);
-  const rediscover=useMemo(()=>()=>{if(rediscovering.current)return;rediscovering.current=true;invalidate();scanController.current?.abort();previousDiscovery.current=null;setDiscovery(null);setStatuses({});setScanPath('');setScan(x=>x+1);},[invalidate]);
-  const rescan=rediscover;
-  return {discovery,repositories,repositoryId,setRepositoryId,scan,subdirectory,setSubdirectory,scanning,error,rescan,rediscover};
+  const rescan=useMemo(()=>()=>{if(rediscovering.current)return;automaticRecoveryUsed.current=false;rediscovering.current=true;invalidate();scanController.current?.abort();previousDiscovery.current=null;setDiscovery(null);setStatuses({});setScanPath('');setScan(x=>x+1);},[invalidate]);
+  const rediscover=useMemo(()=>()=>{
+    if(rediscovering.current||automaticRecoveryUsed.current)return false;
+    rescan();automaticRecoveryUsed.current=true;return true;
+  },[rescan]);
+  const resetRecovery=()=>{automaticRecoveryUsed.current=false;};
+  return {discovery,repositories,repositoryId,setRepositoryId,scan,subdirectory,setSubdirectory,scanning,error,rescan,rediscover,resetRecovery};
 }
 
 // Repository status loading, cancellation and the visible-window focus refresh.
 function useStatusLoading({sessionId,rpc,scheduleStatus,discovery,repositoryId,mode,visibleRepositories,setStatuses,setDetailError,rediscover,invalidate}){
   const [refresh,setRefresh]=useState(0),[historyRefresh,setHistoryRefresh]=useState(0);
-  const statusController=useRef(null),preserveStatusRefresh=useRef(false);
+  const statusController=useRef(null),preserveStatusRefresh=useRef(false),statusPending=useRef(false);
   const refreshStatuses=(preserve=false)=>{if(!preserve)setHistoryRefresh(x=>x+1);preserveStatusRefresh.current=preserve;if(!preserve)invalidate();if(!preserve)setStatuses({});setRefresh(x=>x+1);};
   useEffect(()=>{
     const controller=new AbortController(),preserve=preserveStatusRefresh.current;statusController.current=controller;preserveStatusRefresh.current=false;
     if(!preserve){setStatuses({});setDetailError('');}
-    for(const repository of visibleRepositories){
+    statusPending.current=visibleRepositories.length>0;
+    const loads=visibleRepositories.map(repository=>{
       const modeForRepo=requestMode(repository,mode);
-      scheduleStatus(()=>rpc('vcs/status',{sessionId,repositoryId:repository.id,mode:modeForRepo},controller.signal),controller.signal).then(value=>{
+      return scheduleStatus(()=>rpc('vcs/status',{sessionId,repositoryId:repository.id,mode:modeForRepo},controller.signal),controller.signal).then(value=>{
         if(!controller.signal.aborted)setStatuses(old=>({...old,[repository.id]:{...value,mode:modeForRepo}}));
-      }).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'){rediscover();return;}setStatuses(old=>({...old,[repository.id]:{error:e.message,changes:[],mode:modeForRepo}}));});
-    }
+      }).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'&&rediscover())return;setStatuses(old=>({...old,[repository.id]:{error:e.message,changes:[],mode:modeForRepo}}));});
+    });
+    if(loads.length)Promise.allSettled(loads).then(()=>{if(!controller.signal.aborted)statusPending.current=false;});
     return()=>controller.abort();
   },[sessionId,discovery,repositoryId,mode,refresh]);
-  useEffect(()=>{const focus=e=>{if(e.target===window&&sessionId&&repositoryId&&document.visibilityState==='visible')refreshStatuses(true);};window.addEventListener('focus',focus);return()=>window.removeEventListener('focus',focus);},[sessionId,repositoryId,mode]);
+  useEffect(()=>{const focus=e=>{
+    if(e.target!==window||!sessionId||!visibleRepositories.length||document.visibilityState!=='visible'||statusPending.current)return;
+    statusPending.current=true;refreshStatuses(true);
+  };window.addEventListener('focus',focus);return()=>window.removeEventListener('focus',focus);},[sessionId,visibleRepositories,mode]);
   const abortStatus=()=>statusController.current?.abort();
   return {refresh,historyRefresh,refreshStatuses,abortStatus};
 }
@@ -101,15 +111,22 @@ function useStatusLoading({sessionId,rpc,scheduleStatus,discovery,repositoryId,m
 function useComparisonLoader({sessionId,rpc,discovery,repositories,statuses,mode,reviewActive,setDetailError,setStats,rediscover}){
   const [selected,setSelected]=useState(null),[comparison,setComparison]=useState(null),[loading,setLoading]=useState(false),[tab,setTab]=useState('content');
   const [largeSelection,setLargeSelection]=useState(null),[compareRetry,setCompareRetry]=useState(0),[compareError,setCompareError]=useState(false);
-  const compareController=useRef(null);
+  const compareController=useRef(null),previousRequest=useRef(null);
   const selectedRepository=repositories.find(repo=>repo.id===selected?.repositoryId);
   const selectedStatus=selected?statuses[selected.repositoryId]:null;
   const selectionKey=JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id]);
   const large=largeSelection?.key===selectionKey&&largeSelection?.status===selectedStatus;
   useEffect(()=>setLargeSelection(null),[selectionKey,selectedStatus,reviewActive]);
   useEffect(()=>{
-    const controller=new AbortController();compareController.current=controller;setComparison(null);setCompareError(false);setDetailError('');setStats({added:0,deleted:0,count:0});setTab('content');setLoading(!!selected&&!!selectedStatus);
-    if(!reviewActive&&selected&&selectedStatus&&selectedRepository)rpc('vcs/compare',{sessionId,repositoryId:selected.repositoryId,mode:requestMode(selectedRepository,mode),id:selected.id,...(large?{large:true}:{})},controller.signal).then(value=>{if(!controller.signal.aborted)setComparison(value);}).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'){rediscover();return;}setCompareError(true);setDetailError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    const controller=new AbortController();compareController.current=controller;
+    const available=!!(!reviewActive&&selected&&selectedRepository&&selectedStatus?.changes?.some(change=>change.id===selected.id));
+    const previous=previousRequest.current;
+    const background=available&&!!comparison&&previous?.selected===selected&&previous.status!==selectedStatus&&previous.large===large&&previous.retry===compareRetry;
+    previousRequest.current=available?{selected,status:selectedStatus,large,retry:compareRetry}:null;
+    if(!background){setComparison(null);setTab('content');}
+    setCompareError(false);setDetailError('');setLoading(available&&!background);
+    if(available)rpc('vcs/compare',{sessionId,repositoryId:selected.repositoryId,mode:requestMode(selectedRepository,mode),id:selected.id,...(large?{large:true}:{})},controller.signal).then(value=>{if(!controller.signal.aborted)setComparison(value);}).catch(e=>{if(controller.signal.aborted)return;if(e.code==='vcs/rediscover-required'&&rediscover())return;setComparison(null);setCompareError(true);setDetailError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
+    if(selected&&selectedStatus&&!available&&!reviewActive)setSelected(null);
     return()=>controller.abort();
   },[selected,selectedStatus,sessionId,mode,reviewActive,large,compareRetry]);
   const reset=()=>{compareController.current?.abort();setComparison(null);setSelected(null);setDetailError('');setTab('content');setStats({added:0,deleted:0,count:0});};
@@ -124,16 +141,29 @@ function useComparisonLoader({sessionId,rpc,discovery,repositories,statuses,mode
 function useEditorLifecycle({editorNode,viewer,setStats,comparison,sessionId,discovery,selected,mode,reviewActive}){
   const [editorRetry,setEditorRetry]=useState(0),[editorReady,setEditorReady]=useState(false),[editorError,setEditorError]=useState(''),[computation,setComputation]=useState('pending');
   const [sideBySide,setSide]=useState(true),[ignoreWhitespace,setWhitespace]=useState(false),[wrap,setWrap]=useState(false);
-  const releaseEditor=useRef(()=>{});
+  const releaseEditor=useRef(()=>{}),lastContent=useRef(null);
+  const [started,setStarted]=useState(false);
+  const needsText=!!comparison&&!comparison.binary&&!reviewActive;
+  useEffect(()=>{if(needsText)setStarted(true);},[needsText]);
+  const enabled=started&&!!selected&&!reviewActive;
+  useEffect(()=>{if(!selected||reviewActive)setStarted(false);},[selected,reviewActive]);
   const failEditor=error=>{try{releaseEditor.current();}catch{}setEditorReady(false);setEditorError(error.message);};
   useEffect(()=>{
-    let disposed=false;let instance;const controller=new AbortController();setEditorReady(false);setEditorError('');
+    setEditorReady(false);setEditorError('');lastContent.current=null;
+    if(!enabled)return;
+    let disposed=false;let instance;const controller=new AbortController();
     const release=()=>{const current=instance;instance=undefined;viewer.current=null;current?.dispose();};releaseEditor.current=release;
     const link=document.createElement('link');link.rel='stylesheet';link.href=asset('editor.css');document.head.appendChild(link);
     loadEditor(asset('editor.js')+'?v='+encodeURIComponent(version)+'&retry='+editorRetry,{signal:controller.signal}).then(module=>{if(disposed)return;instance=module.createDiff(editorNode.current,{onStats:setStats,onComputation:state=>{if(!disposed)setComputation(state);}});viewer.current=instance;setEditorReady(true);}).catch(e=>{if(!disposed)failEditor(e);});
     return()=>{disposed=true;controller.abort();try{release();}finally{link.remove();}};
-  },[editorRetry]);
-  useEffect(()=>{if(!editorReady)return;try{if(!comparison||comparison.binary||reviewActive)viewer.current?.setContent({left:{text:''},right:{text:''}},'empty');else viewer.current?.setContent(comparison,JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id,comparison.path]));}catch(error){failEditor(error);}},[editorReady,comparison,sessionId,discovery,selected,mode,reviewActive]);
+  },[editorRetry,enabled]);
+  useEffect(()=>{
+    if(!editorReady||!viewer.current||reviewActive||!comparison||comparison.binary)return;
+    const key=JSON.stringify([sessionId,discovery?.cwd,selected?.repositoryId,mode,selected?.id,comparison.path]);
+    const previous=lastContent.current;
+    if(previous?.key===key&&previous.left===comparison.left.text&&previous.right===comparison.right.text)return;
+    try{viewer.current.setContent(comparison,key);lastContent.current={key,left:comparison.left.text,right:comparison.right.text};}catch(error){failEditor(error);}
+  },[editorReady,comparison,sessionId,discovery,selected,mode,reviewActive]);
   useEffect(()=>{viewer.current?.options({sideBySide,ignoreWhitespace,wrap});},[editorReady,sideBySide,ignoreWhitespace,wrap]);
   return {setEditorRetry,editorReady,editorError,computation,sideBySide,setSide,ignoreWhitespace,setWhitespace,wrap,setWrap};
 }
@@ -146,9 +176,9 @@ function useFileListState(){
 }
 
 // Keyboard review shortcuts plus reveal/scroll behaviour for the file list.
-function usePanelShortcuts({panelNode,searchNode,fileListNode,revealChange,query,setQuery,changes,selected,reviewActive,repositoryId,selectFile,tree,statusFilter,collapsedDirectories,groups,setTree,clearFilters,chosen,setCollapsedDirectories}){
+function usePanelShortcuts({panelNode,searchNode,fileListNode,revealChange,query,setQuery,changes,selected,reviewActive,workspaceFocused,repositoryId,selectFile,tree,statusFilter,collapsedDirectories,groups,setTree,clearFilters,chosen,setCollapsedDirectories}){
   const selectAdjacent=direction=>{const next=adjacentChange(changes,selected?.id,direction);if(next)selectFile(repositoryId,next.id);};
-  useEffect(()=>{const keydown=e=>{if(reviewActive)return;const action=reviewShortcut(e,panelNode.current,searchNode.current,!!query);if(!action)return;e.preventDefault();if(action==='search'){searchNode.current?.focus();searchNode.current?.select();}else if(action==='clear')setQuery('');else selectAdjacent(action);};window.addEventListener('keydown',keydown);return()=>window.removeEventListener('keydown',keydown);},[query,changes,selected,reviewActive]);
+  useEffect(()=>{const keydown=e=>{if(reviewActive)return;const action=reviewShortcut(e,panelNode.current,searchNode.current,!!query);if(!action||(workspaceFocused&&action==='search'))return;e.preventDefault();if(action==='search'){searchNode.current?.focus();searchNode.current?.select();}else if(action==='clear')setQuery('');else selectAdjacent(action);};window.addEventListener('keydown',keydown);return()=>window.removeEventListener('keydown',keydown);},[query,changes,selected,reviewActive,workspaceFocused]);
   useEffect(()=>{const key=revealChange.current;if(!key)return;const item=[...(fileListNode.current?.querySelectorAll('button[data-vcs-change]')||[])].find(node=>node.dataset.vcsChange===key);if(item){item.scrollIntoView({block:'nearest'});item.focus();revealChange.current=null;}},[tree,query,statusFilter,collapsedDirectories,groups]);
   const revealSelected=()=>{const entry=chosen;if(!entry||!selected)return;setTree(true);clearFilters();setCollapsedDirectories(old=>{const next={...old};for(const directory of directoryAncestors(entry.path))next[selected.repositoryId+'\0'+directory]=false;return next;});revealChange.current=changeKey(selected.repositoryId,entry.id);};
   return {selectAdjacent,revealSelected};
@@ -243,10 +273,10 @@ function FileBrowser({t,localeRevision,sessionId,scanning,error,groups,statuses,
 }
 
 // File head with the safe copy-path control and the diff statistics.
-function DetailHeader({t,comparison,chosen,selectedRepository,editorReady,stats,onCopyError}){
+function DetailHeader({t,comparison,chosen,selectedRepository,editorReady,stats,onCopyError,focused,onToggleFocus}){
   const [copiedPath,setCopiedPath]=useState(false);
   const copyPath=async()=>{const value=comparison?.path||chosen?.path;if(!value)return;try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(value);else {const input=document.createElement('textarea');try{input.value=value;input.style.cssText='position:fixed;opacity:0';document.body.appendChild(input);input.select();if(!document.execCommand('copy'))throw Error('copy failed');}finally{input.remove();}}setCopiedPath(true);window.setTimeout(()=>setCopiedPath(false),1500);}catch{onCopyError(t('copyFailed'));}};
-  return <div className="vcs-filehead"><strong title={comparison?.path||chosen?.path}>{selectedRepository?repositoryLabel(selectedRepository,t('workspaceRoot'))+' / ':''}{comparison?.path||chosen?.path||t('pick')}</strong><button className="vcs-copy-path" disabled={!(comparison?.path||chosen?.path)} onClick={copyPath}>{t(copiedPath?'copied':'copyPath')}</button>{copiedPath&&<span className="vcs-sr-only" role="status">{t('pathCopied')}</span>}<span className="vcs-spacer"/>{comparison&&!comparison.binary&&editorReady&&<><span className="vcs-add">+{stats.added}</span><span className="vcs-del">−{stats.deleted}</span></>}</div>;
+  return <div className="vcs-filehead"><strong title={comparison?.path||chosen?.path}>{selectedRepository?repositoryLabel(selectedRepository,t('workspaceRoot'))+' / ':''}{comparison?.path||chosen?.path||t('pick')}</strong><button className="vcs-copy-path" disabled={!(comparison?.path||chosen?.path)} onClick={copyPath}>{t(copiedPath?'copied':'copyPath')}</button>{copiedPath&&<span className="vcs-sr-only" role="status">{t('pathCopied')}</span>}<span className="vcs-spacer"/>{comparison&&!comparison.binary&&editorReady&&<><span className="vcs-add">+{stats.added}</span><span className="vcs-del">−{stats.deleted}</span></>}{(comparison||focused)&&<ComparisonFocus t={t} focused={focused} onToggle={onToggleFocus}/>}</div>;
 }
 
 // Comparison context: status, rename and the two compared labels with encodings.
@@ -279,23 +309,25 @@ function PropertyTable({t,comparison,properties,propertyNames}){
 // Bottom toolbar: editor options, diff navigation and visible change position.
 function DetailToolbar({t,editorReady,sideBySide,setSide,ignoreWhitespace,setWhitespace,wrap,setWrap,stats,overlay,comparison,viewer,changes,selected,onSelectAdjacent}){
   const reviewPosition=changePosition(changes,selected?.id);
-  return <footer className="vcs-toolbar"><button disabled={!editorReady} aria-pressed={sideBySide} onClick={()=>setSide(!sideBySide)}>{t(sideBySide?'side':'inline')}</button><label><input type="checkbox" disabled={!editorReady} checked={ignoreWhitespace} onChange={e=>setWhitespace(e.target.checked)}/>{t('whitespace')}</label><label><input type="checkbox" disabled={!editorReady} checked={wrap} onChange={e=>setWrap(e.target.checked)}/>{t('wrap')}</label><span className="vcs-spacer"/>{editorReady&&<span>{stats.count} {t('changes')}</span>}<button disabled={!editorReady||!comparison||!!overlay} onClick={()=>viewer.current?.navigate('previous')}>{t('previous')}</button><button disabled={!editorReady||!comparison||!!overlay} onClick={()=>viewer.current?.navigate('next')}>{t('next')}</button>{reviewPosition.index>0&&<span className="vcs-review-position">{t('reviewPosition',{index:reviewPosition.index,total:reviewPosition.total})}</span>}<span className="vcs-toolbar-separator"/><button title={t('fileShortcut')} disabled={!changes.length} onClick={()=>onSelectAdjacent('previous')}>{t('previousFile')}</button><button title={t('fileShortcut')} disabled={!changes.length} onClick={()=>onSelectAdjacent('next')}>{t('nextFile')}</button></footer>;
+  return <footer className="vcs-toolbar"><button disabled={!editorReady} aria-pressed={sideBySide} onClick={()=>setSide(!sideBySide)}>{t(sideBySide?'side':'inline')}</button><label><input type="checkbox" disabled={!editorReady} checked={ignoreWhitespace} onChange={e=>setWhitespace(e.target.checked)}/>{t('whitespace')}</label><label><input type="checkbox" disabled={!editorReady} checked={wrap} onChange={e=>setWrap(e.target.checked)}/>{t('wrap')}</label><span className="vcs-spacer"/>{editorReady&&comparison&&!comparison.binary&&!overlay&&<span>{stats.count} {t('changes')}</span>}<button disabled={!editorReady||!comparison||!!overlay} onClick={()=>viewer.current?.navigate('previous')}>{t('previous')}</button><button disabled={!editorReady||!comparison||!!overlay} onClick={()=>viewer.current?.navigate('next')}>{t('next')}</button>{reviewPosition.index>0&&<span className="vcs-review-position">{t('reviewPosition',{index:reviewPosition.index,total:reviewPosition.total})}</span>}<span className="vcs-toolbar-separator"/><button title={t('fileShortcut')} disabled={!changes.length} onClick={()=>onSelectAdjacent('previous')}>{t('previousFile')}</button><button title={t('fileShortcut')} disabled={!changes.length} onClick={()=>onSelectAdjacent('next')}>{t('nextFile')}</button></footer>;
 }
 
 // Detail pane: file head, comparison context/panels, tabs, diff surface, properties and toolbar.
-function DetailPane({t,comparison,selected,selectedRepository,selectedStatus,sessionId,mode,discoveryCwd,refresh,rpc,rediscover,large,selectionKey,loading,detailError,compareError,error,busy,chosen,repositoryCount,editorNode,editorReady,editorError,computation,tab,setTab,stats,onRetryEditor,onRetryCompare,onRescan,onToggleLarge,sideBySide,setSide,ignoreWhitespace,setWhitespace,wrap,setWrap,viewer,changes,onSelectAdjacent,onCopyError}){
+function DetailPane({t,comparison,selected,selectedRepository,selectedStatus,sessionId,mode,discoveryCwd,refresh,rpc,rediscover,large,selectionKey,loading,detailError,compareError,error,busy,chosen,repositoryCount,editorNode,editorReady,editorError,computation,tab,setTab,stats,onRetryEditor,onRetryCompare,onRescan,onToggleLarge,sideBySide,setSide,ignoreWhitespace,setWhitespace,wrap,setWrap,viewer,changes,onSelectAdjacent,onCopyError,focused,onToggleFocus}){
   const properties=comparison?.properties;
   const propertyNames=properties?[...new Set([...Object.keys(properties.left||{}),...Object.keys(properties.right||{})])].filter(k=>properties.left?.[k]!==properties.right?.[k]):[];
   const binarySummary=comparison?.binary?[comparison.left.label,comparison.right.label].filter(Boolean).join(' ↔ '):'';
   const overlay=detailError||(loading?t('loading'):!sessionId?t('noSession'):busy&&!chosen?t('loading'):error?error:!repositoryCount?t('noRepo'):!chosen?t('pick'):comparison?.binary?t('binary')+(binarySummary?' '+t('binaryComparison',{files:binarySummary}):''):!comparison?t('pick'):!editorReady&&!editorError?t('loading'):'');
-  return <main className="vcs-detail"><DetailHeader t={t} comparison={comparison} chosen={chosen} selectedRepository={selectedRepository} editorReady={editorReady} stats={stats} onCopyError={onCopyError}/>
-    {editorError&&<div className="vcs-notice" role="status">{t('fallback')} <button onClick={onRetryEditor}>{t('retry')}</button><details><summary>{t('diagnostics')}</summary>{editorError}</details></div>}
+  return <main className="vcs-detail"><DetailHeader t={t} comparison={comparison} chosen={chosen} selectedRepository={selectedRepository} editorReady={editorReady} stats={stats} onCopyError={onCopyError} focused={focused} onToggleFocus={onToggleFocus}/>
+    <div className="vcs-detail-content">
+    {comparison&&!comparison.binary&&editorError&&<div className="vcs-notice" role="status">{t('fallback')} <button onClick={onRetryEditor}>{t('retry')}</button><details><summary>{t('diagnostics')}</summary>{editorError}</details></div>}
     <ComparisonContext t={t} comparison={comparison}/>
     <ComparisonExtras t={t} comparison={comparison} selected={selected} selectedRepository={selectedRepository} selectedStatus={selectedStatus} sessionId={sessionId} mode={mode} discoveryCwd={discoveryCwd} refresh={refresh} rpc={rpc} rediscover={rediscover} large={large} selectionKey={selectionKey} detailError={detailError} editorError={editorError} computation={computation} onToggleLarge={onToggleLarge} onRetryCompare={onRetryCompare}/>
     {propertyNames.length>0&&<div className="vcs-tabs">{['content','properties'].map(value=><button key={value} aria-pressed={tab===value} onClick={()=>setTab(value)}>{t(value)}{value==='properties'?' ('+propertyNames.length+')':''}</button>)}</div>}
     <div className="vcs-labels"><span>{comparison?.left.label||'—'}{comparison?.left.encoding?' · '+comparison.left.encoding:''}</span><span>{comparison?.right.label||'—'}{comparison?.right.encoding?' · '+comparison.right.encoding:''}</span></div>
     <EditorBox t={t} comparison={comparison} editorNode={editorNode} editorError={editorError} overlay={overlay} tab={tab} error={error} detailError={detailError} compareError={compareError} onRetryEditor={onRetryEditor} onRetryCompare={onRetryCompare} onRescan={onRescan}/>
     {tab==='properties'&&<PropertyTable t={t} comparison={comparison} properties={properties} propertyNames={propertyNames}/>}
+    </div>
     <DetailToolbar t={t} editorReady={editorReady} sideBySide={sideBySide} setSide={setSide} ignoreWhitespace={ignoreWhitespace} setWhitespace={setWhitespace} wrap={wrap} setWrap={setWrap} stats={stats} overlay={overlay} comparison={comparison} viewer={viewer} changes={changes} selected={selected} onSelectAdjacent={onSelectAdjacent}/>
   </main>;
 }
@@ -339,7 +371,7 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     // Loaders are created before the shared reset exists; this late-bound handler keeps the
     // single invalidation path (and its state-reset order) without reordering hooks.
     const invalidateLatest=useMemo(()=>()=>invalidateRef.current?.(),[]);
-    const {discovery,repositories,repositoryId,setRepositoryId,scan,subdirectory,setSubdirectory,scanning,error,rescan,rediscover}=useRepositoryDiscovery({session,rpc,invalidate:invalidateLatest,setStatuses});
+    const {discovery,repositories,repositoryId,setRepositoryId,scan,subdirectory,setSubdirectory,scanning,error,rescan,rediscover,resetRecovery}=useRepositoryDiscovery({session,rpc,invalidate:invalidateLatest,setStatuses});
     const visibleRepositories=useMemo(()=>repositories.filter(repo=>repo.id===repositoryId),[repositories,repositoryId]);
     const gitSelected=visibleRepositories.some(repo=>repo.type==='git');
     const svnSelected=visibleRepositories.some(repo=>repo.type==='svn');
@@ -351,6 +383,10 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const reviewActive=historyActive||stashActive||reflogActive||grepActive||revisionActive;
     const {refresh,historyRefresh,refreshStatuses,abortStatus}=useStatusLoading({sessionId,rpc,scheduleStatus,discovery,repositoryId,mode,visibleRepositories,setStatuses,setDetailError,rediscover,invalidate:invalidateLatest});
     const {selected,comparison,loading,tab,setTab,large,selectionKey,selectedRepository,selectedStatus,compareError,reset:resetComparison,clearSelection,selectFile,toggleLarge,retryCompare}=useComparisonLoader({sessionId,rpc,discovery,repositories,statuses,mode,reviewActive,setDetailError,setStats,rediscover});
+    const [focusWorkspace,setFocusWorkspace]=useState(false);
+    const hasWorkspaceSelection=!!selected&&!reviewActive;
+    const workspaceFocused=hasWorkspaceSelection&&focusWorkspace;
+    useEffect(()=>{if(!hasWorkspaceSelection)setFocusWorkspace(false);},[hasWorkspaceSelection]);
     const invalidate=()=>{abortStatus();resetComparison();};
     invalidateRef.current=invalidate; // Only read from handlers and settled promises, so the latest reset is used.
     const openReviewView=view=>{clearSelection();setReviewView(view);};
@@ -364,26 +400,26 @@ export function createPage(ctx,{initialView='workspace',onViewChange}={}){
     const toggleDirectory=useMemo(()=>(key,closed)=>setCollapsedDirectories(old=>({...old,[key]:!closed})),[]);
     const setTreeExpanded=expanded=>setCollapsedDirectories(old=>{const next={...old};for(const group of displayedGroups)for(const id of treeDirectoryIds(group.changeTree))next[group.repository.id+'\0'+id]=!expanded;return next;});
     const busy=scanning||visibleRepositories.some(repo=>!statuses[repo.id]);
-    const {selectAdjacent,revealSelected}=usePanelShortcuts({panelNode,searchNode,fileListNode,revealChange,query,setQuery,changes,selected,reviewActive,repositoryId,selectFile,tree,statusFilter,collapsedDirectories,groups,setTree,clearFilters,chosen,setCollapsedDirectories});
-    return <section ref={panelNode} className="vcs-root" aria-label={t('title')}><style>{css}</style>
+    const {selectAdjacent,revealSelected}=usePanelShortcuts({panelNode,searchNode,fileListNode,revealChange,query,setQuery,changes,selected,reviewActive,workspaceFocused,repositoryId,selectFile,tree,statusFilter,collapsedDirectories,groups,setTree,clearFilters,chosen,setCollapsedDirectories});
+    return <section ref={panelNode} className="vcs-root" data-workspace-focused={workspaceFocused} aria-label={t('title')}><style>{css}</style>
       <div className="vcs-primary-toolbar">
       <RepositoryToolbar t={t} gitSelected={gitSelected} historyActive={historyActive} stashActive={stashActive} reflogActive={reflogActive} grepActive={grepActive} revisionActive={revisionActive} reviewActive={reviewActive} setReviewView={setReviewView} openReviewView={openReviewView}/>
-      <RepositoryControls t={t} repositories={repositories} repositoryId={repositoryId} gitSelected={gitSelected} scanning={scanning} mode={mode} reviewActive={reviewActive} busy={busy} sessionId={sessionId} discovery={discovery} sessionCwd={session?.cwd} subdirectory={subdirectory} onSubdirectoryChange={setSubdirectory} onRescan={rescan} onRepositoryChange={value=>{invalidate();setStatuses({});setRepositoryId(value);}} onModeChange={value=>{invalidate();setStatuses({});setMode(value);}} onRefresh={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}} onBack={()=>ctx.layout.selectPanel(null)}/>
+      <RepositoryControls t={t} repositories={repositories} repositoryId={repositoryId} gitSelected={gitSelected} scanning={scanning} mode={mode} reviewActive={reviewActive} busy={busy} sessionId={sessionId} discovery={discovery} sessionCwd={session?.cwd} subdirectory={subdirectory} onSubdirectoryChange={setSubdirectory} onRescan={rescan} onRepositoryChange={value=>{resetRecovery();invalidate();setStatuses({});setRepositoryId(value);}} onModeChange={value=>{invalidate();setStatuses({});setMode(value);}} onRefresh={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rescan();}}} onBack={()=>ctx.layout.selectPanel(null)}/>
       </div>
-      <PanelHeader t={t} repositories={repositories} repositoryId={repositoryId} gitSelected={gitSelected} scanning={scanning} mode={mode} reviewActive={reviewActive} busy={busy} sessionId={sessionId} discovery={discovery} sessionCwd={session?.cwd} subdirectory={subdirectory} onSubdirectoryChange={setSubdirectory} onRescan={rescan} onRepositoryChange={value=>{invalidate();setStatuses({});setRepositoryId(value);}} onModeChange={value=>{invalidate();setStatuses({});setMode(value);}} onRefresh={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}} onBack={()=>ctx.layout.selectPanel(null)}/>
+      <PanelHeader t={t} repositories={repositories} repositoryId={repositoryId} gitSelected={gitSelected} scanning={scanning} mode={mode} reviewActive={reviewActive} busy={busy} sessionId={sessionId} discovery={discovery} sessionCwd={session?.cwd} subdirectory={subdirectory} onSubdirectoryChange={setSubdirectory} onRescan={rescan} onRepositoryChange={value=>{resetRecovery();invalidate();setStatuses({});setRepositoryId(value);}} onModeChange={value=>{invalidate();setStatuses({});setMode(value);}} onRefresh={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rescan();}}} onBack={()=>ctx.layout.selectPanel(null)}/>
       <div className="vcs-operations" hidden={!gitSelected||reviewActive||mode==='all'}>
-      {!reviewActive&&gitSelected&&mode==='staged'&&statuses[repositoryId]?.mode==='staged'&&!statuses[repositoryId]?.error&&statuses[repositoryId]?.changes?.length>0&&<CommitPanel sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onCommitted={()=>{clearIndexUnknown(repositoryId);clearSelection();rediscover();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/> }
-      {!reviewActive&&gitSelected&&mode==='staged'&&statuses[repositoryId]?.mode==='staged'&&!statuses[repositoryId]?.error&&Array.isArray(statuses[repositoryId]?.changes)&&<AmendPanel sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onAmended={()=>{clearIndexUnknown(repositoryId);clearSelection();rediscover();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rediscover();}}}/> }
-      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&chosen.worktreeStatus===' '&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<IndexUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
-      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus===' '&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<IndexStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
-      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&[' ','M'].includes(chosen.indexStatus)&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<PartialStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
-      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&[' ','M'].includes(chosen.worktreeStatus)&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<PartialUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
-      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&[' ','M'].includes(chosen.indexStatus)&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<LineStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
-      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&[' ','M'].includes(chosen.worktreeStatus)&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<LineUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rediscover();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&statuses[repositoryId]?.mode==='staged'&&!statuses[repositoryId]?.error&&statuses[repositoryId]?.changes?.length>0&&<CommitPanel sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onCommitted={()=>{clearIndexUnknown(repositoryId);clearSelection();rescan();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rescan();}}}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&statuses[repositoryId]?.mode==='staged'&&!statuses[repositoryId]?.error&&Array.isArray(statuses[repositoryId]?.changes)&&<AmendPanel sessionId={sessionId} repositoryId={repositoryId} mode={mode} refresh={refresh} scope={scan} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onAmended={()=>{clearIndexUnknown(repositoryId);clearSelection();rescan();}} onRediscover={()=>{if(!indexPendingRef.current.has(repositoryId)){clearIndexUnknown(repositoryId);rescan();}}}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&chosen.worktreeStatus===' '&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<IndexUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rescan();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus===' '&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<IndexStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rescan();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&[' ','M'].includes(chosen.indexStatus)&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&comparison.status==='modified'&&<PartialStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rescan();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&[' ','M'].includes(chosen.worktreeStatus)&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<PartialUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rescan();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='unstaged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&[' ','M'].includes(chosen.indexStatus)&&chosen.worktreeStatus==='M'&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<LineStage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onStaged={()=>{clearIndexUnknown(repositoryId);rescan();}} onRediscover={rediscover}/> }
+      {!reviewActive&&gitSelected&&mode==='staged'&&selected?.repositoryId===repositoryId&&comparison&&chosen?.status==='modified'&&chosen.indexStatus==='M'&&[' ','M'].includes(chosen.worktreeStatus)&&!chosen.oldPath&&!chosen.submodule&&!comparison.submodule&&!comparison.oldPath&&!comparison.binary&&!comparison.large&&!comparison.special&&!comparison.symlink&&!comparison.image&&comparison.preview?.kind!=='special'&&comparison.status==='modified'&&<LineUnstage key={JSON.stringify([sessionId,repositoryId,selected.id,refresh,scan,mode])} sessionId={sessionId} repositoryId={repositoryId} id={selected.id} mode={mode} refresh={refresh} rpc={indexRpc} t={t} pending={!!indexPending[repositoryId]} blocked={!!indexUnknown[repositoryId]} onUnknown={()=>markIndexUnknown(repositoryId)} onUnstaged={()=>{clearIndexUnknown(repositoryId);rescan();}} onRediscover={rediscover}/> }
       </div>
       {visibleRepositories.filter(repo=>repo.type==='svn'&&!reviewActive).map(repo=><React.Fragment key={JSON.stringify([sessionId,repo.id,scan,refresh])}><SvnIdentity repositoryId={repo.id} {...{sessionId,rpc,t}} onRediscover={rediscover}/></React.Fragment>)}
       <ReviewPanels sessionId={sessionId} repositoryId={repositoryId} svnWorkingCopy={svnSelected?visibleRepositories[0]?.root:undefined} historyRefresh={historyRefresh} scan={scan} rpc={rpc} t={t} rediscover={rediscover} historyActive={historyActive} stashActive={stashActive} reflogActive={reflogActive} grepActive={grepActive} revisionActive={revisionActive} svnSelected={svnSelected} gitSelected={gitSelected}/>
-      <div className="vcs-body" hidden={reviewActive} aria-label={t('workspaceView')}><FileBrowser t={t} localeRevision={localeRevision} sessionId={sessionId} scanning={scanning} error={error} groups={displayedGroups} statuses={statuses} query={query} statusFilter={statusFilter} statusCounts={statusCounts} changes={changes} tree={tree} collapsedDirectories={collapsedDirectories} selected={selected} mode={mode} searchNode={searchNode} fileListNode={fileListNode} chosen={chosen} onQuery={setQuery} onStatusFilter={setStatusFilter} onClearFilters={clearFilters} onToggleTree={()=>setTree(!tree)} onExpandAll={()=>setTreeExpanded(true)} onCollapseAll={()=>setTreeExpanded(false)} onRevealSelected={revealSelected} onSelect={selectFile} onToggleDirectory={toggleDirectory} onRescan={rescan}/><DetailPane t={t} comparison={comparison} selected={selected} selectedRepository={selectedRepository} selectedStatus={selectedStatus} sessionId={sessionId} mode={mode} discoveryCwd={discovery?.cwd} refresh={refresh} rpc={rpc} rediscover={rediscover} large={large} selectionKey={selectionKey} loading={loading} detailError={detailError} compareError={compareError} error={error} busy={busy} chosen={chosen} repositoryCount={repositories.length} editorNode={editorNode} editorReady={editorReady} editorError={editorError} computation={computation} tab={tab} setTab={setTab} stats={stats} onRetryEditor={()=>setEditorRetry(x=>x+1)} onRetryCompare={retryCompare} onRescan={rescan} onToggleLarge={toggleLarge} sideBySide={sideBySide} setSide={setSide} ignoreWhitespace={ignoreWhitespace} setWhitespace={setWhitespace} wrap={wrap} setWrap={setWrap} viewer={viewer} changes={changes} onSelectAdjacent={selectAdjacent} onCopyError={setDetailError}/></div>
+      <div className="vcs-body" hidden={reviewActive} aria-label={t('workspaceView')}><FileBrowser t={t} localeRevision={localeRevision} sessionId={sessionId} scanning={scanning} error={error} groups={displayedGroups} statuses={statuses} query={query} statusFilter={statusFilter} statusCounts={statusCounts} changes={changes} tree={tree} collapsedDirectories={collapsedDirectories} selected={selected} mode={mode} searchNode={searchNode} fileListNode={fileListNode} chosen={chosen} onQuery={setQuery} onStatusFilter={setStatusFilter} onClearFilters={clearFilters} onToggleTree={()=>setTree(!tree)} onExpandAll={()=>setTreeExpanded(true)} onCollapseAll={()=>setTreeExpanded(false)} onRevealSelected={revealSelected} onSelect={selectFile} onToggleDirectory={toggleDirectory} onRescan={rescan}/><DetailPane t={t} comparison={comparison} selected={selected} selectedRepository={selectedRepository} selectedStatus={selectedStatus} sessionId={sessionId} mode={mode} discoveryCwd={discovery?.cwd} refresh={refresh} rpc={rpc} rediscover={rediscover} large={large} selectionKey={selectionKey} loading={loading} detailError={detailError} compareError={compareError} error={error} busy={busy} chosen={chosen} repositoryCount={repositories.length} editorNode={editorNode} editorReady={editorReady} editorError={editorError} computation={computation} tab={tab} setTab={setTab} stats={stats} onRetryEditor={()=>setEditorRetry(x=>x+1)} onRetryCompare={retryCompare} onRescan={rescan} onToggleLarge={toggleLarge} sideBySide={sideBySide} setSide={setSide} ignoreWhitespace={ignoreWhitespace} setWhitespace={setWhitespace} wrap={wrap} setWrap={setWrap} viewer={viewer} changes={changes} onSelectAdjacent={selectAdjacent} onCopyError={setDetailError} focused={workspaceFocused} onToggleFocus={setFocusWorkspace}/></div>
     </section>;
   }
   return Page;

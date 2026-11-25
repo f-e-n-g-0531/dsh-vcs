@@ -29,5 +29,5 @@ test('workspace setContent failure is local and editor retry does not reload the
 });
 test('workspace cleanup removes CSS even when editor disposal throws',async()=>{
  let links=0,disposed=0;const document={baseURI:'https://fixture.test/',visibilityState:'visible',head:{appendChild(){links++;}},createElement:()=>({remove(){links--;}})};const f=fixture(async()=>comparison,{document,loadEditor:async()=>({createDiff:()=>({setContent(){},options(){},dispose(){disposed++;throw Error('dispose failure');}})})});
- await f.h.flush();assert.equal(links,1);assert.throws(()=>f.h.dispose(),/dispose failure/);assert.equal(disposed,1);assert.equal(links,0);
+ await f.h.flush();assert.equal(links,0);await select(f);assert.equal(links,1);assert.throws(()=>f.h.dispose(),/dispose failure/);assert.equal(disposed,1);assert.equal(links,0);
 });

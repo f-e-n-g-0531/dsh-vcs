@@ -14,6 +14,7 @@ export {checkFollowHistory} from './follow-history-browser.jsx';
 export {checkBranchHistory} from './branch-history-browser.jsx';
 export {checkHistorySearch} from './history-search-browser.jsx';
 export {checkReviewViews} from './review-views-browser.jsx';
+export {checkWorkspaceStability} from './workspace-stability-browser.jsx';
 export {checkHistoryRefs} from './history-refs-browser.jsx';
 export {checkImageUI} from './image-ui-browser.jsx';
 export {checkConflictStages} from './conflict-stages-browser.jsx';

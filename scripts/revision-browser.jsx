@@ -3,8 +3,11 @@ import locales from '../src/locales.json';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import RevisionPanel from '../src/RevisionPanel.jsx';
+import css from '../src/style.css';
 export async function checkRevisions(){
- const host=document.createElement('div');document.body.appendChild(host);const root=createRoot(host);
+ const host=document.createElement('div');host.className='vcs-root';host.style.cssText='width:1000px;height:800px';document.body.appendChild(host);
+ const style=document.createElement('style');style.textContent=css;host.append(style);
+ const mount=document.createElement('div');mount.style.cssText='display:flex;flex:1;min-height:0';host.append(mount);const root=createRoot(mount);
  const a='a'.repeat(40),b='b'.repeat(40);let delayed,oldSignal,refLoads=0,refResolve,refSignal;const calls=[];
  const wait=async fn=>{for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,25));}throw Error('Revision UI timeout');};
  const button=text=>[...host.querySelectorAll('button')].find(n=>n.textContent.includes(text));
@@ -24,6 +27,14 @@ export async function checkRevisions(){
  root.render(<RevisionPanel commits={[{id:a,subject:'first'},{id:b,subject:'second'}]} sessionId="s" repositoryId="r" rpc={rpc} t={key=>key} onRediscover={()=>{throw Error('Unexpected rediscovery');}}/>);
  await wait(()=>host.querySelectorAll('select:not([aria-label=historyBranch]):not([aria-label="历史起点（本地引用）"]):not([aria-label="History tip (local reference)"])').length===2);choose(0,a);choose(1,b);
  await wait(()=>button('pair.txt'));button('pair.txt').click();await wait(()=>button('historyBasic'));button('historyBasic').click();await wait(()=>host.textContent.includes('right revision'));
+  const focus=button('comparisonFocus'), beforeFocus=calls.length, viewer=host.querySelector('.vcs-history-editor-host');
+  const initialHeight=viewer.clientHeight;
+  const hidden=selector=>getComputedStyle(host.querySelector(selector)).display==='none';
+  focus.click();await wait(()=>focus.getAttribute('aria-pressed')==='true');
+  if(!hidden('.vcs-revision-controls')||!hidden('.vcs-revision-picker')||viewer.clientHeight<=initialHeight)throw Error('Revision focus did not enlarge the editor and hide controls');
+  if(!host.querySelector('.vcs-revision-files[data-comparison-focused=true]')||focus.textContent!=='comparisonRestore'||host.querySelector('.vcs-history-editor-host')!==viewer||calls.length!==beforeFocus)throw Error('Revision focus reset the active Diff');
+  focus.click();await wait(()=>focus.getAttribute('aria-pressed')==='false');
+  if(hidden('.vcs-revision-controls')||hidden('.vcs-revision-picker')||button('pair.txt').getAttribute('aria-pressed')!=='true'||calls.length!==beforeFocus)throw Error('Revision focus restore lost the file selection');
  const input=host.querySelector('input'),countBefore=calls.length;
  const enter=value=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));};
  enter('no-match');await wait(()=>host.textContent.includes('emptySearch'));

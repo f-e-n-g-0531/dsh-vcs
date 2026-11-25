@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import HistoryViewer from './HistoryViewer.jsx';
+import ComparisonFocus from './ComparisonFocus.jsx';
 import {filterSvnHistory} from './svn-history-filter.mjs';
 import {mergeSvnHistoryWindow} from './svn-history-window.mjs';
 import {previousSvnRevision} from './svn-revision.mjs';
@@ -38,8 +39,9 @@ function Detail({sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscov
  const [data,setData]=useState(null),[selection,setSelection]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0),[query,setQuery]=useState(''),[focused,setFocused]=useState(false);
  const [detailTab,setDetailTab]=useState('changes');
  useEffect(()=>{const c=new AbortController();setData(null);setSelection(null);setError('');rpc('vcs/svn-detail',{sessionId,repositoryId,token,snapshot,revision},c.signal).then(v=>{if(!c.signal.aborted)setData(v);}).catch(e=>{if(!c.signal.aborted){setError(e.message);if(e.code==='vcs/rediscover-required')onRediscover();}});return()=>c.abort();},[retry]);
+ const comparing=selection?.mode==='compare';
  const files=(data?.changes||[]).filter(change=>change.path.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
- return <section className={'vcs-commit-details'+(focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}>
+ return <section className={'vcs-commit-details'+(comparing&&focused?' vcs-commit-focused':'')} aria-label={t('commitDetails')}>
   {error?<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>{t('retry')}</button></p>:!data?<p role="status">{t('loading')}</p>:<div className="vcs-commit-sidebar">
    <nav className="vcs-commit-detail-tabs" aria-label={t('commitDetails')}>{['commit','changes'].map(tab=><button key={tab} type="button" aria-pressed={detailTab===tab} onClick={()=>setDetailTab(tab)}>{t(tab==='commit'?'commitInfoTab':'commitChangesTab')}</button>)}</nav>
    <header className="vcs-commit-summary" hidden={detailTab!=='commit'}><h3>{data.message?.split(/\r?\n/)[0]||'r'+revision}</h3><code className="vcs-commit-oid">r{revision}</code><p>{data.author} · {data.date}</p><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{data.message}</pre><p>{previousSvnRevision(revision)===null?t('commitRoot'):'r'+previousSvnRevision(revision)} → r{revision}</p></header>
@@ -51,7 +53,7 @@ function Detail({sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscov
    </aside>
   </div>}
   <div className="vcs-commit-review" hidden={detailTab!=='changes'}><div className="vcs-commit-comparison" aria-label={t('comparisonContext')}>
-   {selection&&<button className="vcs-comparison-focus" aria-pressed={focused} onClick={()=>setFocused(v=>!v)}>{t(focused?'comparisonRestore':'comparisonFocus')}</button>}
+   {comparing&&<ComparisonFocus t={t} focused={focused} onToggle={setFocused}/>}
    {selection?<Selected key={JSON.stringify(selection)} {...{sessionId,repositoryId,token,snapshot,revision,rpc,t,onRediscover}} {...selection}/>:<p role="status">{t('pick')}</p>}
   </div></div>
  </section>;
