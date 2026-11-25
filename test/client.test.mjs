@@ -174,7 +174,7 @@ test('refresh is manual or on visible window focus, never periodic',async()=>{
  assert.doesNotMatch(source,/setInterval|clearInterval|30000/);
  assert.ok(source.includes("window.addEventListener('focus',focus)"));
  assert.ok(source.includes("window.removeEventListener('focus',focus)"));
- assert.ok(source.includes("sessionId&&repositoryId&&document.visibilityState==='visible'"));
+ assert.ok(source.includes("if(e.target!==window||!sessionId||!visibleRepositories.length||document.visibilityState!=='visible'||statusPending.current)return;"));
  assert.ok(source.includes('refreshStatuses(true)'));
  const locales=JSON.parse(await readFile(new URL('../src/locales.json',import.meta.url),'utf8'));
  assert.equal(locales.zh.autoRefresh,'手动或窗口聚焦时刷新');

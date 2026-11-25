@@ -7,7 +7,8 @@ test('review modes have one mutually-exclusive state and one cancellation transi
  for(const old of ['setHistoryOpen','setStashOpen','setGrepOpen'])assert.ok(!source.includes(old));
  for(const view of ['history','stash','grep'])assert.ok(source.includes("openReviewView('"+view+"')"));
  assert.ok(source.includes('[selected,selectedStatus,sessionId,mode,reviewActive,large,compareRetry]'));
- assert.ok(source.includes('if(!reviewActive&&selected&&selectedStatus&&selectedRepository)'));
+ assert.ok(source.includes('const available=!!(!reviewActive&&selected&&selectedRepository&&selectedStatus?.changes?.some(change=>change.id===selected.id))'));
+ assert.ok(source.includes("if(available)rpc('vcs/compare'"));
 });
 test('content search remounts its request owner when Session or repository changes',async()=>{
  const source=await readFile(new URL('../src/GrepPanel.jsx',import.meta.url),'utf8');
